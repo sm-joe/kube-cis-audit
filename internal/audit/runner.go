@@ -60,12 +60,16 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if strings.TrimSpace(nodeName) == "" {
 		return Report{}, fmt.Errorf("node name is required; set NODE_NAME or pass --node-name")
 	}
-	if strings.TrimSpace(o.HostRoot) == "" {
-		return Report{}, fmt.Errorf("host root is required")
-	}
-	hostRoot, err := filepath.Abs(o.HostRoot)
-	if err != nil {
-		return Report{}, fmt.Errorf("resolve host root: %w", err)
+	var hostRoot string
+	if strings.TrimSpace(o.MetadataFile) == "" {
+		if strings.TrimSpace(o.HostRoot) == "" {
+			return Report{}, fmt.Errorf("either host root or metadata file is required")
+		}
+		var err error
+		hostRoot, err = filepath.Abs(o.HostRoot)
+		if err != nil {
+			return Report{}, fmt.Errorf("resolve host root: %w", err)
+		}
 	}
 	bench, err := readSelectedBenchmark(o.ConfigDir, o.Benchmark)
 	if err != nil {
@@ -81,6 +85,19 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		CompatibilityStatus: bench.CompatibilityStatus,
 		CompatibilityNote:   bench.CompatibilityNote,
 	}
+	var metadata NodeMetadataSnapshot
+	if o.MetadataFile != "" {
+		metadata, err = readNodeMetadataSnapshot(o.MetadataFile, nodeName)
+		if err != nil {
+			metadata = NodeMetadataSnapshot{NodeName: nodeName, Files: map[string]NodeFileMetadata{}}
+			metadataError := err.Error()
+			for _, c := range bench.Checks {
+				if strings.EqualFold(c.Target, "node") && (c.Kind == "host_file_mode" || c.Kind == "host_file_exists") {
+					metadata.Files[c.Path] = NodeFileMetadata{Error: metadataError}
+				}
+			}
+		}
+	}
 	for _, c := range bench.Checks {
 		// Node-local mode intentionally runs only checks explicitly targeted at
 		// worker/control-plane node configuration and backed by host file data.
@@ -90,7 +107,12 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" {
 			continue
 		}
-		r := evaluateNodeHostCheck(hostRoot, nodeName, c)
+		var r Result
+		if o.MetadataFile != "" {
+			r = evaluateNodeHostCheckFromMetadata(nodeName, c, metadata)
+		} else {
+			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
+		}
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
