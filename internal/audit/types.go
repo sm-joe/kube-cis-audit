@@ -72,4 +72,4 @@ type Report struct {
 	Summary             Summary   `json:"summary"`
 }
 
-type Options struct{ Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace, MetadataFile string }
+type Options struct{ Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace string }

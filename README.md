@@ -9,7 +9,7 @@ A Go-based, read-only Kubernetes security configuration auditor. Checks are desc
 - Detects the Kubernetes server version through discovery and selects a benchmark YAML by the configured Kubernetes minor-version mapping.
 - Targets: `master`, `node`, and `policies`; select `all` to include every configured target.
 - Read-only Kubernetes API checks for workload security context, NetworkPolicy presence, and cluster-admin bindings.
-- Host filesystem metadata checks for explicitly allowlisted node files, collected by a narrowly scoped helper and evaluated by the unprivileged auditor.
+- Host filesystem checks for node/control-plane configuration files when the host root is mounted at `/host`.
 - PASS / FAIL / WARN / MANUAL / NOT_ASSESSED / INFO terminal output, structured JSON evidence, remediation text, and a summary.
 - Credential selection: explicit `--kubeconfig` first; otherwise in-cluster ServiceAccount credentials when the Kubernetes service environment is present; otherwise standard client-go kubeconfig loading (`KUBECONFIG`, then `~/.kube/config`). If none is usable, the error explains how to configure access.
 
@@ -50,7 +50,7 @@ docker run --rm -v "$HOME/.kube:/home/nonroot/.kube:ro" \
   -e KUBECONFIG=/home/nonroot/.kube/config kubecis:0.1.0 scan --output text
 ```
 
-The default image runs non-root and has a read-only root filesystem when deployed with the supplied Job. Standalone `node-audit` can inspect a read-only host mount using `--host-root`. For the DaemonSet deployment, use the dedicated `node-metadata` helper: it mounts only `/var/lib/kubelet` read-only, uses `CAP_DAC_READ_SEARCH` to inspect metadata behind restrictive directory permissions, and publishes an allowlisted metadata-only snapshot. The main auditor remains non-root with all capabilities dropped. Neither container uses privileged mode or the host PID/network namespace.
+The default image runs non-root and has a read-only root filesystem when deployed with the supplied Job. For host-level checks, mount the host filesystem read-only at `/host` and set `--host-root /host`. Do not use privileged mode or host PID namespace for these file metadata checks.
 
 ## Kubernetes Job
 
@@ -64,27 +64,6 @@ kubectl -n kube-system logs job/kubecis-audit
 
 The supplied Job runs API/policy checks only and uses a minimal read-only ClusterRole. For node/control-plane file checks, schedule a separate per-node workload with a read-only host-root mount and suitable tolerations/affinity. Control-plane nodes in managed services are generally not accessible; those controls should report NOT_ASSESSED or MANUAL, not PASS.
 
-## Node-level audit (Milestone 2.2)
-
-For per-node checks, build and publish the new `milestone-2-step-2.2-metadata-helper` tag, then use it in both image references in `deploy/node-auditor-daemonset.yaml`. If the GHCR package is private, create `ghcr-pull-secret` in `kube-system` using `deploy/create-ghcr-pull-secret.ps1` and a GitHub PAT classic with `read:packages`.
-
-The DaemonSet contains two containers:
-
-- `node-auditor`: UID/GID 10001, no Linux capabilities, read-only root filesystem, and read-only access to the metadata snapshot.
-- `node-metadata`: UID 0 with only `DAC_READ_SEARCH`, no privilege escalation, RuntimeDefault seccomp, and a read-only root filesystem. Its hostPath is limited to `/var/lib/kubelet`; code currently allowlists only `config.yaml` and uses `lstat` without reading file contents.
-
-The helper's capability is sensitive: it can technically bypass read/search permissions within its mounted directory. Review this exception with your cluster security team and admission policy before deployment. Do not replace it with privileged mode or a full host-root mount.
-
-Apply and inspect:
-
-```powershell
-kubectl apply -f .\deploy\node-auditor-daemonset.yaml
-kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
-kubectl -n kube-system logs -l app.kubernetes.io/name=kubecis-node-auditor --all-containers=true --prefix=true
-```
-
-The helper refreshes metadata every 15 seconds; the auditor reports every 24 hours. If metadata is unavailable or older than two minutes, the check remains `NOT_ASSESSED`.
-
 ## YAML check schema
 
 Each benchmark directory contains `benchmark.yaml`. A check has an ID, title, target, evaluator kind, scored flag, and optional remediation. The evaluator kind selects Go logic; YAML controls which checks are enabled and their benchmark metadata.
@@ -93,7 +72,7 @@ Supported evaluator kinds:
 
 | Kind | Scope | Behaviour |
 |---|---|---|
-| `api_policy_control` | policies | Inspects Pod Security Admission namespace labels and discovers selected VAP/webhook candidates. Effective enforcement remains MANUAL unless API-server settings and policy scope can be verified. |
+| `api_policy_control` | policies | Inventories Pod Security Admission labels, Pod-matching ValidatingAdmissionPolicy bindings, and validating webhooks by actual resource rules. Distinguishes Deny from Warn/Audit and reports incomplete API inventory as NOT_ASSESSED; discovered candidates remain MANUAL pending effective-enforcement review. |
 | `api_pod_non_root` | policies | Inspects regular, init and ephemeral containers, resolving container-level overrides over Pod-level `runAsNonRoot` and `runAsUser`. Missing explicit identity evidence is WARN, not a claim that the image runs as root. |
 | `api_pod_seccomp` | policies | Inspects effective Pod/container seccomp settings. Explicit `RuntimeDefault` and valid `Localhost` profiles pass; `Unconfined` or missing profiles fail this pod-spec check. |
 | `api_network_policy` | policies | Checks for at least one NetworkPolicy object in every namespace, including system namespaces. Presence does not prove effective isolation or CNI enforcement. |
@@ -123,7 +102,7 @@ This project does not bundle or reproduce the full CIS Benchmark.
 
 ### CIS 2.1.0 starter-profile limitations
 
-The `cis-2.1.0` directory is a limited starter profile, not a complete benchmark implementation. It currently includes selected checks only. Pod checks evaluate non-terminal Pods in all namespaces and effective pod/container security contexts; they do not inspect controller templates or image metadata. Pod Security Admission coverage is inferred from namespace `pod-security.kubernetes.io/enforce` labels and does not prove the admission plugin is enabled or that Kyverno/Gatekeeper policies are effective. The node DaemonSet uses a metadata helper for the allowlisted kubelet config file; the helper requires review/approval for `CAP_DAC_READ_SEARCH` and a read-only `/var/lib/kubelet` hostPath. Managed control planes may not expose host files at all.
+The `cis-2.1.0` directory is a limited starter profile, not a complete benchmark implementation. It currently includes selected checks only. Pod checks evaluate non-terminal Pods in all namespaces and effective pod/container security contexts; they do not inspect controller templates or image metadata. Pod Security Admission coverage is inferred from namespace `pod-security.kubernetes.io/enforce` labels and does not prove the admission plugin is enabled or that Kyverno/Gatekeeper policies are effective. Host filesystem checks require the relevant node filesystem to be mounted at `--host-root`; a single Job only inspects the node on which that Job runs. Use a DaemonSet or a dedicated per-node collection design for complete worker-node coverage. Managed control planes may not expose host files at all.
 
 
 ## Audit result semantics (Milestone 1)
@@ -139,7 +118,7 @@ KubeCIS distinguishes a verified violation from missing evidence:
 
 Each result can include structured `evidence` entries in JSON and corresponding evidence lines in text output. Missing kubelet/control-plane host mounts are `NOT_ASSESSED`, not `FAIL`. Pod security evaluation includes regular, init and ephemeral containers and honours container-level overrides over Pod-level security context. A missing `runAsNonRoot`/`runAsUser` declaration is reported as insufficient explicit evidence rather than a claim that the image is running as root. NetworkPolicy presence is checked across all namespaces; presence alone is not proof of isolation or CNI enforcement.
 
-The `api_policy_control` evaluator does not claim a policy engine is effective merely because a webhook or policy object exists. Alternative mechanisms and fully labelled PSA namespaces require manual verification of API-server configuration, policy rules, binding scope and exemptions. The Job ClusterRole includes read-only access to the admissionregistration resources used for this discovery.
+The `api_policy_control` evaluator does not claim a policy engine is effective merely because a webhook or policy object exists. It matches validating webhooks and ValidatingAdmissionPolicy bindings against Pod CREATE/UPDATE requests, distinguishes Deny from Warn/Audit actions, and surfaces incomplete inventory. Discovered candidates and full PSA namespace-label coverage remain MANUAL pending review of CEL expressions, selectors, exclusions, parameters, webhook endpoint behaviour, API-server configuration and exemptions. The Job ClusterRole includes read-only access to the admissionregistration resources used for this discovery. See `docs/MILESTONE-2-STEP-2.3.md`.
 
 ## Node-level host assessment (Linux)
 

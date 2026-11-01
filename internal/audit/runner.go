@@ -60,16 +60,12 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if strings.TrimSpace(nodeName) == "" {
 		return Report{}, fmt.Errorf("node name is required; set NODE_NAME or pass --node-name")
 	}
-	var hostRoot string
-	if strings.TrimSpace(o.MetadataFile) == "" {
-		if strings.TrimSpace(o.HostRoot) == "" {
-			return Report{}, fmt.Errorf("either host root or metadata file is required")
-		}
-		var err error
-		hostRoot, err = filepath.Abs(o.HostRoot)
-		if err != nil {
-			return Report{}, fmt.Errorf("resolve host root: %w", err)
-		}
+	if strings.TrimSpace(o.HostRoot) == "" {
+		return Report{}, fmt.Errorf("host root is required")
+	}
+	hostRoot, err := filepath.Abs(o.HostRoot)
+	if err != nil {
+		return Report{}, fmt.Errorf("resolve host root: %w", err)
 	}
 	bench, err := readSelectedBenchmark(o.ConfigDir, o.Benchmark)
 	if err != nil {
@@ -85,19 +81,6 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		CompatibilityStatus: bench.CompatibilityStatus,
 		CompatibilityNote:   bench.CompatibilityNote,
 	}
-	var metadata NodeMetadataSnapshot
-	if o.MetadataFile != "" {
-		metadata, err = readNodeMetadataSnapshot(o.MetadataFile, nodeName)
-		if err != nil {
-			metadata = NodeMetadataSnapshot{NodeName: nodeName, Files: map[string]NodeFileMetadata{}}
-			metadataError := err.Error()
-			for _, c := range bench.Checks {
-				if strings.EqualFold(c.Target, "node") && (c.Kind == "host_file_mode" || c.Kind == "host_file_exists") {
-					metadata.Files[c.Path] = NodeFileMetadata{Error: metadataError}
-				}
-			}
-		}
-	}
 	for _, c := range bench.Checks {
 		// Node-local mode intentionally runs only checks explicitly targeted at
 		// worker/control-plane node configuration and backed by host file data.
@@ -107,12 +90,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" {
 			continue
 		}
-		var r Result
-		if o.MetadataFile != "" {
-			r = evaluateNodeHostCheckFromMetadata(nodeName, c, metadata)
-		} else {
-			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
-		}
+		r := evaluateNodeHostCheck(hostRoot, nodeName, c)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
@@ -345,71 +323,132 @@ func evaluateHostFileMode(mode os.FileMode, c Check, r Result) Result {
 }
 
 func evaluatePolicyControl(ctx context.Context, client kubernetes.Interface, c Check, o Options, r Result) Result {
-	nsList, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		r.Status, r.Details = "NOT_ASSESSED", "Unable to inspect namespaces for Pod Security Admission labels: "+err.Error()
+	nsList, nsErr := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if nsErr != nil {
+		r.Status = "NOT_ASSESSED"
+		r.Details = "Unable to inventory namespaces for Pod Security Admission coverage: " + nsErr.Error()
 		return r
 	}
-	total, covered := 0, 0
+
+	totalNamespaces, psaCovered := 0, 0
 	for _, ns := range nsList.Items {
 		if o.Namespace != "" && ns.Name != o.Namespace {
 			continue
 		}
-		total++
+		totalNamespaces++
 		level := strings.ToLower(ns.Labels["pod-security.kubernetes.io/enforce"])
 		if level == "baseline" || level == "restricted" {
-			covered++
+			psaCovered++
 			r.Evidence = append(r.Evidence, Evidence{Resource: "Namespace", Name: ns.Name, Field: "pod-security.kubernetes.io/enforce", Observed: level, Expected: "baseline or restricted"})
 		} else {
 			r.Evidence = append(r.Evidence, Evidence{Resource: "Namespace", Name: ns.Name, Field: "pod-security.kubernetes.io/enforce", Observed: firstNonEmpty(level, "<unset>"), Expected: "baseline or restricted"})
 		}
 	}
-	if total > 0 && covered == total {
-		r.Status = "MANUAL"
-		r.Details = fmt.Sprintf("Pod Security Admission enforce labels cover all %d inspected namespaces. Confirm the PodSecurity admission plugin is enabled in the API server and review configured exemptions; namespace labels alone do not prove effective admission enforcement.", total)
+	if totalNamespaces == 0 {
+		r.Status = "NOT_ASSESSED"
+		r.Details = "No namespaces were available in the requested assessment scope."
 		return r
 	}
-	// A missing PSA label is not proof that the cluster has no policy engine.
-	// Look for evidence of alternative admission mechanisms, but do not claim
-	// they enforce pod security until their rules and match scopes are reviewed.
-	var candidates []string
-	if bindings, e := client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(ctx, metav1.ListOptions{}); e == nil {
-		policies, pe := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(ctx, metav1.ListOptions{})
-		policyNames := map[string]bool{}
-		if pe == nil {
-			for _, p := range policies.Items {
-				if len(p.Spec.Validations) > 0 {
-					policyNames[p.Name] = true
+
+	var inventoryErrors []string
+	blockingCandidates, advisoryCandidates := 0, 0
+
+	policies, policyErr := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().List(ctx, metav1.ListOptions{})
+	bindings, bindingErr := client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(ctx, metav1.ListOptions{})
+	if policyErr != nil {
+		inventoryErrors = append(inventoryErrors, "ValidatingAdmissionPolicies: "+policyErr.Error())
+	}
+	if bindingErr != nil {
+		inventoryErrors = append(inventoryErrors, "ValidatingAdmissionPolicyBindings: "+bindingErr.Error())
+	}
+
+	if policyErr == nil && bindingErr == nil {
+		policyByName := make(map[string]admissionv1.ValidatingAdmissionPolicy, len(policies.Items))
+		for _, policy := range policies.Items {
+			policyByName[policy.Name] = policy
+		}
+		for _, binding := range bindings.Items {
+			policy, found := policyByName[binding.Spec.PolicyName]
+			if !found {
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: binding.Name, Field: "spec.policyName", Observed: "unresolved reference: " + binding.Spec.PolicyName, Expected: "existing ValidatingAdmissionPolicy"})
+				continue
+			}
+			if len(policy.Spec.Validations) == 0 || !matchResourcesCanMatchPods(policy.Spec.MatchConstraints, false) {
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: binding.Name, Field: "policyMatch", Observed: "policy has no Pod CREATE/UPDATE validation rule", Expected: "validation rule matching core/v1 Pods"})
+				continue
+			}
+			if binding.Spec.MatchResources != nil && !matchResourcesCanMatchPods(binding.Spec.MatchResources, true) {
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: binding.Name, Field: "bindingMatch", Observed: "binding resource rules do not match Pod CREATE/UPDATE", Expected: "binding scope intersecting Pod validation rule"})
+				continue
+			}
+
+			selectors := policySelectorSummary(policy.Spec.MatchConstraints)
+			if len(policy.Spec.MatchConditions) > 0 {
+				selectors += fmt.Sprintf("; policyMatchConditions=%d", len(policy.Spec.MatchConditions))
+			}
+			if binding.Spec.MatchResources != nil {
+				selectors += "; binding " + policySelectorSummary(binding.Spec.MatchResources)
+			}
+			if hasDenyAction(binding.Spec.ValidationActions) {
+				blockingCandidates++
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: binding.Name, Field: "spec.validationActions", Observed: "Deny; policy=" + policy.Name + "; " + selectors + "; policyFailurePolicy=" + failurePolicyValue(policy.Spec.FailurePolicy), Expected: "review CEL expressions, selectors, exclusions, parameter resolution and effective enforcement"})
+			} else {
+				advisoryCandidates++
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: binding.Name, Field: "spec.validationActions", Observed: fmt.Sprintf("%v; policy=%s; %s", binding.Spec.ValidationActions, policy.Name, selectors), Expected: "Deny action for blocking validation"})
+			}
+		}
+	}
+
+	webhooks, webhookErr := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
+	if webhookErr != nil {
+		inventoryErrors = append(inventoryErrors, "ValidatingWebhookConfigurations: "+webhookErr.Error())
+	} else {
+		for _, configuration := range webhooks.Items {
+			for _, webhook := range configuration.Webhooks {
+				matchesPods := false
+				for _, rule := range webhook.Rules {
+					if ruleMatchesPodCreateUpdate(rule) {
+						matchesPods = true
+						break
+					}
 				}
-			}
-		}
-		for _, b := range bindings.Items {
-			if policyNames[b.Spec.PolicyName] && hasDenyAction(b.Spec.ValidationActions) {
-				candidates = append(candidates, "ValidatingAdmissionPolicyBinding/"+b.Name+" (Deny)")
-				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Name: b.Name, Field: "spec.validationActions", Observed: "Deny; policy=" + b.Spec.PolicyName, Expected: "policy rules match pod create/update requests and intended namespaces"})
-			}
-		}
-	}
-	if hooks, e := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, metav1.ListOptions{}); e == nil {
-		for _, h := range hooks.Items {
-			name := strings.ToLower(h.Name)
-			if strings.Contains(name, "kyverno") || strings.Contains(name, "gatekeeper") || strings.Contains(name, "kubewarden") {
-				candidates = append(candidates, "ValidatingWebhookConfiguration/"+h.Name)
-				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingWebhookConfiguration", Name: h.Name, Field: "webhooks", Observed: fmt.Sprintf("%d webhook(s)", len(h.Webhooks)), Expected: "inspect webhook rules, failurePolicy and policy enforcement"})
+				if !matchesPods {
+					continue
+				}
+				blockingCandidates++
+				selectorInfo := "namespaceSelector=" + labelSelectorState(webhook.NamespaceSelector) + "; objectSelector=" + labelSelectorState(webhook.ObjectSelector)
+				if len(webhook.MatchConditions) > 0 {
+					selectorInfo += fmt.Sprintf("; matchConditions=%d", len(webhook.MatchConditions))
+				}
+				r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingWebhook", Name: configuration.Name + "/" + webhook.Name, Field: "rules/failurePolicy", Observed: fmt.Sprintf("matches Pod CREATE/UPDATE; rules=%d; failurePolicy=%s; %s", len(webhook.Rules), failurePolicyValue(webhook.FailurePolicy), selectorInfo), Expected: "review webhook implementation, selectors, endpoint health and policy enforcement"})
 			}
 		}
 	}
-	if total == 0 {
-		r.Status, r.Details = "NOT_ASSESSED", "No namespaces were available to evaluate policy-control coverage."
-	} else if len(candidates) > 0 {
+
+	if len(inventoryErrors) > 0 {
+		r.Status = "NOT_ASSESSED"
+		r.Details = "Admission-control inventory is incomplete: " + strings.Join(inventoryErrors, "; ")
+		if psaCovered > 0 || blockingCandidates > 0 || advisoryCandidates > 0 {
+			r.Details += ". Partial evidence was collected, but it is insufficient for a complete assessment."
+		}
+		return r
+	}
+
+	if psaCovered == totalNamespaces {
 		r.Status = "MANUAL"
-		r.Details = fmt.Sprintf("Pod Security Admission enforce labels cover %d of %d namespaces. Alternative admission-policy candidates were detected (%s), but their rules, match scope, failure behavior and enforcement must be reviewed manually.", covered, total, strings.Join(candidates, ", "))
-	} else if covered > 0 {
+		r.Details = fmt.Sprintf("Pod Security Admission enforce labels cover all %d inspected namespaces. Confirm the PodSecurity admission plugin is active and review API-server exemptions; also review discovered admission policies and webhook behavior.", totalNamespaces)
+	} else if blockingCandidates > 0 {
+		r.Status = "MANUAL"
+		r.Details = fmt.Sprintf("Found %d admission mechanism(s) configured to evaluate Pod CREATE/UPDATE requests with potentially blocking behavior. Namespace PSA labels cover %d of %d namespaces. Review CEL expressions or webhook logic, selectors, exclusions, endpoint health and exemptions; configuration inventory alone cannot prove effective enforcement.", blockingCandidates, psaCovered, totalNamespaces)
+	} else if advisoryCandidates > 0 {
 		r.Status = "WARN"
-		r.Details = fmt.Sprintf("Pod Security Admission enforce labels cover %d of %d namespaces. Uncovered namespaces: %d. No recognized alternative policy candidate was confirmed; inspect admission configuration and policy engines.", covered, total, total-covered)
+		r.Details = fmt.Sprintf("Found %d ValidatingAdmissionPolicy binding(s) matching Pod CREATE/UPDATE with only non-blocking validation actions. Namespace PSA labels cover %d of %d namespaces. Warn/Audit actions do not reject requests when a validation evaluates false.", advisoryCandidates, psaCovered, totalNamespaces)
+	} else if psaCovered > 0 {
+		r.Status = "WARN"
+		r.Details = fmt.Sprintf("Pod Security Admission enforce labels cover %d of %d inspected namespaces. Uncovered namespaces require review; no Pod-matching blocking admission policy or validating webhook was identified.", psaCovered, totalNamespaces)
 	} else {
 		r.Status = "NOT_ASSESSED"
-		r.Details = fmt.Sprintf("No baseline/restricted Pod Security Admission enforce labels were found across %d namespaces. The Kubernetes API cannot prove that no other admission policy mechanism is configured; inspect API-server admission configuration and installed policy engines.", total)
+		r.Details = fmt.Sprintf("No Pod Security Admission enforce labels or Pod-matching ValidatingAdmissionPolicy/validating webhook candidates were identified across %d namespaces. The Kubernetes API inventory cannot prove that no external or provider-managed admission control is active.", totalNamespaces)
 	}
 	return r
 }

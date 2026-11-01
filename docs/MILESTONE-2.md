@@ -35,3 +35,8 @@ Before enabling the DaemonSet, verify the target distribution's actual kubelet c
 - Missing seccomp profile is reported as a missing explicit Pod-spec requirement, not mislabeled as an explicit incompatible profile.
 - Pod-level inheritance and container overrides are covered by tests.
 - Node-level checks produce per-node evidence and never imply cluster-wide coverage from a single node.
+
+
+## Step 2.3.1 — Admission mechanism discovery
+
+The first admission-policy increment inventories Pod Security Admission enforce labels, ValidatingAdmissionPolicy objects/bindings, and validating webhooks. It matches actual admission rules against core/v1 Pod CREATE/UPDATE requests instead of relying on vendor names. VAP Deny actions and matching validating webhooks are marked MANUAL candidates; Warn/Audit-only VAP bindings are WARN. API inventory errors are reported as NOT_ASSESSED. This does not prove effective enforcement: CEL logic, selectors, exclusions, parameter resolution, webhook reachability/behavior, and API-server plugin configuration still require review. See `docs/MILESTONE-2-STEP-2.3.md`.

@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -11,7 +12,9 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 func boolPtr(v bool) *bool       { return &v }
@@ -125,12 +128,150 @@ func TestPolicyControlRequiresManualConfirmationWhenAllNamespacesEnforcePSA(t *t
 }
 
 func TestPolicyControlAlternativeCandidateRequiresManualReview(t *testing.T) {
-	policy := &admissionv1.ValidatingAdmissionPolicy{ObjectMeta: metav1.ObjectMeta{Name: "deny-root"}, Spec: admissionv1.ValidatingAdmissionPolicySpec{Validations: []admissionv1.Validation{{Expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true)"}}}}
+	podRule := admissionv1.NamedRuleWithOperations{RuleWithOperations: admissionv1.RuleWithOperations{
+		Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},
+		Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}
+	policy := &admissionv1.ValidatingAdmissionPolicy{ObjectMeta: metav1.ObjectMeta{Name: "deny-root"}, Spec: admissionv1.ValidatingAdmissionPolicySpec{
+		MatchConstraints: &admissionv1.MatchResources{ResourceRules: []admissionv1.NamedRuleWithOperations{podRule}},
+		Validations:      []admissionv1.Validation{{Expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true)"}},
+	}}
 	binding := &admissionv1.ValidatingAdmissionPolicyBinding{ObjectMeta: metav1.ObjectMeta{Name: "deny-root-binding"}, Spec: admissionv1.ValidatingAdmissionPolicyBindingSpec{PolicyName: "deny-root", ValidationActions: []admissionv1.ValidationAction{admissionv1.Deny}}}
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}}, policy, binding)
 	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
 	if r.Status != "MANUAL" {
 		t.Fatalf("got %s, want MANUAL: %s", r.Status, r.Details)
+	}
+	if !strings.Contains(r.Details, "potentially blocking") {
+		t.Fatalf("expected Pod-matching policy candidate details, got: %s", r.Details)
+	}
+}
+
+func TestPolicyControlIgnoresWebhookNameWithoutPodRules(t *testing.T) {
+	failurePolicy := admissionv1.FailurePolicyType("Fail")
+	webhookConfig := &admissionv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "kyverno-resource-validating-webhook-cfg"},
+		Webhooks:   []admissionv1.ValidatingWebhook{{Name: "validate.kyverno.svc", FailurePolicy: &failurePolicy}},
+	}
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}}, webhookConfig)
+	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
+	if r.Status != "NOT_ASSESSED" {
+		t.Fatalf("got %s, want NOT_ASSESSED when webhook has no Pod rules: %s", r.Status, r.Details)
+	}
+}
+
+func TestPolicyControlReportsAdmissionInventoryErrors(t *testing.T) {
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}})
+	client.PrependReactor("list", "validatingwebhookconfigurations", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	})
+	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
+	if r.Status != "NOT_ASSESSED" {
+		t.Fatalf("got %s, want NOT_ASSESSED when admission inventory fails: %s", r.Status, r.Details)
+	}
+	if !strings.Contains(r.Details, "ValidatingWebhookConfigurations") || !strings.Contains(r.Details, "forbidden") {
+		t.Fatalf("inventory error not surfaced in details: %s", r.Details)
+	}
+}
+
+func TestPolicyControlDiscoversPodValidatingWebhookByRules(t *testing.T) {
+	failurePolicy := admissionv1.FailurePolicyType("Fail")
+	webhookConfig := &admissionv1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "custom-admission"},
+		Webhooks: []admissionv1.ValidatingWebhook{{
+			Name:          "security.example.com",
+			FailurePolicy: &failurePolicy,
+			Rules: []admissionv1.RuleWithOperations{{
+				Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},
+				Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+			}},
+		}},
+	}
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}}, webhookConfig)
+	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
+	if r.Status != "MANUAL" {
+		t.Fatalf("got %s, want MANUAL for Pod-matching validating webhook: %s", r.Status, r.Details)
+	}
+	if len(r.Evidence) == 0 || r.Evidence[len(r.Evidence)-1].Resource != "ValidatingWebhook" {
+		t.Fatalf("expected validating webhook evidence, got %#v", r.Evidence)
+	}
+}
+
+func TestRuleMatchesPodCreateUpdateRequiresPodResourceAndWriteOperation(t *testing.T) {
+	tests := []struct {
+		name string
+		rule admissionv1.RuleWithOperations
+		want bool
+	}{
+		{
+			name: "pod create",
+			rule: admissionv1.RuleWithOperations{Operations: []admissionv1.OperationType{admissionv1.Create}, Rule: admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}}},
+			want: true,
+		},
+		{
+			name: "delete only",
+			rule: admissionv1.RuleWithOperations{Operations: []admissionv1.OperationType{admissionv1.Delete}, Rule: admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}}},
+			want: false,
+		},
+		{
+			name: "pod subresources only",
+			rule: admissionv1.RuleWithOperations{Operations: []admissionv1.OperationType{admissionv1.Create}, Rule: admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods/*"}}},
+			want: false,
+		},
+		{
+			name: "cluster scope only",
+			rule: admissionv1.RuleWithOperations{Operations: []admissionv1.OperationType{admissionv1.Create}, Rule: admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}, Scope: scopePtr(admissionv1.ClusterScope)}},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ruleMatchesPodCreateUpdate(tt.rule); got != tt.want {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func scopePtr(value admissionv1.ScopeType) *admissionv1.ScopeType { return &value }
+
+func TestMatchResourcesHonorsPodExclusions(t *testing.T) {
+	podRule := admissionv1.NamedRuleWithOperations{RuleWithOperations: admissionv1.RuleWithOperations{
+		Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},
+		Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}
+	match := &admissionv1.MatchResources{
+		ResourceRules:        []admissionv1.NamedRuleWithOperations{podRule},
+		ExcludeResourceRules: []admissionv1.NamedRuleWithOperations{podRule},
+	}
+	if matchResourcesCanMatchPods(match, false) {
+		t.Fatal("expected Pod exclusion to take precedence over inclusion")
+	}
+
+	// Excluding UPDATE must not hide a remaining CREATE match.
+	match.ExcludeResourceRules = []admissionv1.NamedRuleWithOperations{{RuleWithOperations: admissionv1.RuleWithOperations{
+		Operations: []admissionv1.OperationType{admissionv1.Update},
+		Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}}
+	if !matchResourcesCanMatchPods(match, false) {
+		t.Fatal("expected remaining Pod CREATE match after excluding UPDATE")
+	}
+}
+
+func TestPolicyControlWarnOnlyVAPIsNotBlocking(t *testing.T) {
+	podRule := admissionv1.NamedRuleWithOperations{RuleWithOperations: admissionv1.RuleWithOperations{
+		Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},
+		Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+	}}
+	policy := &admissionv1.ValidatingAdmissionPolicy{ObjectMeta: metav1.ObjectMeta{Name: "audit-root"}, Spec: admissionv1.ValidatingAdmissionPolicySpec{
+		MatchConstraints: &admissionv1.MatchResources{ResourceRules: []admissionv1.NamedRuleWithOperations{podRule}},
+		Validations:      []admissionv1.Validation{{Expression: "true"}},
+	}}
+	binding := &admissionv1.ValidatingAdmissionPolicyBinding{ObjectMeta: metav1.ObjectMeta{Name: "audit-root-binding"}, Spec: admissionv1.ValidatingAdmissionPolicyBindingSpec{PolicyName: "audit-root", ValidationActions: []admissionv1.ValidationAction{admissionv1.Warn, admissionv1.Audit}}}
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}}, policy, binding)
+	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
+	if r.Status != "WARN" {
+		t.Fatalf("got %s, want WARN for non-blocking actions: %s", r.Status, r.Details)
 	}
 }
 
