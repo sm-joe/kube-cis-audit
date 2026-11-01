@@ -119,3 +119,30 @@ KubeCIS distinguishes a verified violation from missing evidence:
 Each result can include structured `evidence` entries in JSON and corresponding evidence lines in text output. Missing kubelet/control-plane host mounts are `NOT_ASSESSED`, not `FAIL`. Pod security evaluation includes regular, init and ephemeral containers and honours container-level overrides over Pod-level security context. A missing `runAsNonRoot`/`runAsUser` declaration is reported as insufficient explicit evidence rather than a claim that the image is running as root. NetworkPolicy presence is checked across all namespaces; presence alone is not proof of isolation or CNI enforcement.
 
 The `api_policy_control` evaluator does not claim a policy engine is effective merely because a webhook or policy object exists. Alternative mechanisms and fully labelled PSA namespaces require manual verification of API-server configuration, policy rules, binding scope and exemptions. The Job ClusterRole includes read-only access to the admissionregistration resources used for this discovery.
+
+## Node-level host assessment (Linux)
+
+The regular `kubecis scan` command audits Kubernetes API-visible configuration. It does not automatically have access to the filesystem of each Kubernetes node. For Linux node host-file checks, use the separate `node-audit` command through the read-only DaemonSet:
+
+1. Build and publish the image, then replace the placeholder image in `deploy/node-auditor-daemonset.yaml`.
+2. Review the host-root mount and your cluster's hostPath security policy.
+3. Apply the DaemonSet:
+
+   ```powershell
+   kubectl apply -f .\deploy\node-auditor-daemonset.yaml
+   ```
+
+4. Inspect per-node results:
+
+   ```powershell
+   kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
+   kubectl -n kube-system logs -l app.kubernetes.io/name=kubecis-node-auditor --all-containers=true --prefix=true
+   ```
+
+The node auditor requires an explicit benchmark because it does not query the Kubernetes API version:
+
+```text
+kubecis node-audit --benchmark cis-2.1.0 --host-root /host --node-name worker-01 --output json
+```
+
+The DaemonSet repeats the assessment every 24 hours. It runs as non-root with all Linux capabilities dropped, has no service-account token, uses RuntimeDefault seccomp, and mounts the host root read-only. If a host path cannot be traversed, it reports `NOT_ASSESSED`; do not make the container privileged to force access. This initial node mode runs only checks with `target: node` and supported host-file kinds. It does not assess managed control-plane files or Windows nodes. See `docs/MILESTONE-2-STEP-2.2.md` for the security model and limitations.

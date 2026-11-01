@@ -47,23 +47,129 @@ func Run(o Options) (Report, error) {
 		}
 		r := evaluate(ctx, client, c, o)
 		report.Results = append(report.Results, r)
-		switch r.Status {
-		case "PASS":
-			report.Summary.Pass++
-		case "FAIL":
-			report.Summary.Fail++
-		case "WARN":
-			report.Summary.Warn++
-		case "MANUAL":
-			report.Summary.Manual++
-		case "NOT_ASSESSED":
-			report.Summary.NotAssessed++
-		default:
-			report.Summary.Info++
-		}
+		incrementSummary(&report.Summary, r.Status)
 	}
 	report.Summary.Total = len(report.Results)
 	return report, nil
+}
+
+// RunNode performs a node-local, read-only assessment. It deliberately does not
+// create a Kubernetes client: the node auditor only inspects the explicitly
+// mounted host filesystem and has no need for Kubernetes API credentials.
+func RunNode(o Options, nodeName string) (Report, error) {
+	if strings.TrimSpace(nodeName) == "" {
+		return Report{}, fmt.Errorf("node name is required; set NODE_NAME or pass --node-name")
+	}
+	if strings.TrimSpace(o.HostRoot) == "" {
+		return Report{}, fmt.Errorf("host root is required")
+	}
+	hostRoot, err := filepath.Abs(o.HostRoot)
+	if err != nil {
+		return Report{}, fmt.Errorf("resolve host root: %w", err)
+	}
+	bench, err := readSelectedBenchmark(o.ConfigDir, o.Benchmark)
+	if err != nil {
+		return Report{}, err
+	}
+	report := Report{
+		AuditMode:           "node-local",
+		NodeName:            nodeName,
+		Tool:                "KubeCIS",
+		GeneratedAt:         time.Now().UTC(),
+		ClusterVersion:      "not queried (node-local mode)",
+		Benchmark:           bench.ID,
+		CompatibilityStatus: bench.CompatibilityStatus,
+		CompatibilityNote:   bench.CompatibilityNote,
+	}
+	for _, c := range bench.Checks {
+		// Node-local mode intentionally runs only checks explicitly targeted at
+		// worker/control-plane node configuration and backed by host file data.
+		if !strings.EqualFold(c.Target, "node") {
+			continue
+		}
+		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" {
+			continue
+		}
+		r := evaluateNodeHostCheck(hostRoot, nodeName, c)
+		report.Results = append(report.Results, r)
+		incrementSummary(&report.Summary, r.Status)
+	}
+	report.Summary.Total = len(report.Results)
+	if report.Summary.Total == 0 {
+		return Report{}, fmt.Errorf("benchmark %s contains no supported node-local host checks", bench.ID)
+	}
+	return report, nil
+}
+
+func readSelectedBenchmark(dir, id string) (Benchmark, error) {
+	if id == "" || id == "auto" {
+		return Benchmark{}, fmt.Errorf("node-local mode requires an explicit --benchmark because it does not query the Kubernetes API version")
+	}
+	return readBench(filepath.Join(dir, id, "benchmark.yaml"))
+}
+
+func incrementSummary(s *Summary, status string) {
+	switch status {
+	case "PASS":
+		s.Pass++
+	case "FAIL":
+		s.Fail++
+	case "WARN":
+		s.Warn++
+	case "MANUAL":
+		s.Manual++
+	case "NOT_ASSESSED":
+		s.NotAssessed++
+	default:
+		s.Info++
+	}
+}
+
+func evaluateNodeHostCheck(hostRoot, nodeName string, c Check) Result {
+	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "identity", Observed: nodeName, Expected: "Kubernetes node being assessed"}}}
+	clean := filepath.Clean(filepath.FromSlash(c.Path))
+	if c.Path == "" || filepath.IsAbs(clean) || clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+		r.Details = fmt.Sprintf("Invalid or unsafe host path %q in benchmark profile; path must be relative to the mounted host root.", c.Path)
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Observed: "rejected unsafe path", Expected: "relative path beneath host root"}}
+		return r
+	}
+	fullPath := filepath.Join(hostRoot, clean)
+	rel, err := filepath.Rel(hostRoot, fullPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		r.Details = fmt.Sprintf("Host path %q resolves outside the mounted host root and was rejected.", c.Path)
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Observed: "rejected path escape", Expected: "path beneath host root"}}
+		return r
+	}
+	// Lstat avoids silently following a symlink from the mounted host into a
+	// different location. Symlink targets need a separate, explicit policy.
+	st, err := os.Lstat(fullPath)
+	if err != nil {
+		r.Details = fmt.Sprintf("Node %s: host evidence unavailable at %s: %v. This is an access limitation, not a control failure.", nodeName, c.Path, err)
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: "node", Observed: nodeName, Expected: "node-local host file evidence"}, {Resource: "host-file", Name: c.Path, Observed: "unavailable", Expected: "readable host file"}}
+		return r
+	}
+	if st.Mode()&os.ModeSymlink != 0 {
+		r.Details = fmt.Sprintf("Host path %s is a symbolic link; target inspection is intentionally not followed.", c.Path)
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: "type", Observed: "symlink", Expected: "regular file or explicitly reviewed target"}}
+		return r
+	}
+	if !st.Mode().IsRegular() {
+		r.Details = fmt.Sprintf("Host path %s is not a regular file.", c.Path)
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: "type", Observed: st.Mode().Type().String(), Expected: "regular file"}}
+		return r
+	}
+	if c.Kind == "host_file_exists" {
+		r.Status = "PASS"
+		r.Details = "Host configuration file exists: " + c.Path
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Observed: "present", Expected: "present"}}
+		return r
+	}
+	if runtime.GOOS == "windows" {
+		r.Details = "POSIX host-file permissions cannot be reliably inspected from a Windows process; run node-audit on Linux."
+		r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: "mode", Observed: "unavailable on Windows", Expected: "POSIX permission bits no broader than " + c.MaxMode}}
+		return r
+	}
+	return evaluateHostFileMode(st.Mode(), c, r)
 }
 
 func clusterConfig(path string) (*rest.Config, error) {
@@ -292,7 +398,7 @@ func evaluatePodSecurity(ctx context.Context, client kubernetes.Interface, c Che
 		r.Status, r.Details = "NOT_ASSESSED", "Unable to list Pods: "+err.Error()
 		return r
 	}
-	checkedPods, passed, failed, unknown := 0, 0, 0, 0
+	checkedPods, passed, failed, missing, unknown := 0, 0, 0, 0, 0
 	for _, pod := range pods.Items {
 		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 			continue
@@ -309,19 +415,28 @@ func evaluatePodSecurity(ctx context.Context, client kubernetes.Interface, c Che
 				passed++
 			case "fail":
 				failed++
+			case "missing":
+				missing++
 			default:
 				unknown++
 			}
 		}
 	}
-	if checkedPods == 0 || passed+failed+unknown == 0 {
+	inspected := passed + failed + missing + unknown
+	if checkedPods == 0 || inspected == 0 {
 		r.Status, r.Details = "NOT_ASSESSED", "No eligible non-terminal Pods with inspectable containers were available."
-	} else if failed > 0 {
+		return r
+	}
+	if failed > 0 || (c.Kind == "api_pod_seccomp" && missing > 0) {
 		r.Status = "FAIL"
-		r.Details = fmt.Sprintf("%d of %d inspected containers have an explicit incompatible security setting across %d Pods. Unknown/inherited cases: %d. Evidence is capped at 30 entries.", failed, passed+failed+unknown, checkedPods, unknown)
-	} else if unknown > 0 {
+		if c.Kind == "api_pod_seccomp" {
+			r.Details = fmt.Sprintf("%d containers have an explicitly incompatible seccomp setting and %d lack an explicit acceptable seccomp profile across %d Pods; %d containers satisfy the check and %d have unknown settings. The benchmark check evaluates Pod-spec configuration, not the effective runtime profile.", failed, missing, checkedPods, passed, unknown)
+		} else {
+			r.Details = fmt.Sprintf("%d of %d inspected containers have an explicitly incompatible non-root setting across %d Pods; %d containers satisfy the check and %d have insufficient Pod-spec evidence. Missing settings are not proof that the image runs as root.", failed, inspected, checkedPods, passed, unknown+missing)
+		}
+	} else if unknown > 0 || missing > 0 {
 		r.Status = "WARN"
-		r.Details = fmt.Sprintf("%d containers satisfy the check; %d containers have insufficient explicit Pod-spec evidence across %d Pods. Missing settings are not proof that the image runs as root or that the runtime is unconfined.", passed, unknown, checkedPods)
+		r.Details = fmt.Sprintf("%d containers satisfy the check; %d containers have insufficient or unsupported Pod-spec evidence across %d Pods. Missing non-root settings are not proof that the image runs as root.", passed, unknown+missing, checkedPods)
 	} else {
 		r.Status = "PASS"
 		r.Details = fmt.Sprintf("All %d inspected containers across %d Pods satisfy the configured Pod-spec check.", passed, checkedPods)
@@ -390,7 +505,9 @@ func evaluateContainerSecurity(kind string, podSC *corev1.PodSecurityContext, co
 		profile = containerSC.SeccompProfile
 	}
 	if profile == nil {
-		return "seccompProfile unset", "fail"
+		// This check requires an explicit profile in the Pod specification.
+		// Missing is reported separately from an explicitly incompatible profile.
+		return "seccompProfile unset", "missing"
 	}
 	switch profile.Type {
 	case corev1.SeccompProfileTypeRuntimeDefault:

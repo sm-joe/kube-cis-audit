@@ -57,7 +57,7 @@ func TestEvaluateContainerSeccomp(t *testing.T) {
 		{"localhost nil profile pointer", &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: nil}, "fail"},
 		{"localhost whitespace profile", &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeLocalhost, LocalhostProfile: stringPtr("  ")}, "fail"},
 		{"unconfined", &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined}, "fail"},
-		{"unset", nil, "fail"},
+		{"unset", nil, "missing"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -66,6 +66,30 @@ func TestEvaluateContainerSeccomp(t *testing.T) {
 				t.Fatalf("got %s, want %s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEvaluateContainerSeccompContainerOverrideWins(t *testing.T) {
+	podSC := &corev1.PodSecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}
+	containerSC := &corev1.SecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined}}
+	_, got := evaluateContainerSecurity("api_pod_seccomp", podSC, containerSC)
+	if got != "fail" {
+		t.Fatalf("container-level Unconfined override got %s, want fail", got)
+	}
+}
+
+func TestSeccompMissingProfileIsFailureWithAccurateEvidence(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "app-pod", Namespace: "app"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}}, Status: corev1.PodStatus{Phase: corev1.PodRunning}}
+	client := fake.NewSimpleClientset(pod)
+	r := evaluatePodSecurity(context.Background(), client, Check{Kind: "api_pod_seccomp"}, Options{}, Result{})
+	if r.Status != "FAIL" {
+		t.Fatalf("got %s, want FAIL: %s", r.Status, r.Details)
+	}
+	if !strings.Contains(r.Details, "lack an explicit acceptable seccomp profile") || strings.Contains(r.Details, "explicitly incompatible security setting") {
+		t.Fatalf("misleading seccomp summary: %s", r.Details)
+	}
+	if len(r.Evidence) != 1 || !strings.Contains(r.Evidence[0].Observed, "missing") {
+		t.Fatalf("missing-profile evidence not recorded accurately: %#v", r.Evidence)
 	}
 }
 

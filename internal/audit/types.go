@@ -60,6 +60,8 @@ type Summary struct {
 }
 
 type Report struct {
+	AuditMode           string    `json:"auditMode,omitempty"`
+	NodeName            string    `json:"nodeName,omitempty"`
 	Tool                string    `json:"tool"`
 	GeneratedAt         time.Time `json:"generatedAt"`
 	ClusterVersion      string    `json:"clusterVersion"`

@@ -6,7 +6,13 @@ import (
 )
 
 func Print(r Report) {
-	fmt.Printf("\nKubeCIS | Kubernetes CIS configuration audit\nCluster: %s   Benchmark: %s\nGenerated: %s\n", r.ClusterVersion, r.Benchmark, r.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
+	fmt.Printf("\nKubeCIS | Kubernetes CIS configuration audit\n")
+	if r.AuditMode == "node-local" {
+		fmt.Printf("Mode: node-local   Node: %s   Benchmark: %s\n", r.NodeName, r.Benchmark)
+	} else {
+		fmt.Printf("Cluster: %s   Benchmark: %s\n", r.ClusterVersion, r.Benchmark)
+	}
+	fmt.Printf("Generated: %s\n", r.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
 	if r.CompatibilityStatus != "" {
 		fmt.Printf("Benchmark compatibility: %s\n", strings.ToUpper(r.CompatibilityStatus))
 	}
