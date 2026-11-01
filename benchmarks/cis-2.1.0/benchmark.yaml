@@ -1,0 +1,67 @@
+id: cis-2.1.0
+name: CIS Kubernetes Benchmark v2.1.0 - KubeCIS provisional starter profile
+# Provisional Kubernetes 1.37 mapping: verify distribution applicability against the
+# official CIS benchmark before treating these results as compliance evidence.
+kubernetesMinor: ["37"]
+compatibilityStatus: provisional
+compatibilityNote: "Provisional Kubernetes 1.37 mapping. This is a limited starter profile, not the complete CIS benchmark."
+checks:
+  - id: 1.1.1
+    title: API server pod specification file permissions are 0600 or more restrictive
+    description: Checks Unix permission bits on the API server static pod manifest when the host filesystem is explicitly mounted and readable.
+    target: master
+    kind: host_file_mode
+    path: etc/kubernetes/manifests/kube-apiserver.yaml
+    maxMode: "0600"
+    scored: true
+    remediation: Restrict permissions on the API server manifest to 0600 or more restrictive.
+  - id: 1.2.1
+    title: API server anonymous authentication is disabled
+    description: Requires inspection of the API server configuration or managed control-plane provider evidence; API-only scanning cannot verify the effective flag.
+    target: master
+    kind: manual
+    scored: false
+    manual: true
+    remediation: Verify that the API server --anonymous-auth argument is set to false, accounting for provider-specific health-check requirements.
+  - id: 4.1.9
+    title: Kubelet config.yaml permissions are 0600 or more restrictive
+    target: node
+    kind: host_file_mode
+    path: var/lib/kubelet/config.yaml
+    maxMode: "0600"
+    scored: true
+    remediation: Restrict the kubelet config.yaml file permissions to 0600 or more restrictive, subject to the platform's supported configuration.
+  - id: 5.1.1
+    title: Ensure cluster-admin role is only used where required
+    target: policies
+    kind: api_cluster_admin
+    scored: true
+    remediation: Remove unnecessary cluster-admin bindings and use least-privilege roles.
+  - id: 5.2.1
+    title: Ensure the cluster has at least one active policy control mechanism
+    description: Evaluates namespace-level Pod Security Admission enforce labels and detects limited alternative admission-policy candidates. Candidate detection is not proof of effective enforcement.
+    target: policies
+    kind: api_policy_control
+    scored: true
+    remediation: Enable Pod Security Admission with baseline/restricted enforcement labels or verify another active admission policy mechanism such as Kyverno or Gatekeeper.
+  - id: 5.2.7
+    title: Minimize the admission of root containers
+    target: policies
+    description: Evaluates effective Pod/container runAsNonRoot and runAsUser settings on non-terminal Pods. Missing image-user metadata is treated as unknown rather than proof of root execution.
+    kind: api_pod_non_root
+    scored: true
+    remediation: "Set runAsNonRoot: true at pod or container level, and verify images run as a non-root UID."
+  - id: 5.3.2
+    title: Ensure all namespaces have NetworkPolicies defined
+    target: policies
+    description: Requires at least one NetworkPolicy object in every namespace, including system namespaces. Presence does not prove effective traffic isolation or CNI enforcement.
+    kind: api_network_policy
+    scored: true
+    remediation: Define appropriate NetworkPolicies for each namespace; a policy's presence alone does not prove effective isolation.
+  - id: 5.6.2
+    title: Ensure the seccomp profile is set in pod definitions
+    target: policies
+    description: Evaluates effective Pod/container seccomp profile settings on non-terminal Pods; RuntimeDefault and Localhost are accepted explicit profiles.
+    kind: api_pod_seccomp
+    scored: true
+    remediation: Set seccompProfile.type to RuntimeDefault at pod or container level where compatible.

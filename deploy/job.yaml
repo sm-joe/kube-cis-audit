@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kubecis-audit
+  namespace: kube-system
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      serviceAccountName: kubecis
+      restartPolicy: Never
+      containers:
+        - name: kubecis
+          image: ghcr.io/your-org/kubecis:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["scan", "--benchmark", "auto", "--target", "policies", "--output", "text"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }

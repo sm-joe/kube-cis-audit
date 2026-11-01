@@ -1,0 +1,46 @@
+id: cis-2.0.1
+name: CIS Kubernetes Benchmark v2.0.1 - KubeCIS starter profile
+# Mapping is deliberately explicit. Extend this list only after validating the benchmark's applicability.
+kubernetesMinor: ["34", "35"]
+checks:
+  - id: 1.1.1
+    title: API server and control-plane configuration files are present
+    description: Starter presence check; does not validate all API server flags.
+    target: master
+    kind: host_file_exists
+    path: etc/kubernetes/manifests/kube-apiserver.yaml
+    scored: false
+    remediation: Verify the API server manifest and required CIS flags against your distribution's benchmark.
+  - id: 1.2.1
+    title: Control-plane component configuration requires host inspection
+    target: master
+    kind: manual
+    scored: true
+    manual: true
+    remediation: Review API server, scheduler, controller manager and etcd configuration using the applicable CIS benchmark.
+  - id: 4.1.1
+    title: Kubelet configuration file permissions
+    target: node
+    kind: host_file_mode
+    path: var/lib/kubelet/config.yaml
+    maxMode: "0644"
+    scored: true
+    remediation: Restrict kubelet configuration file permissions to 0644 or more restrictive, according to your platform guidance.
+  - id: 5.1.1
+    title: Minimize cluster-admin role bindings
+    target: policies
+    kind: api_cluster_admin
+    scored: true
+    remediation: Remove unnecessary cluster-admin bindings and use least-privilege roles.
+  - id: 5.2.1
+    title: Workloads use non-root execution and RuntimeDefault seccomp
+    target: policies
+    kind: api_pod_security
+    scored: true
+    remediation: "Set pod/container runAsNonRoot: true and seccompProfile.type: RuntimeDefault where compatible."
+  - id: 5.3.2
+    title: Application namespaces have NetworkPolicy resources
+    target: policies
+    kind: api_network_policy
+    scored: true
+    remediation: Define default-deny ingress/egress NetworkPolicies and explicit required traffic rules.
