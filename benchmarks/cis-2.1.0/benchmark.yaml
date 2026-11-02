@@ -89,3 +89,11 @@ checks:
     kind: api_pod_capabilities
     scored: false
     remediation: Configure securityContext.capabilities.drop to include ALL. Add back only capabilities required by the workload and document their justification.
+
+  - id: KUBECIS-2.4.4
+    title: Assess read-only container root filesystems and writable volume mounts
+    description: KubeCIS extension (not an official CIS control). Evaluates readOnlyRootFilesystem on regular, init, and ephemeral containers. Reports writable volume mounts separately because read-only root filesystems do not make mounted volumes read-only. VolumeDevices and effective runtime mount state are not assessed.
+    target: policies
+    kind: api_pod_read_only_rootfs
+    scored: false
+    remediation: "Set securityContext.readOnlyRootFilesystem to true. Review writable volume mounts individually and set readOnly: true where the workload does not require write access."

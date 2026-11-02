@@ -278,6 +278,8 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return evaluatePodPrivilegeSecurity(ctx, client, c, o, r)
 	case "api_pod_capabilities":
     return evaluatePodCapabilities(ctx, client, c, o, r)
+	case "api_pod_read_only_rootfs":
+    return evaluatePodReadOnlyRootFilesystem(ctx, client, c, o, r)
 
 	case "host_file_exists", "host_file_mode":
 		p := filepath.Join(o.HostRoot, strings.TrimLeft(filepath.Clean(c.Path), "/"))
