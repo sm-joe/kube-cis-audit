@@ -268,10 +268,16 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return evaluatePolicyControl(ctx, client, c, o, r)
 	case "api_pod_non_root", "api_pod_seccomp":
 		return evaluatePodSecurity(ctx, client, c, o, r)
+	case "api_pod_group_security_context":
+		return evaluatePodGroupSecurityContext(ctx, client, c, o, r)
 	case "api_network_policy":
 		return evaluateNetworkPolicies(ctx, client, c, o, r)
 	case "api_cluster_admin":
 		return evaluateClusterAdmin(ctx, client, c, r)
+	case "api_pod_privilege_security":
+		return evaluatePodPrivilegeSecurity(ctx, client, c, o, r)
+	case "api_pod_capabilities":
+    return evaluatePodCapabilities(ctx, client, c, o, r)
 
 	case "host_file_exists", "host_file_mode":
 		p := filepath.Join(o.HostRoot, strings.TrimLeft(filepath.Clean(c.Path), "/"))
@@ -533,23 +539,48 @@ func podContainers(p corev1.Pod) []podContainer {
 	return out
 }
 
+// effectiveSecurityContext contains the Pod/container security-context values
+// needed by workload security assessments. Nil means the field was not set in
+// the Pod specification; this resolver does not infer image or runtime defaults.
+type effectiveSecurityContext struct {
+	RunAsNonRoot *bool
+	RunAsUser    *int64
+	RunAsGroup   *int64
+	FSGroup      *int64
+}
+
+// resolveEffectiveSecurityContext applies Kubernetes Pod-to-container
+// inheritance independently for fields supported by both scopes. A
+// container-level value overrides only the matching Pod-level field.
+// FSGroup is Pod-scoped and is therefore copied only from PodSecurityContext.
+func resolveEffectiveSecurityContext(podSC *corev1.PodSecurityContext, containerSC *corev1.SecurityContext) effectiveSecurityContext {
+	effective := effectiveSecurityContext{}
+	if podSC != nil {
+		effective.RunAsNonRoot = podSC.RunAsNonRoot
+		effective.RunAsUser = podSC.RunAsUser
+		effective.RunAsGroup = podSC.RunAsGroup
+		effective.FSGroup = podSC.FSGroup
+	}
+	if containerSC != nil {
+		if containerSC.RunAsNonRoot != nil {
+			effective.RunAsNonRoot = containerSC.RunAsNonRoot
+		}
+		if containerSC.RunAsUser != nil {
+			effective.RunAsUser = containerSC.RunAsUser
+		}
+		if containerSC.RunAsGroup != nil {
+			effective.RunAsGroup = containerSC.RunAsGroup
+		}
+	}
+	return effective
+}
+
 // outcome is pass, fail, or unknown. Pod-level values are inherited unless a
 // container-level value explicitly overrides them.
 func evaluateContainerSecurity(kind string, podSC *corev1.PodSecurityContext, containerSC *corev1.SecurityContext) (observed, outcome string) {
 	if kind == "api_pod_non_root" {
-		var runAsNonRoot *bool
-		var uid *int64
-		if podSC != nil {
-			runAsNonRoot, uid = podSC.RunAsNonRoot, podSC.RunAsUser
-		}
-		if containerSC != nil {
-			if containerSC.RunAsNonRoot != nil {
-				runAsNonRoot = containerSC.RunAsNonRoot
-			}
-			if containerSC.RunAsUser != nil {
-				uid = containerSC.RunAsUser
-			}
-		}
+		effective := resolveEffectiveSecurityContext(podSC, containerSC)
+		runAsNonRoot, uid := effective.RunAsNonRoot, effective.RunAsUser
 		if uid != nil {
 			if *uid == 0 {
 				return "runAsUser=0", "fail"

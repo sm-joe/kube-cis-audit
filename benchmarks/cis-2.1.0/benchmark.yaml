@@ -65,3 +65,27 @@ checks:
     kind: api_pod_seccomp
     scored: true
     remediation: Set seccompProfile.type to RuntimeDefault at pod or container level where compatible.
+
+  - id: KUBECIS-2.4.1
+    title: Inventory effective runAsGroup and fsGroup security-context settings
+    description: KubeCIS extension (not an official CIS control). Reports explicit primary GID and Pod fsGroup configuration without treating missing values or non-zero IDs as proof of security.
+    target: policies
+    kind: api_pod_group_security_context
+    scored: false
+    remediation: Review GID 0 warnings and validate group permissions and volume ownership against workload requirements.
+
+  - id: KUBECIS-2.4.2
+    title: Assess privileged containers and privilege escalation
+    description: KubeCIS extension (not an official CIS control). Evaluates container-scoped privileged and allowPrivilegeEscalation settings, including Kubernetes defaults and CAP_SYS_ADMIN behavior.
+    target: policies
+    kind: api_pod_privilege_security
+    scored: false
+    remediation: Set privileged to false and allowPrivilegeEscalation to false; avoid adding CAP_SYS_ADMIN unless explicitly required and risk-accepted.
+
+  - id: KUBECIS-2.4.3
+    title: Assess Linux capability reduction and additions
+    description: KubeCIS extension (not an official CIS control). Checks whether each workload container drops ALL Linux capabilities and records capabilities added back. Added capabilities require workload-specific justification; effective runtime capabilities are not inferred.
+    target: policies
+    kind: api_pod_capabilities
+    scored: false
+    remediation: Configure securityContext.capabilities.drop to include ALL. Add back only capabilities required by the workload and document their justification.

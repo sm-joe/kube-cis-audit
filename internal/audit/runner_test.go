@@ -48,6 +48,129 @@ func TestEvaluateContainerNonRoot(t *testing.T) {
 	}
 }
 
+func TestResolveEffectiveSecurityContext(t *testing.T) {
+	tests := []struct {
+		name             string
+		pod              *corev1.PodSecurityContext
+		container        *corev1.SecurityContext
+		wantRunAsNonRoot *bool
+		wantRunAsUser    *int64
+		wantRunAsGroup   *int64
+		wantFSGroup      *int64
+	}{
+		{
+			name: "nil contexts remain unset",
+		},
+		{
+			name: "pod values are inherited",
+			pod: &corev1.PodSecurityContext{
+				RunAsNonRoot: boolPtr(true),
+				RunAsUser:    int64Ptr(10001),
+				RunAsGroup:   int64Ptr(10002),
+				FSGroup:      int64Ptr(10003),
+			},
+			wantRunAsNonRoot: boolPtr(true),
+			wantRunAsUser:    int64Ptr(10001),
+			wantRunAsGroup:   int64Ptr(10002),
+			wantFSGroup:      int64Ptr(10003),
+		},
+		{
+			name: "container values override matching pod fields independently",
+			pod: &corev1.PodSecurityContext{
+				RunAsNonRoot: boolPtr(true),
+				RunAsUser:    int64Ptr(10001),
+				RunAsGroup:   int64Ptr(10002),
+				FSGroup:      int64Ptr(10003),
+			},
+			container: &corev1.SecurityContext{
+				RunAsNonRoot: boolPtr(false),
+				RunAsUser:    int64Ptr(20001),
+				RunAsGroup:   int64Ptr(20002),
+			},
+			wantRunAsNonRoot: boolPtr(false),
+			wantRunAsUser:    int64Ptr(20001),
+			wantRunAsGroup:   int64Ptr(20002),
+			wantFSGroup:      int64Ptr(10003),
+		},
+		{
+			name: "partial container override preserves other pod defaults",
+			pod: &corev1.PodSecurityContext{
+				RunAsNonRoot: boolPtr(true),
+				RunAsUser:    int64Ptr(10001),
+				RunAsGroup:   int64Ptr(10002),
+				FSGroup:      int64Ptr(10003),
+			},
+			container:        &corev1.SecurityContext{RunAsUser: int64Ptr(20001)},
+			wantRunAsNonRoot: boolPtr(true),
+			wantRunAsUser:    int64Ptr(20001),
+			wantRunAsGroup:   int64Ptr(10002),
+			wantFSGroup:      int64Ptr(10003),
+		},
+		{
+			name: "container-only values do not invent fsGroup",
+			container: &corev1.SecurityContext{
+				RunAsNonRoot: boolPtr(true),
+				RunAsUser:    int64Ptr(10001),
+				RunAsGroup:   int64Ptr(10002),
+			},
+			wantRunAsNonRoot: boolPtr(true),
+			wantRunAsUser:    int64Ptr(10001),
+			wantRunAsGroup:   int64Ptr(10002),
+		},
+		{
+			name: "explicit zero values override pod defaults",
+			pod: &corev1.PodSecurityContext{
+				RunAsUser:  int64Ptr(10001),
+				RunAsGroup: int64Ptr(10002),
+				FSGroup:    int64Ptr(10003),
+			},
+			container: &corev1.SecurityContext{
+				RunAsUser:  int64Ptr(0),
+				RunAsGroup: int64Ptr(0),
+			},
+			wantRunAsUser:  int64Ptr(0),
+			wantRunAsGroup: int64Ptr(0),
+			wantFSGroup:    int64Ptr(10003),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveEffectiveSecurityContext(tt.pod, tt.container)
+			assertBoolPointerEqual(t, "RunAsNonRoot", got.RunAsNonRoot, tt.wantRunAsNonRoot)
+			assertInt64PointerEqual(t, "RunAsUser", got.RunAsUser, tt.wantRunAsUser)
+			assertInt64PointerEqual(t, "RunAsGroup", got.RunAsGroup, tt.wantRunAsGroup)
+			assertInt64PointerEqual(t, "FSGroup", got.FSGroup, tt.wantFSGroup)
+		})
+	}
+}
+
+func assertBoolPointerEqual(t *testing.T, field string, got, want *bool) {
+	t.Helper()
+	if got == nil || want == nil {
+		if got != nil || want != nil {
+			t.Fatalf("%s = %v, want %v", field, got, want)
+		}
+		return
+	}
+	if *got != *want {
+		t.Fatalf("%s = %t, want %t", field, *got, *want)
+	}
+}
+
+func assertInt64PointerEqual(t *testing.T, field string, got, want *int64) {
+	t.Helper()
+	if got == nil || want == nil {
+		if got != nil || want != nil {
+			t.Fatalf("%s = %v, want %v", field, got, want)
+		}
+		return
+	}
+	if *got != *want {
+		t.Fatalf("%s = %d, want %d", field, *got, *want)
+	}
+}
+
 func TestEvaluateContainerSeccomp(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -9,8 +9,6 @@ spec:
     spec:
       serviceAccountName: kubecis
       restartPolicy: Never
-      imagePullSecrets:
-        - name: ghcr-pull-secret
       containers:
         - name: kubecis
           image: ghcr.io/sm-joe/kubecis:2.3.2-admission-inventory
