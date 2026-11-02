@@ -97,3 +97,11 @@ checks:
     kind: api_pod_read_only_rootfs
     scored: false
     remediation: "Set securityContext.readOnlyRootFilesystem to true. Review writable volume mounts individually and set readOnly: true where the workload does not require write access."
+
+  - id: KUBECIS-2.4.5
+    title: Assess host namespace sharing by Pods
+    description: KubeCIS extension (not an official CIS control). Evaluates hostPID, hostIPC, and hostNetwork independently for non-terminal Pods. Explicitly enabled host namespace sharing is reported as a security finding. Unset fields use Kubernetes API defaults of false.
+    target: policies
+    kind: api_pod_host_namespaces
+    scored: false
+    remediation: Set hostPID, hostIPC, and hostNetwork to false unless host namespace sharing is explicitly required, documented, and approved.

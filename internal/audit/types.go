@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-const BuildVersion = "2.4.4-readonly-rootfs-assessment"
+const BuildVersion = "2.4.5-host-namespace-assessment"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
