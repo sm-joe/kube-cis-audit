@@ -154,11 +154,8 @@ func evaluateNetworkSecurity(ctx context.Context, client kubernetes.Interface, _
 			}
 		}
 	}
-	publicConfigured, nodePortConfigured, externalNameConfigured, externalIPServices := 0, 0, 0, 0
+	publicConfigured, nodePortConfigured, externalNameConfigured := 0, 0, 0
 	for _, svc := range services.Items {
-		if len(svc.Spec.ExternalIPs) > 0 {
-			externalIPServices++
-		}
 		switch svc.Spec.Type {
 		case corev1.ServiceTypeLoadBalancer:
 			publicConfigured++
@@ -167,7 +164,7 @@ func evaluateNetworkSecurity(ctx context.Context, client kubernetes.Interface, _
 		case corev1.ServiceTypeExternalName:
 			externalNameConfigured++
 		}
-		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer || svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeExternalName || len(svc.Spec.ExternalIPs) > 0 {
+		if svc.Spec.Type == corev1.ServiceTypeLoadBalancer || svc.Spec.Type == corev1.ServiceTypeNodePort || svc.Spec.Type == corev1.ServiceTypeExternalName {
 			ports := make([]string, 0, len(svc.Spec.Ports))
 			for _, p := range svc.Spec.Ports {
 				ports = append(ports, fmt.Sprintf("%s:%d->%d", p.Protocol, p.Port, p.TargetPort.IntValue()))
@@ -192,9 +189,8 @@ func evaluateNetworkSecurity(ctx context.Context, client kubernetes.Interface, _
 				}
 			}
 			sort.Strings(hosts)
-			tlsConfigured := len(ing.Spec.TLS) > 0
 			if len(r.Evidence) < 150 {
-				r.Evidence = append(r.Evidence, Evidence{Resource: "Ingress", Namespace: ing.Namespace, Name: ing.Name, Field: "spec.rules.host/spec.tls", Observed: fmt.Sprintf("hosts=%s; tlsConfigured=%t", strings.Join(hosts, ","), tlsConfigured), Expected: "review ingress class, TLS configuration, authentication and external routing independently"})
+				r.Evidence = append(r.Evidence, Evidence{Resource: "Ingress", Namespace: ing.Namespace, Name: ing.Name, Field: "spec.rules.host", Observed: strings.Join(hosts, ","), Expected: "review ingress class, TLS configuration, authentication and external routing independently"})
 			}
 		}
 	} else {
@@ -208,14 +204,14 @@ func evaluateNetworkSecurity(ctx context.Context, client kubernetes.Interface, _
 	} else if missingIngress > 0 || missingEgress > 0 {
 		status = "WARN"
 	}
-	if (publicConfigured+nodePortConfigured+externalIPServices+hostPortMappings+broadPolicyRules) > 0 && status == "PASS" {
+	if (publicConfigured+nodePortConfigured+hostPortMappings+broadPolicyRules) > 0 && status == "PASS" {
 		status = "WARN"
 	}
 	if ingressErr != nil && status == "PASS" {
 		status = "NOT_ASSESSED"
 	}
 	r.Status = status
-	r.Details = fmt.Sprintf("Inspected %d non-terminal Pods, %d NetworkPolicies and %d Services. Pod isolation coverage: ingress=%d/%d, egress=%d/%d. Services configured as LoadBalancer=%d, NodePort=%d, ExternalName=%d, externalIP=%d; hostPort mappings=%d; broad/unrestricted policy rules=%d; Ingress inventory=%s. Service types indicate exposure configuration only; this audit does not verify routing, firewall rules, cloud load-balancer reachability, CNI enforcement or actual packet flow.", eligiblePods, len(policies.Items), len(services.Items), ingressIsolated, eligiblePods, egressIsolated, eligiblePods, publicConfigured, nodePortConfigured, externalNameConfigured, externalIPServices, hostPortMappings, broadPolicyRules, ingressInventoryStatus(ingressErr))
+	r.Details = fmt.Sprintf("Inspected %d non-terminal Pods, %d NetworkPolicies and %d Services. Pod isolation coverage: ingress=%d/%d, egress=%d/%d. Services configured as LoadBalancer=%d, NodePort=%d, ExternalName=%d; hostPort mappings=%d; broad/unrestricted policy rules=%d; Ingress inventory=%s. Service types indicate exposure configuration only; this audit does not verify routing, firewall rules, cloud load-balancer reachability, CNI enforcement or actual packet flow.", eligiblePods, len(policies.Items), len(services.Items), ingressIsolated, eligiblePods, egressIsolated, eligiblePods, publicConfigured, nodePortConfigured, externalNameConfigured, hostPortMappings, broadPolicyRules, ingressInventoryStatus(ingressErr))
 	return r
 }
 

@@ -78,4 +78,7 @@ type Report struct {
 	Compliance          ComplianceSummary `json:"compliance"`
 }
 
-type Options struct{ Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace string }
+type Options struct {
+	Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace string
+	MetadataFile                                                  string
+}

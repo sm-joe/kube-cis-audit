@@ -186,10 +186,8 @@ func classifyRBACRule(rule rbacv1.PolicyRule) []rbacRisk {
 	verbs := stringSet(rule.Verbs)
 	groups := stringSet(rule.APIGroups)
 	resources := stringSet(rule.Resources)
-	if verbs["*"] && resources["*"] {
-		out = append(out, rbacRisk{3, "wildcard verbs and resources grant broad API access"})
-	} else if verbs["*"] || groups["*"] || resources["*"] {
-		out = append(out, rbacRisk{2, "wildcard in an RBAC rule dimension broadens API access"})
+	if verbs["*"] || groups["*"] || resources["*"] {
+		out = append(out, rbacRisk{3, "wildcard permission grants broad API access"})
 	}
 	for _, verb := range []string{"impersonate", "bind", "escalate"} {
 		if verbs[verb] {

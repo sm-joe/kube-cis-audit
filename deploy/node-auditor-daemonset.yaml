@@ -29,22 +29,27 @@ spec:
         - operator: Exists
       imagePullSecrets:
         - name: ghcr-pull-secret
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
+        # This container has no Kubernetes API token and cannot read host files.
+        # It consumes only a short-lived, metadata-only snapshot from the helper.
         - name: node-auditor
-          image: ghcr.io/sm-joe/kubecis:milestone-2-step-2.2
+          image: ghcr.io/sm-joe/kubecis:2.9.0
           imagePullPolicy: IfNotPresent
           args:
             - node-audit
             - --benchmark
             - cis-2.1.0
-            - --host-root
-            - /host
+            - --metadata-file
+            - /metadata/snapshot.json
             - --node-name
             - $(NODE_NAME)
             - --output
             - json
             - --interval
-            - 24h
+            - 30s
           env:
             - name: NODE_NAME
               valueFrom:
@@ -54,25 +59,71 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
-            runAsUser: 10001
-            runAsGroup: 10001
-            seccompProfile:
-              type: RuntimeDefault
+            runAsUser: 65532
+            runAsGroup: 65532
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: host-root
-              mountPath: /host
+            - name: metadata
+              mountPath: /metadata
               readOnly: true
           resources:
             requests:
               cpu: 10m
               memory: 32Mi
             limits:
-              cpu: 100m
+              cpu: 200m
               memory: 128Mi
+        # Narrow exception: root plus CAP_DAC_READ_SEARCH can stat only the
+        # allowlisted kubelet config path; no file contents are read.
+        - name: node-metadata-helper
+          image: ghcr.io/sm-joe/kubecis:2.9.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - node-metadata
+            - --benchmark
+            - cis-2.1.0
+            - --host-root
+            - /host-kubelet
+            - --node-name
+            - $(NODE_NAME)
+            - --output-file
+            - /metadata/snapshot.json
+            - --interval
+            - 30s
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["DAC_READ_SEARCH"]
+          volumeMounts:
+            - name: kubelet-config
+              mountPath: /host-kubelet
+              readOnly: true
+            - name: metadata
+              mountPath: /metadata
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       volumes:
-        - name: host-root
+        - name: kubelet-config
           hostPath:
-            path: /
+            path: /var/lib/kubelet
             type: Directory
+        - name: metadata
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Mi

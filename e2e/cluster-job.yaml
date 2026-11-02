@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kubecis-e2e-cluster-audit
+  namespace: kube-system
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      serviceAccountName: kubecis
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kubecis
+          image: kubecis:e2e
+          imagePullPolicy: Never
+          args: ["scan", "--benchmark", "cis-2.1.0", "--target", "all", "--output", "json", "--exit-code-on-fail=false"]
+          env:
+            - name: KUBECIS_CONFIG_DIR
+              value: /app/benchmarks
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 1000m, memory: 512Mi }

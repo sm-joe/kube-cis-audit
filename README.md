@@ -159,3 +159,9 @@ The DaemonSet repeats the assessment every 24 hours. It runs as non-root with al
 ### Verify the running build
 
 Run `kubecis version` to print the embedded build identifier. Cluster JSON reports include the same value in `buildVersion`. For the admission-inventory verification package, the expected identifier is `2.3.2-admission-inventory`.
+
+## Docker image and Kubernetes deployment
+
+See [Docker and E2E deployment guide](docs/DOCKER-AND-E2E.md) for the multi-stage Distroless image, the read-only cluster audit Job, the two-container node-local DaemonSet, GHCR publishing, and the disposable Kind E2E test.
+
+The node-local DaemonSet separates the unprivileged auditor from a metadata-only helper. The helper's narrowly scoped UID 0 + `CAP_DAC_READ_SEARCH` exception is restricted to a read-only `/var/lib/kubelet` mount and an explicit file-path allowlist; it does not read host file contents. Do not replace this boundary with a privileged container.

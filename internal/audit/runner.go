@@ -89,12 +89,16 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if strings.TrimSpace(nodeName) == "" {
 		return Report{}, fmt.Errorf("node name is required; set NODE_NAME or pass --node-name")
 	}
-	if strings.TrimSpace(o.HostRoot) == "" {
-		return Report{}, fmt.Errorf("host root is required")
-	}
-	hostRoot, err := filepath.Abs(o.HostRoot)
-	if err != nil {
-		return Report{}, fmt.Errorf("resolve host root: %w", err)
+	hostRoot := ""
+	if strings.TrimSpace(o.MetadataFile) == "" {
+		if strings.TrimSpace(o.HostRoot) == "" {
+			return Report{}, fmt.Errorf("host root is required when metadata-file is not configured")
+		}
+		var err error
+		hostRoot, err = filepath.Abs(o.HostRoot)
+		if err != nil {
+			return Report{}, fmt.Errorf("resolve host root: %w", err)
+		}
 	}
 	bench, err := readSelectedBenchmark(o.ConfigDir, o.Benchmark)
 	if err != nil {
@@ -111,6 +115,11 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		CompatibilityStatus: bench.CompatibilityStatus,
 		CompatibilityNote:   bench.CompatibilityNote,
 	}
+	var metadata NodeMetadataSnapshot
+	var metadataErr error
+	if strings.TrimSpace(o.MetadataFile) != "" {
+		metadata, metadataErr = readNodeMetadataSnapshot(o.MetadataFile, nodeName)
+	}
 	for _, c := range bench.Checks {
 		// Node-local mode intentionally runs only checks explicitly targeted at
 		// worker/control-plane node configuration and backed by host file data.
@@ -120,7 +129,16 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" {
 			continue
 		}
-		r := evaluateNodeHostCheck(hostRoot, nodeName, c)
+		var r Result
+		if strings.TrimSpace(o.MetadataFile) != "" {
+			if metadataErr != nil {
+				r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Details: "Node metadata snapshot unavailable: " + metadataErr.Error(), Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "metadata", Observed: "unavailable", Expected: "fresh metadata snapshot from the node metadata helper"}}}
+			} else {
+				r = evaluateNodeHostCheckFromMetadata(nodeName, c, metadata)
+			}
+		} else {
+			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
+		}
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}

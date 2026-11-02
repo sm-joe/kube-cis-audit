@@ -10,19 +10,29 @@ metadata:
   name: kubecis-auditor
 rules:
   - apiGroups: [""]
-    resources: ["pods", "namespaces"]
+    resources:
+      - pods
+      - namespaces
+      - serviceaccounts
+      - services
     verbs: ["get", "list"]
   - apiGroups: ["networking.k8s.io"]
-    resources: ["networkpolicies"]
+    resources:
+      - networkpolicies
+      - ingresses
     verbs: ["get", "list"]
   - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["clusterrolebindings", "rolebindings"]
+    resources:
+      - roles
+      - rolebindings
+      - clusterroles
+      - clusterrolebindings
     verbs: ["get", "list"]
   - apiGroups: ["admissionregistration.k8s.io"]
     resources:
-      - "validatingadmissionpolicies"
-      - "validatingadmissionpolicybindings"
-      - "validatingwebhookconfigurations"
+      - validatingadmissionpolicies
+      - validatingadmissionpolicybindings
+      - validatingwebhookconfigurations
     verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
