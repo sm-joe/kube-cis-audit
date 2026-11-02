@@ -9,11 +9,13 @@ spec:
     spec:
       serviceAccountName: kubecis
       restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: kubecis
-          image: ghcr.io/your-org/kubecis:0.1.0
-          imagePullPolicy: IfNotPresent
-          args: ["scan", "--benchmark", "auto", "--target", "policies", "--output", "text"]
+          image: ghcr.io/sm-joe/kubecis:2.3.2-admission-inventory
+          imagePullPolicy: Always
+          args: ["scan", "--benchmark", "cis-2.1.0", "--target", "policies", "--output", "json"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

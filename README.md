@@ -146,3 +146,8 @@ kubecis node-audit --benchmark cis-2.1.0 --host-root /host --node-name worker-01
 ```
 
 The DaemonSet repeats the assessment every 24 hours. It runs as non-root with all Linux capabilities dropped, has no service-account token, uses RuntimeDefault seccomp, and mounts the host root read-only. If a host path cannot be traversed, it reports `NOT_ASSESSED`; do not make the container privileged to force access. This initial node mode runs only checks with `target: node` and supported host-file kinds. It does not assess managed control-plane files or Windows nodes. See `docs/MILESTONE-2-STEP-2.2.md` for the security model and limitations.
+
+
+### Verify the running build
+
+Run `kubecis version` to print the embedded build identifier. Cluster JSON reports include the same value in `buildVersion`. For the admission-inventory verification package, the expected identifier is `2.3.2-admission-inventory`.

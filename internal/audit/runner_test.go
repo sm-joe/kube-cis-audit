@@ -119,6 +119,32 @@ func TestPolicyControlDoesNotFalseFailWhenNoPSALabels(t *testing.T) {
 	}
 }
 
+func TestPolicyControlRecordsSuccessfulEmptyAdmissionInventories(t *testing.T) {
+	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app"}})
+	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})
+	if r.Status != "NOT_ASSESSED" {
+		t.Fatalf("got %s, want NOT_ASSESSED: %s", r.Status, r.Details)
+	}
+	want := map[string]bool{
+		"ValidatingAdmissionPolicy":        false,
+		"ValidatingAdmissionPolicyBinding": false,
+		"ValidatingWebhookConfiguration":   false,
+	}
+	for _, evidence := range r.Evidence {
+		if _, ok := want[evidence.Resource]; ok && evidence.Field == "inventory" {
+			if !strings.Contains(evidence.Observed, "list succeeded; count=0") {
+				t.Errorf("unexpected inventory evidence for %s: %s", evidence.Resource, evidence.Observed)
+			}
+			want[evidence.Resource] = true
+		}
+	}
+	for resource, found := range want {
+		if !found {
+			t.Errorf("missing successful empty inventory evidence for %s; evidence=%#v", resource, r.Evidence)
+		}
+	}
+}
+
 func TestPolicyControlRequiresManualConfirmationWhenAllNamespacesEnforcePSA(t *testing.T) {
 	client := fake.NewSimpleClientset(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "app", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}})
 	r := evaluatePolicyControl(context.Background(), client, Check{}, Options{}, Result{})

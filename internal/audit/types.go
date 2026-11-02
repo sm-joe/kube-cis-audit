@@ -2,6 +2,10 @@ package audit
 
 import "time"
 
+// BuildVersion is embedded in every report so operators can verify which
+// auditor implementation actually produced the results.
+const BuildVersion = "2.3.2-admission-inventory"
+
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
 	Title       string `yaml:"title" json:"title"`
@@ -60,6 +64,7 @@ type Summary struct {
 }
 
 type Report struct {
+	BuildVersion        string    `json:"buildVersion"`
 	AuditMode           string    `json:"auditMode,omitempty"`
 	NodeName            string    `json:"nodeName,omitempty"`
 	Tool                string    `json:"tool"`

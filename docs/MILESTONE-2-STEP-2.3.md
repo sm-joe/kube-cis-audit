@@ -50,3 +50,26 @@ gofmt -w .\internal\audit\admission.go .\internal\audit\runner.go .\internal\aud
 go test ./internal/audit
 go test ./...
 ```
+
+
+## Milestone 2.3.2 — admission inventory verification
+
+Every cluster report now includes `buildVersion`. The expected value for this package is `2.3.2-admission-inventory`; the `kubecis version` command prints the same value. This is an execution fingerprint: do not interpret a report as produced by this package unless the field matches.
+
+The policy-control result records successful inventory calls even when the API returns zero objects. It records separate counts for `ValidatingAdmissionPolicies`, `ValidatingAdmissionPolicyBindings`, and `ValidatingWebhookConfigurations`. Failed list calls are recorded as evidence and force `NOT_ASSESSED`. This distinguishes an empty inventory from an inventory that was never executed or could not be read.
+
+### Build and run on Windows PowerShell
+
+Run from the repository root. The tag is intentionally unique so an older image tag cannot be mistaken for this build.
+
+```powershell
+docker build --pull -t ghcr.io/sm-joe/kubecis:2.3.2-admission-inventory .
+docker push ghcr.io/sm-joe/kubecis:2.3.2-admission-inventory
+
+kubectl apply -f deploy/rbac.yaml
+kubectl delete job kubecis-audit -n kube-system --ignore-not-found
+kubectl apply -f deploy/job.yaml
+kubectl logs -n kube-system job/kubecis-audit
+```
+
+The report must contain `\"buildVersion\": \"2.3.2-admission-inventory\"` and inventory evidence entries for all three admission API resource types. If it does not, the cluster is still running a different image. If the inventory calls fail, the report will show the exact API error; verify that the `kubecis-auditor` ClusterRole and ClusterRoleBinding in `deploy/rbac.yaml` have been applied.

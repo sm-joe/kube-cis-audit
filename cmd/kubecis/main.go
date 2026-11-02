@@ -94,8 +94,12 @@ func main() {
 	nodeAudit.Flags().StringVar(&nodeOutput, "output", "json", "Output format: json or text")
 	nodeAudit.Flags().DurationVar(&nodeInterval, "interval", 0, "Repeat assessment interval (e.g. 24h); zero runs once")
 
+	version := &cobra.Command{Use: "version", Short: "Print KubeCIS build version", Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(audit.BuildVersion)
+	}}
 	root.AddCommand(scan)
 	root.AddCommand(nodeAudit)
+	root.AddCommand(version)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)
 		os.Exit(1)

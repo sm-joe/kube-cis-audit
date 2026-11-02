@@ -38,7 +38,7 @@ func Run(o Options) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	report := Report{Tool: "KubeCIS", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, Benchmark: bench.ID, CompatibilityStatus: bench.CompatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
+	report := Report{BuildVersion: BuildVersion, Tool: "KubeCIS", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, Benchmark: bench.ID, CompatibilityStatus: bench.CompatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	for _, c := range bench.Checks {
@@ -72,6 +72,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		return Report{}, err
 	}
 	report := Report{
+		BuildVersion:        BuildVersion,
 		AuditMode:           "node-local",
 		NodeName:            nodeName,
 		Tool:                "KubeCIS",
@@ -357,9 +358,15 @@ func evaluatePolicyControl(ctx context.Context, client kubernetes.Interface, c C
 	bindings, bindingErr := client.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().List(ctx, metav1.ListOptions{})
 	if policyErr != nil {
 		inventoryErrors = append(inventoryErrors, "ValidatingAdmissionPolicies: "+policyErr.Error())
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicy", Field: "inventory", Observed: "list failed: " + policyErr.Error(), Expected: "successful cluster-wide list"})
+	} else {
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicy", Field: "inventory", Observed: fmt.Sprintf("list succeeded; count=%d", len(policies.Items)), Expected: "inventory result recorded, including zero objects"})
 	}
 	if bindingErr != nil {
 		inventoryErrors = append(inventoryErrors, "ValidatingAdmissionPolicyBindings: "+bindingErr.Error())
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Field: "inventory", Observed: "list failed: " + bindingErr.Error(), Expected: "successful cluster-wide list"})
+	} else {
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingAdmissionPolicyBinding", Field: "inventory", Observed: fmt.Sprintf("list succeeded; count=%d", len(bindings.Items)), Expected: "inventory result recorded, including zero objects"})
 	}
 
 	if policyErr == nil && bindingErr == nil {
@@ -402,7 +409,9 @@ func evaluatePolicyControl(ctx context.Context, client kubernetes.Interface, c C
 	webhooks, webhookErr := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, metav1.ListOptions{})
 	if webhookErr != nil {
 		inventoryErrors = append(inventoryErrors, "ValidatingWebhookConfigurations: "+webhookErr.Error())
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingWebhookConfiguration", Field: "inventory", Observed: "list failed: " + webhookErr.Error(), Expected: "successful cluster-wide list"})
 	} else {
+		r.Evidence = append(r.Evidence, Evidence{Resource: "ValidatingWebhookConfiguration", Field: "inventory", Observed: fmt.Sprintf("list succeeded; count=%d", len(webhooks.Items)), Expected: "inventory result recorded, including zero objects"})
 		for _, configuration := range webhooks.Items {
 			for _, webhook := range configuration.Webhooks {
 				matchesPods := false
