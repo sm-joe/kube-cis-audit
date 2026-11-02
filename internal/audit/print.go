@@ -34,7 +34,15 @@ func Print(r Report) {
 		}
 	}
 	fmt.Println(strings.Repeat("─", 100))
-	fmt.Printf("SUMMARY  PASS: %d  FAIL: %d  WARN: %d  MANUAL: %d  NOT_ASSESSED: %d  INFO: %d  TOTAL: %d\n\n", r.Summary.Pass, r.Summary.Fail, r.Summary.Warn, r.Summary.Manual, r.Summary.NotAssessed, r.Summary.Info, r.Summary.Total)
+	fmt.Printf("SUMMARY  PASS: %d  FAIL: %d  WARN: %d  MANUAL: %d  NOT_ASSESSED: %d  INFO: %d  TOTAL: %d\n", r.Summary.Pass, r.Summary.Fail, r.Summary.Warn, r.Summary.Manual, r.Summary.NotAssessed, r.Summary.Info, r.Summary.Total)
+	if r.Compliance.ScoreStatus != "" {
+		if r.Compliance.CompliancePercent == nil {
+			fmt.Printf("COMPLIANCE  scored=%d  coverage=%.2f%%  score=WITHHELD (%s)\n", r.Compliance.ScoredTotal, r.Compliance.CoveragePercent, r.Compliance.ScoreStatus)
+		} else {
+			fmt.Printf("COMPLIANCE  scored=%d  coverage=%.2f%%  compliance=%.2f%% (%s)\n", r.Compliance.ScoredTotal, r.Compliance.CoveragePercent, *r.Compliance.CompliancePercent, r.Compliance.ScoreStatus)
+		}
+	}
+	fmt.Println()
 }
 
 func symbol(s string) string {

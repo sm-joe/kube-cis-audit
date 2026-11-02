@@ -8,8 +8,10 @@ A Go-based, read-only Kubernetes security configuration auditor. Checks are desc
 
 - Detects the Kubernetes server version through discovery and selects a benchmark YAML by the configured Kubernetes minor-version mapping.
 - Targets: `master`, `node`, and `policies`; select `all` to include every configured target.
-- Read-only Kubernetes API checks for workload security context, HostPath volume exposure, host namespace sharing, NetworkPolicy presence, and cluster-admin bindings.
+- Read-only Kubernetes API checks for workload security, RBAC permissions and service-account token automount, NetworkPolicy coverage, Service/Ingress/hostPort exposure configuration, and visible control-plane/audit flags.
+- Consolidated benchmark coverage and scoring metadata; the compliance percentage is withheld when scored controls have unresolved statuses.
 - Consolidated workload security reporting across KubeCIS extensions 2.4.1–2.4.6.
+- Milestones 2.5–2.9 add RBAC risk inventory, network configuration assessment, visible control-plane posture, audit logging configuration evidence, and benchmark coverage reporting.
 - Host filesystem checks for node/control-plane configuration files when the host root is mounted at `/host`.
 - PASS / FAIL / WARN / MANUAL / NOT_ASSESSED / INFO terminal output, structured JSON evidence, remediation text, and a summary.
 - Credential selection: explicit `--kubeconfig` first; otherwise in-cluster ServiceAccount credentials when the Kubernetes service environment is present; otherwise standard client-go kubeconfig loading (`KUBECONFIG`, then `~/.kube/config`). If none is usable, the error explains how to configure access.
@@ -78,6 +80,11 @@ Supported evaluator kinds:
 | `api_pod_seccomp` | policies | Inspects effective Pod/container seccomp settings. Explicit `RuntimeDefault` and valid `Localhost` profiles pass; `Unconfined` or missing profiles fail this pod-spec check. |
 | `api_network_policy` | policies | Checks for at least one NetworkPolicy object in every namespace, including system namespaces. Presence does not prove effective isolation or CNI enforcement. |
 | `api_cluster_admin` | policies | Lists User, Group and ServiceAccount subjects bound to `cluster-admin` through both ClusterRoleBindings and RoleBindings. Bindings are WARN for necessity review. |
+| `api_rbac_risk` | policies | Inventories roles/bindings, wildcard and sensitive permissions, escalation verbs, and service-account token automount metadata. Never reads Secret contents. |
+| `api_network_security` | policies | Assesses Pod ingress/egress policy selection and inventories Service, Ingress, hostPort and broad policy-rule configuration. Does not prove reachability or CNI enforcement. |
+| `api_control_plane_security` | policies | Inspects visible control-plane Pod arguments for selected security flags. Hidden managed control planes and omitted flags require MANUAL verification. |
+| `api_audit_logging` | policies | Inspects visible API-server audit policy/backend flags. Does not prove policy file contents, log delivery, retention or alerting. |
+| `report_compliance_summary` | report | Adds scored-control counts and coverage; withholds compliance percentage if any scored control is unresolved. |
 | `host_file_exists` | master/node | Checks a file beneath `--host-root`. |
 | `host_file_mode` | master/node | Checks Unix permission bits against `maxMode` (octal string), using a bitmask comparison. |
 | `manual: true` | any | Emits MANUAL to indicate auditor verification is required. |

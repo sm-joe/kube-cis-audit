@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-const BuildVersion = "2.4.7-workload-security-consolidation"
+const BuildVersion = "2.9.0-consolidated-security-assessment"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
@@ -64,17 +64,18 @@ type Summary struct {
 }
 
 type Report struct {
-	BuildVersion        string    `json:"buildVersion"`
-	AuditMode           string    `json:"auditMode,omitempty"`
-	NodeName            string    `json:"nodeName,omitempty"`
-	Tool                string    `json:"tool"`
-	GeneratedAt         time.Time `json:"generatedAt"`
-	ClusterVersion      string    `json:"clusterVersion"`
-	Benchmark           string    `json:"benchmark"`
-	CompatibilityStatus string    `json:"benchmarkCompatibilityStatus,omitempty"`
-	CompatibilityNote   string    `json:"benchmarkCompatibilityNote,omitempty"`
-	Results             []Result  `json:"results"`
-	Summary             Summary   `json:"summary"`
+	BuildVersion        string            `json:"buildVersion"`
+	AuditMode           string            `json:"auditMode,omitempty"`
+	NodeName            string            `json:"nodeName,omitempty"`
+	Tool                string            `json:"tool"`
+	GeneratedAt         time.Time         `json:"generatedAt"`
+	ClusterVersion      string            `json:"clusterVersion"`
+	Benchmark           string            `json:"benchmark"`
+	CompatibilityStatus string            `json:"benchmarkCompatibilityStatus,omitempty"`
+	CompatibilityNote   string            `json:"benchmarkCompatibilityNote,omitempty"`
+	Results             []Result          `json:"results"`
+	Summary             Summary           `json:"summary"`
+	Compliance          ComplianceSummary `json:"compliance"`
 }
 
 type Options struct{ Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace string }

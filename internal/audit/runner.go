@@ -42,9 +42,17 @@ func Run(o Options) (Report, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
+	var complianceSummaryCheck *Check
+	selectedChecks := make([]Check, 0, len(bench.Checks))
 	for i := range bench.Checks {
 		c := bench.Checks[i]
 		if o.Target != "all" && o.Target != "" && !strings.EqualFold(c.Target, o.Target) {
+			continue
+		}
+		selectedChecks = append(selectedChecks, c)
+		if c.Kind == "report_compliance_summary" {
+			checkCopy := c
+			complianceSummaryCheck = &checkCopy
 			continue
 		}
 		if c.Kind == "report_workload_security_summary" {
@@ -60,6 +68,15 @@ func Run(o Options) (Report, error) {
 		r := buildWorkloadSecuritySummary(*workloadSummaryCheck, report.Results)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
+	}
+	compliance, complianceResult := buildComplianceSummary(selectedChecks, report.Results)
+	report.Compliance = compliance
+	if complianceSummaryCheck != nil {
+		complianceResult.ID = complianceSummaryCheck.ID
+		complianceResult.Title = complianceSummaryCheck.Title
+		complianceResult.Remediation = complianceSummaryCheck.Remediation
+		report.Results = append(report.Results, complianceResult)
+		incrementSummary(&report.Summary, complianceResult.Status)
 	}
 	report.Summary.Total = len(report.Results)
 	return report, nil
@@ -296,6 +313,14 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return evaluatePodHostNamespaces(ctx, client, c, o, r)
 	case "api_pod_hostpath":
 		return evaluatePodHostPath(ctx, client, c, o, r)
+	case "api_rbac_risk":
+		return evaluateRBACRisk(ctx, client, c, o, r)
+	case "api_network_security":
+		return evaluateNetworkSecurity(ctx, client, c, o, r)
+	case "api_control_plane_security":
+		return evaluateControlPlaneSecurity(ctx, client, c, o, r)
+	case "api_audit_logging":
+		return evaluateAuditLogging(ctx, client, c, o, r)
 	case "report_workload_security_summary":
 		r.Status = "NOT_ASSESSED"
 		r.Details = "Workload security summary is generated after individual benchmark checks."

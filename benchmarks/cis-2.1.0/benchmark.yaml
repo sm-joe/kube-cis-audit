@@ -121,3 +121,43 @@ checks:
     kind: report_workload_security_summary
     scored: false
     remediation: Review all underlying workload security findings and resolve or formally accept each exception. A summary status does not replace review of individual evidence.
+
+  - id: KUBECIS-2.5.1
+    title: Assess RBAC least privilege and workload identity exposure
+    description: KubeCIS extension (not an official CIS control). Inventories Roles, ClusterRoles, bindings and subjects; identifies wildcard, privilege-escalation, Secret-read and interactive workload permissions; records service-account token automount configuration without reading Secret contents.
+    target: policies
+    kind: api_rbac_risk
+    scored: false
+    remediation: Remove unnecessary wildcard and privilege-escalation permissions, restrict Secret access and workload exec permissions, and disable service-account token automount where not required.
+
+  - id: KUBECIS-2.6.1
+    title: Assess network policy coverage and configured workload exposure
+    description: KubeCIS extension (not an official CIS control). Evaluates per-Pod ingress and egress NetworkPolicy selection, inventories Service exposure types, Ingress host rules and hostPort mappings. Configuration does not prove CNI enforcement or external reachability.
+    target: policies
+    kind: api_network_security
+    scored: false
+    remediation: Apply least-privilege ingress and egress policies to workloads; review LoadBalancer, NodePort, Ingress and hostPort exposure with network owners.
+
+  - id: KUBECIS-2.7.1
+    title: Assess visible Kubernetes control-plane security configuration
+    description: KubeCIS extension (not an official CIS control). Inspects visible control-plane Pod arguments for selected API server, etcd, scheduler and controller-manager settings. Managed control planes or hidden configuration require provider-side/manual evidence; omitted flags are not treated as secure.
+    target: policies
+    kind: api_control_plane_security
+    scored: false
+    remediation: Verify API server authentication and authorization, etcd mutual TLS, and restricted scheduler/controller-manager serving and profiling settings using supported provider or node-local evidence.
+
+  - id: KUBECIS-2.8.1
+    title: Assess visible Kubernetes API audit logging configuration
+    description: KubeCIS extension (not an official CIS control). Inspects visible API server arguments for audit policy and log/webhook backend configuration. Does not read referenced files or prove log delivery, retention or alert operation.
+    target: policies
+    kind: api_audit_logging
+    scored: false
+    remediation: Configure an appropriate audit policy and a supported audit backend; independently validate policy content, delivery, retention, access controls and alerting.
+
+  - id: KUBECIS-2.9.1
+    title: Summarize benchmark coverage and compliance scoring
+    description: KubeCIS reporting extension (not an official CIS control). Reports scored-control status counts, assessment coverage and a compliance percentage only when every scored control resolves to PASS or FAIL. KubeCIS extensions are excluded from official scoring; WARN, MANUAL and NOT_ASSESSED are never counted as PASS.
+    target: report
+    kind: report_compliance_summary
+    scored: false
+    remediation: Resolve incomplete scored controls and review individual evidence. A withheld percentage indicates that the assessment is incomplete or contains indeterminate scored results.
