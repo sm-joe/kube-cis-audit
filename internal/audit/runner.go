@@ -41,11 +41,23 @@ func Run(o Options) (Report, error) {
 	report := Report{BuildVersion: BuildVersion, Tool: "KubeCIS", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, Benchmark: bench.ID, CompatibilityStatus: bench.CompatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	for _, c := range bench.Checks {
+	var workloadSummaryCheck *Check
+	for i := range bench.Checks {
+		c := bench.Checks[i]
 		if o.Target != "all" && o.Target != "" && !strings.EqualFold(c.Target, o.Target) {
 			continue
 		}
+		if c.Kind == "report_workload_security_summary" {
+			checkCopy := c
+			workloadSummaryCheck = &checkCopy
+			continue
+		}
 		r := evaluate(ctx, client, c, o)
+		report.Results = append(report.Results, r)
+		incrementSummary(&report.Summary, r.Status)
+	}
+	if workloadSummaryCheck != nil {
+		r := buildWorkloadSecuritySummary(*workloadSummaryCheck, report.Results)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
@@ -282,7 +294,12 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return evaluatePodReadOnlyRootFilesystem(ctx, client, c, o, r)
 	case "api_pod_host_namespaces":
 		return evaluatePodHostNamespaces(ctx, client, c, o, r)
-
+	case "api_pod_hostpath":
+		return evaluatePodHostPath(ctx, client, c, o, r)
+	case "report_workload_security_summary":
+		r.Status = "NOT_ASSESSED"
+		r.Details = "Workload security summary is generated after individual benchmark checks."
+		return r
 	case "host_file_exists", "host_file_mode":
 		p := filepath.Join(o.HostRoot, strings.TrimLeft(filepath.Clean(c.Path), "/"))
 		st, err := os.Stat(p)

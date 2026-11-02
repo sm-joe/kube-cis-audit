@@ -105,3 +105,19 @@ checks:
     kind: api_pod_host_namespaces
     scored: false
     remediation: Set hostPID, hostIPC, and hostNetwork to false unless host namespace sharing is explicitly required, documented, and approved.
+
+  - id: KUBECIS-2.4.6
+    title: Assess HostPath volume exposure
+    description: KubeCIS extension (not an official CIS control). Inventories HostPath volumes and their container mounts/block-device mappings across non-terminal Pods. Sensitive host paths exposed writable fail; sensitive read-only mounts warn; other writable HostPath mounts warn. Mount propagation and unmounted HostPath declarations are reported separately. This evaluates Pod specifications, not resolved host filesystem objects or runtime mount state.
+    target: policies
+    kind: api_pod_hostpath
+    scored: false
+    remediation: Avoid HostPath volumes where possible. Prefer PersistentVolumes, projected volumes, or dedicated CSI drivers. If HostPath is unavoidable, restrict the path to the narrowest required location, mount it read-only, disable mount propagation, and document an owner-approved exception.
+
+  - id: KUBECIS-2.4.7
+    title: Consolidate workload security assessment results
+    description: KubeCIS extension (not an official CIS control). Summarizes the individual KubeCIS workload security checks from 2.4.1 through 2.4.6 without re-scanning resources. FAIL takes precedence over WARN, and incomplete evidence prevents an overall PASS.
+    target: policies
+    kind: report_workload_security_summary
+    scored: false
+    remediation: Review all underlying workload security findings and resolve or formally accept each exception. A summary status does not replace review of individual evidence.

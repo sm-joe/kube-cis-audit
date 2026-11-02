@@ -8,7 +8,8 @@ A Go-based, read-only Kubernetes security configuration auditor. Checks are desc
 
 - Detects the Kubernetes server version through discovery and selects a benchmark YAML by the configured Kubernetes minor-version mapping.
 - Targets: `master`, `node`, and `policies`; select `all` to include every configured target.
-- Read-only Kubernetes API checks for workload security context, NetworkPolicy presence, and cluster-admin bindings.
+- Read-only Kubernetes API checks for workload security context, HostPath volume exposure, host namespace sharing, NetworkPolicy presence, and cluster-admin bindings.
+- Consolidated workload security reporting across KubeCIS extensions 2.4.1–2.4.6.
 - Host filesystem checks for node/control-plane configuration files when the host root is mounted at `/host`.
 - PASS / FAIL / WARN / MANUAL / NOT_ASSESSED / INFO terminal output, structured JSON evidence, remediation text, and a summary.
 - Credential selection: explicit `--kubeconfig` first; otherwise in-cluster ServiceAccount credentials when the Kubernetes service environment is present; otherwise standard client-go kubeconfig loading (`KUBECONFIG`, then `~/.kube/config`). If none is usable, the error explains how to configure access.
