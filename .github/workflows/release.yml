@@ -31,8 +31,11 @@ jobs:
             goarch: arm64
             archive: tar.gz
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
           go-version: "1.26.x"
           cache: true
