@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: kubecis
-          image: ghcr.io/sm-joe/kubecis:2.9.0
+          image: ghcr.io/sm-joe/kubecis:v3.0.0
           imagePullPolicy: IfNotPresent
           args:
             - scan
@@ -36,6 +36,7 @@ spec:
             - all
             - --output
             - json
+            - --exit-code-on-fail=false
           env:
             - name: KUBECIS_CONFIG_DIR
               value: /app/benchmarks

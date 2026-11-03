@@ -21,7 +21,7 @@ import (
 )
 
 func Run(o Options) (Report, error) {
-	cfg, err := clusterConfig(o.Kubeconfig)
+	cfg, err := clusterConfig(o.Kubeconfig, o.KubeContext)
 	if err != nil {
 		return Report{}, fmt.Errorf("connect to cluster: %w", err)
 	}
@@ -220,10 +220,8 @@ func evaluateNodeHostCheck(hostRoot, nodeName string, c Check) Result {
 	return evaluateHostFileMode(st.Mode(), c, r)
 }
 
-func clusterConfig(path string) (*rest.Config, error) {
-	// An explicit --kubeconfig always wins. If it is not supplied, honour
-	// KUBECONFIG (including its platform-specific list of files) through the
-	// standard client-go loading rules.
+func clusterConfig(path, contextName string) (*rest.Config, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if path != "" {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
@@ -232,18 +230,16 @@ func clusterConfig(path string) (*rest.Config, error) {
 		if _, err := os.Stat(absPath); err != nil {
 			return nil, fmt.Errorf("kubeconfig %q is not accessible: %w; pass --kubeconfig <path> or set KUBECONFIG", absPath, err)
 		}
-		cfg, err := clientcmd.BuildConfigFromFlags("", absPath)
-		if err != nil {
-			return nil, fmt.Errorf("load kubeconfig %q: %w", absPath, err)
-		}
-		return cfg, nil
+		loadingRules = &clientcmd.ClientConfigLoadingRules{ExplicitPath: absPath}
 	}
 
 	// In-cluster credentials are available to Pods through the mounted
 	// service-account token and Kubernetes service environment variables.
-	// Do not attempt this path on a workstation: it produces noisy client-go
-	// warnings when those variables are absent.
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
+	// A kubeconfig context has no meaning inside this authentication mode.
+	if path == "" && os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
+		if contextName != "" {
+			return nil, fmt.Errorf("--context cannot be used with in-cluster credentials")
+		}
 		cfg, err := rest.InClusterConfig()
 		if err != nil {
 			return nil, fmt.Errorf("load in-cluster credentials: %w", err)
@@ -251,20 +247,18 @@ func clusterConfig(path string) (*rest.Config, error) {
 		return cfg, nil
 	}
 
-	// Outside a Pod, use the normal client-go loading rules. They honour
-	// KUBECONFIG and otherwise resolve ~/.kube/config on Windows, macOS and
-	// Linux. This avoids BuildConfigFromFlags' in-cluster fallback warning.
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		loadingRules,
-		&clientcmd.ConfigOverrides{},
-	)
+	overrides := &clientcmd.ConfigOverrides{CurrentContext: contextName}
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 	cfg, err := clientConfig.ClientConfig()
 	if err != nil {
+		if path != "" {
+			return nil, fmt.Errorf("load kubeconfig %q (context %q): %w", path, contextName, err)
+		}
 		return nil, fmt.Errorf("no usable Kubernetes credentials found: %w; run 'kubectl config current-context' to verify your context, or specify --kubeconfig <path> (or set KUBECONFIG). When running as a Kubernetes Job, ensure the Pod uses a ServiceAccount with the required RBAC permissions", err)
 	}
 	return cfg, nil
 }
+
 func loadBenchmark(dir, id, minor string) (Benchmark, error) {
 	if id != "auto" && id != "" {
 		return readBench(filepath.Join(dir, id, "benchmark.yaml"))

@@ -32,11 +32,55 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # Produce the first snapshot before the unprivileged auditor starts.
+        - name: node-metadata-init
+          image: ghcr.io/sm-joe/kubecis:v3.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - node-metadata
+            - --benchmark
+            - cis-2.1.0
+            - --host-root
+            - /host-kubelet
+            - --node-name
+            - $(NODE_NAME)
+            - --output-file
+            - /metadata/snapshot.json
+            - --interval
+            - 0s
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["DAC_READ_SEARCH"]
+          volumeMounts:
+            - name: kubelet-config
+              mountPath: /host-kubelet
+              readOnly: true
+            - name: metadata
+              mountPath: /metadata
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
       containers:
         # This container has no Kubernetes API token and cannot read host files.
         # It consumes only a short-lived, metadata-only snapshot from the helper.
         - name: node-auditor
-          image: ghcr.io/sm-joe/kubecis:2.9.0
+          image: ghcr.io/sm-joe/kubecis:v3.0.0
           imagePullPolicy: IfNotPresent
           args:
             - node-audit
@@ -49,7 +93,7 @@ spec:
             - --output
             - json
             - --interval
-            - 30s
+            - 24h
           env:
             - name: NODE_NAME
               valueFrom:
@@ -77,7 +121,7 @@ spec:
         # Narrow exception: root plus CAP_DAC_READ_SEARCH can stat only the
         # allowlisted kubelet config path; no file contents are read.
         - name: node-metadata-helper
-          image: ghcr.io/sm-joe/kubecis:2.9.0
+          image: ghcr.io/sm-joe/kubecis:v3.0.0
           imagePullPolicy: IfNotPresent
           args:
             - node-metadata
@@ -90,7 +134,7 @@ spec:
             - --output-file
             - /metadata/snapshot.json
             - --interval
-            - 30s
+            - 15s
           env:
             - name: NODE_NAME
               valueFrom:

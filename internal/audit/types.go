@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-const BuildVersion = "2.9.0-consolidated-security-assessment"
+var BuildVersion = "3.0.0-dev"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
@@ -79,6 +79,6 @@ type Report struct {
 }
 
 type Options struct {
-	Kubeconfig, ConfigDir, Benchmark, Target, HostRoot, Namespace string
-	MetadataFile                                                  string
+	Kubeconfig, KubeContext, ConfigDir, Benchmark, Target, HostRoot, Namespace string
+	MetadataFile                                                               string
 }
