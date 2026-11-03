@@ -18,7 +18,7 @@ spec:
         - name: kubecis
           image: kubecis:e2e
           imagePullPolicy: Never
-          args: ["scan", "--benchmark", "cis-2.1.0", "--target", "all", "--output", "json"]
+          args: ["scan", "--benchmark", "cis-2.1.0", "--target", "all", "--output", "json", "--exit-code-on-fail=false"]
           env:
             - name: KUBECIS_CONFIG_DIR
               value: /app/benchmarks

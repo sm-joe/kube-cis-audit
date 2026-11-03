@@ -1,4 +1,4 @@
-name: CI
+name: CI Pipeline
 
 on:
   pull_request:
@@ -11,24 +11,29 @@ permissions:
 
 jobs:
   test:
-    name: Test and build
+    name: Test and Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: "1.26.x"
           cache: true
-      - name: Verify formatting
+
+      - name: Verify Formatting
         shell: bash
         run: |
           test -z "$(gofmt -l $(find cmd internal -name '*.go'))"
-      - name: Vet
+
+      - name: Run Go Vet
         run: go vet ./...
-      - name: Test
+
+      - name: Run Go Tests
         run: go test ./... -count=1
+        
       - name: Build Linux CLI
         run: |
           mkdir -p dist

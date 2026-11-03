@@ -68,7 +68,7 @@ kubecis scan --benchmark cis-2.1.0 --target all --output json
 Build locally:
 
 ```powershell
-podman build --build-arg VERSION=dev -t kubecis:dev .
+podman build --build-arg VERSION=3.0.0-dev -t kubecis:3.0.0-dev .
 ```
 
 Run with your kubeconfig mounted read-only:
@@ -77,10 +77,10 @@ Run with your kubeconfig mounted read-only:
 podman run --rm `
   -v "$HOME\.kube:/home/nonroot/.kube:ro" `
   -e KUBECONFIG=/home/nonroot/.kube/config `
-  kubecis:dev scan --benchmark auto --target all --output json --exit-code-on-fail=false
+  kubecis:3.0.0-dev scan --benchmark auto --target all --output json --exit-code-on-fail=false
 ```
 
-The container runs as UID/GID 65532, uses a distroless non-root runtime, and includes the benchmark profiles. The host filesystem is not mounted by default; host-file checks require the separate node-audit deployment and its explicit read-only mounts.
+The container runs as UID/GID 65532, uses a Distroless non-root runtime, and includes the benchmark profiles. The host filesystem is not mounted by default; host-file checks require the separate node-audit deployment and its explicit read-only mounts. A standalone container can reach only API endpoints routable from its own network namespace, and kubeconfigs that require external `exec` credential plugins (such as `aws`, `az`, or `gcloud`) are not supported by this minimal image. For local Kind on Podman, use the in-cluster Job below: a kubeconfig endpoint such as `127.0.0.1` points to the container itself, not the Windows host. See [Container and E2E details](docs/DOCKER-AND-E2E.md).
 
 ## Run inside Kubernetes
 

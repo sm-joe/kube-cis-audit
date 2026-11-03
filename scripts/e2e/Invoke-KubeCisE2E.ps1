@@ -1,145 +1,401 @@
 [CmdletBinding()]
 param(
-    [string]$ClusterName = "kubecis-e2e",
-    [switch]$KeepCluster
+    [string]$Context = "kind-kind",
+    [string]$Version = "3.0.0-dev"
 )
 
 $ErrorActionPreference = "Stop"
+
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Artifacts = Join-Path $RepoRoot "artifacts\e2e"
+$ImageArchive = Join-Path $Artifacts "kubecis-e2e-image.tar"
+$Image = "kubecis:e2e-$($Version.Replace('.', '-'))"
+$KubernetesImage = "localhost/$Image"
+$RenderedJobManifest = Join-Path $Artifacts "cluster-job.generated.yaml"
+$RenderedNodeDaemonSetManifest = Join-Path $Artifacts "node-auditor-daemonset.generated.yaml"
+
+# Kind context names use the form kind-<cluster-name>.
+if (-not $Context.StartsWith("kind-")) {
+    throw "Context '$Context' is not a Kind context. Expected a context such as 'kind-kind'."
+}
+$ClusterName = $Context.Substring(5)
+if ([string]::IsNullOrWhiteSpace($ClusterName)) {
+    throw "Could not derive the Kind cluster name from context '$Context'."
+}
+
 New-Item -ItemType Directory -Force -Path $Artifacts | Out-Null
 
 function Require-Command {
-    param([string]$Name)
+    param([Parameter(Mandatory)][string]$Name)
+
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "Required command '$Name' was not found in PATH. Install Docker Desktop, kubectl and kind, then retry."
+        throw "Required command '$Name' was not found in PATH."
     }
 }
 
-Require-Command "docker"
-Require-Command "kubectl"
-Require-Command "kind"
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory)][string]$Command,
+        [Parameter(Mandatory)][string[]]$Arguments,
+        [string]$FailureMessage = "$Command failed"
+    )
 
-# Native tools such as Kind/Podman can write informational diagnostics to stderr
-# while returning exit code 0. Do not let PowerShell promote that stderr stream
-# into terminating errors; the script checks $LASTEXITCODE after native commands.
-if (Test-Path Variable:PSNativeCommandUseErrorActionPreference) {
-    $PSNativeCommandUseErrorActionPreference = $false
-}
-$clusters = @(kind get clusters 2>$null)
-$kindGetClustersExitCode = $LASTEXITCODE
-if ($kindGetClustersExitCode -ne 0) {
-    throw "kind get clusters failed ($kindGetClustersExitCode). Verify the Kind/Podman provider and container runtime."
-}
-if ($clusters -contains $ClusterName) {
-    throw "Kind cluster '$ClusterName' already exists. Delete it or choose another -ClusterName; this test expects a disposable cluster."
-}
-$ClusterCreated = $false
+    $previousErrorActionPreference = $ErrorActionPreference
+    $previousNativePreference = $null
+    $hasNativePreference = Test-Path Variable:PSNativeCommandUseErrorActionPreference
 
-try {
-    Write-Host "[1/8] Creating disposable Kind cluster '$ClusterName'..."
-    kind create cluster --name $ClusterName
-    if ($LASTEXITCODE -ne 0) { throw "kind create cluster failed ($LASTEXITCODE)" }
-    $ClusterCreated = $true
-
-    Write-Host "[2/8] Building KubeCIS image..."
-    docker build --pull -t kubecis:e2e $RepoRoot
-    if ($LASTEXITCODE -ne 0) { throw "Docker image build failed ($LASTEXITCODE)" }
-    $imageUser = docker image inspect kubecis:e2e --format '{{.Config.User}}'
-    if ($LASTEXITCODE -ne 0 -or $imageUser.Trim() -ne "65532:65532") { throw "Runtime image must default to UID/GID 65532; got '$imageUser'" }
-    $imageVersion = docker run --rm kubecis:e2e version
-    if ($LASTEXITCODE -ne 0 -or $imageVersion.Trim() -ne "2.9.0-consolidated-security-assessment") { throw "Image version command failed or returned an unexpected build identifier: '$imageVersion'" }
-
-    Write-Host "[3/8] Loading image into Kind..."
-    kind load docker-image kubecis:e2e --name $ClusterName
-    if ($LASTEXITCODE -ne 0) { throw "kind load docker-image failed ($LASTEXITCODE)" }
-
-    kubectl config use-context "kind-$ClusterName" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Could not select Kind context" }
-
-    Write-Host "[4/8] Applying read-only auditor RBAC and intentionally insecure test fixtures..."
-    kubectl apply -f (Join-Path $RepoRoot "deploy\rbac.yaml")
-    if ($LASTEXITCODE -ne 0) { throw "Applying auditor RBAC failed" }
-    kubectl apply -f (Join-Path $RepoRoot "e2e\fixtures.yaml")
-    if ($LASTEXITCODE -ne 0) { throw "Applying E2E fixtures failed" }
-
-    Write-Host "[5/8] Running cluster/API audit Job..."
-    kubectl apply -f (Join-Path $RepoRoot "e2e\cluster-job.yaml")
-    if ($LASTEXITCODE -ne 0) { throw "Creating cluster audit Job failed" }
-
-    $deadline = (Get-Date).AddMinutes(4)
-    $jobPhase = ""
-    while ((Get-Date) -lt $deadline) {
-        $job = kubectl get job kubecis-e2e-cluster-audit -n kube-system -o json | ConvertFrom-Json
-        if ($job.status.succeeded -gt 0) { $jobPhase = "Complete"; break }
-        if ($job.status.failed -gt 0) { $jobPhase = "Failed"; break }
-        Start-Sleep -Seconds 3
+    if ($hasNativePreference) {
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
     }
-    if (-not $jobPhase) { throw "Cluster audit Job did not terminate within four minutes" }
 
-    $clusterLogs = kubectl logs job/kubecis-e2e-cluster-audit -n kube-system 2>&1 | Out-String
-    $clusterLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "cluster-audit.log")
-    $jsonMatch = [regex]::Match($clusterLogs, '(?s)\{.*\}')
-    if (-not $jsonMatch.Success) { throw "Cluster audit did not emit a JSON report. See artifacts/e2e/cluster-audit.log" }
-    $clusterReport = $jsonMatch.Value | ConvertFrom-Json
-    $clusterReport | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 (Join-Path $Artifacts "cluster-audit.json")
-    if ($clusterReport.buildVersion -ne "2.9.0-consolidated-security-assessment") {
-        throw "Unexpected cluster build version: $($clusterReport.buildVersion)"
+    try {
+        # Kind/Podman can write informational messages to stderr. Capture both
+        # streams, but use the native process exit code to determine success.
+        $ErrorActionPreference = "Continue"
+        $output = & $Command @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
     }
-    $expectedIds = @("KUBECIS-2.4.7", "KUBECIS-2.5.1", "KUBECIS-2.6.1", "KUBECIS-2.7.1", "KUBECIS-2.8.1", "KUBECIS-2.9.1")
-    $actualIds = @($clusterReport.results | ForEach-Object { $_.id })
-    foreach ($id in $expectedIds) {
-        if ($actualIds -notcontains $id) { throw "Cluster report is missing expected check '$id'" }
-    }
-    $checksById = @{}
-    foreach ($result in $clusterReport.results) { $checksById[$result.id] = $result }
-    foreach ($id in @("KUBECIS-2.4.2", "KUBECIS-2.4.5", "KUBECIS-2.5.1")) {
-        if ($checksById[$id].status -ne "FAIL") {
-            throw "Expected insecure fixture finding '$id' to be FAIL; got '$($checksById[$id].status)'"
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
         }
     }
-    Write-Host "Cluster audit report verified. Job phase: $jobPhase; checks: $($clusterReport.results.Count); FAIL: $($clusterReport.summary.fail); NOT_ASSESSED: $($clusterReport.summary.notAssessed)"
 
-    Write-Host "[6/8] Running node-local DaemonSet with metadata-only helper..."
-    kubectl apply -f (Join-Path $RepoRoot "e2e\node-auditor-daemonset.yaml")
-    if ($LASTEXITCODE -ne 0) { throw "Creating node auditor DaemonSet failed" }
-    kubectl rollout status daemonset/kubecis-e2e-node-auditor -n kube-system --timeout=180s
-    if ($LASTEXITCODE -ne 0) { throw "Node auditor DaemonSet did not become ready" }
-    Start-Sleep -Seconds 40
-
-    $nodePodsResponse = kubectl get pods -n kube-system -l app=kubecis-e2e-node-auditor -o json | ConvertFrom-Json
-    $nodePods = @($nodePodsResponse.items)
-    if ($nodePods.Count -lt 1) { throw "No node auditor Pods were created" }
-    $nodePod = $nodePods[0].metadata.name
-    $helperLogs = kubectl logs $nodePod -n kube-system -c node-metadata-helper --tail=20 2>&1 | Out-String
-    $nodeLogs = kubectl logs $nodePod -n kube-system -c node-auditor --tail=200 2>&1 | Out-String
-    $helperLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-metadata-helper.log")
-    $nodeLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-audit.log")
-    if ($helperLogs -notmatch "snapshot refreshed") { throw "Metadata helper did not confirm a refreshed snapshot. See node-metadata-helper.log" }
-    if ($nodeLogs -notmatch '"auditMode": "node-local"') { throw "Node auditor did not emit a node-local JSON report. See node-audit.log" }
-    if ($nodeLogs -notmatch '"buildVersion": "2.9.0-consolidated-security-assessment"') { throw "Node report has an unexpected build version" }
-
-    Write-Host "[7/8] Verifying runtime security boundaries..."
-    $nodePodJson = kubectl get pod $nodePod -n kube-system -o json | ConvertFrom-Json
-    $mainContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-auditor" }
-    $helperContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-metadata-helper" }
-    if (-not $mainContainer.securityContext.readOnlyRootFilesystem -or $mainContainer.securityContext.runAsUser -ne 65532) {
-        throw "Node auditor main container security context does not match the non-root/read-only design"
+    if ($exitCode -ne 0) {
+        $detail = ($output | ForEach-Object { "$_" }) -join [Environment]::NewLine
+        throw "$FailureMessage (exit $exitCode). $detail"
     }
-    if ($helperContainer.securityContext.runAsUser -ne 0 -or $helperContainer.securityContext.capabilities.add -notcontains "DAC_READ_SEARCH") {
-        throw "Metadata helper does not have the narrowly scoped DAC_READ_SEARCH exception"
-    }
-    if ($nodePodJson.spec.automountServiceAccountToken -ne $false) { throw "Node DaemonSet must not mount a service-account token" }
 
-    Write-Host "[8/8] E2E checks completed. Artifacts: $Artifacts"
-    Write-Host "Cluster report: $($clusterReport.summary | ConvertTo-Json -Compress)"
-    Write-Host "Cluster job phase '$jobPhase' is acceptable when the fixture findings cause the CLI's findings-based non-zero exit. The report is still validated above."
+    return $output
 }
-finally {
-    if ($ClusterCreated -and -not $KeepCluster) {
-        Write-Host "Deleting disposable Kind cluster '$ClusterName'..."
-        kind delete cluster --name $ClusterName
-    } elseif ($ClusterCreated -and $KeepCluster) {
-        Write-Host "Keeping Kind cluster '$ClusterName' as requested."
+
+Require-Command "podman"
+Require-Command "kind"
+Require-Command "kubectl"
+
+# This script is specifically for the existing Podman-backed Kind cluster.
+$env:KIND_EXPERIMENTAL_PROVIDER = "podman"
+
+Write-Host "[1/8] Verifying the existing Kind cluster and context '$Context'..."
+
+$clusters = @(
+    Invoke-Native -Command "kind" `
+        -Arguments @("get", "clusters") `
+        -FailureMessage "kind get clusters failed" |
+        ForEach-Object { "$_".Trim() } |
+        Where-Object { $_ -ne "" -and $_ -notmatch "^using podman due to" -and $_ -notmatch "^enabling experimental podman provider$" }
+)
+
+if ($clusters -notcontains $ClusterName) {
+    throw "Expected existing Kind cluster '$ClusterName' was not found. This script never creates or deletes clusters. Found: $($clusters -join ', ')"
+}
+
+$contextNames = @(
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("config", "get-contexts", "-o", "name") `
+        -FailureMessage "Could not read kubeconfig contexts" |
+        ForEach-Object { "$_".Trim() }
+)
+
+if ($contextNames -notcontains $Context) {
+    throw "Kubeconfig context '$Context' was not found. Available contexts: $($contextNames -join ', ')"
+}
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "get", "nodes") `
+    -FailureMessage "Existing cluster is not reachable" |
+    Out-Host
+
+Write-Host "[2/8] Building and verifying the version-specific Linux container image..."
+
+Invoke-Native -Command "podman" `
+    -Arguments @("build", "--pull", "--build-arg", "VERSION=$Version", "-t", $Image, $RepoRoot) `
+    -FailureMessage "Podman image build failed" |
+    Out-Host
+
+$imageUser = (
+    Invoke-Native -Command "podman" `
+        -Arguments @("image", "inspect", "--format", "{{.Config.User}}", $Image) `
+        -FailureMessage "Could not inspect image" |
+        Out-String
+).Trim()
+
+if ($imageUser -ne "65532:65532") {
+    throw "Runtime image must default to UID/GID 65532:65532; got '$imageUser'."
+}
+
+$imageVersion = (
+    Invoke-Native -Command "podman" `
+        -Arguments @("run", "--rm", $Image, "version") `
+        -FailureMessage "Container version command failed" |
+        Out-String
+).Trim()
+
+if ($imageVersion -ne $Version) {
+    throw "Container version mismatch. Expected '$Version', got '$imageVersion'."
+}
+
+Write-Host "Verified image: $Image; version: $imageVersion; runtime user: $imageUser"
+
+Write-Host "[3/8] Loading the Podman-built image into the existing Kind cluster..."
+
+if (Test-Path $ImageArchive) {
+    Remove-Item -Force $ImageArchive
+}
+
+Invoke-Native -Command "podman" `
+    -Arguments @("save", "--format", "docker-archive", "-o", $ImageArchive, $Image) `
+    -FailureMessage "Could not export Podman image" |
+    Out-Host
+
+Invoke-Native -Command "kind" `
+    -Arguments @("load", "image-archive", $ImageArchive, "--name", $ClusterName) `
+    -FailureMessage "Could not load Podman image into existing Kind cluster" |
+    Out-Host
+
+# Podman archive imports this image into Kind containerd with the localhost/
+# namespace. Kubernetes must use that exact name when imagePullPolicy is Never.
+# Use ctr's quiet output: it returns complete image references, whereas
+# the tabular output from crictl/ctr splits repository and tag into columns.
+$nodeImageReferences = @(
+    Invoke-Native -Command "podman" `
+        -Arguments @("exec", "kind-control-plane", "ctr", "-n", "k8s.io", "images", "list", "-q") `
+        -FailureMessage "Could not inspect image references in the existing Kind node" |
+        ForEach-Object { "$_".Trim() } |
+        Where-Object { $_ -ne "" }
+)
+
+if ($nodeImageReferences -notcontains $KubernetesImage) {
+    $nodeImageList = (
+        Invoke-Native -Command "podman" `
+            -Arguments @("exec", "kind-control-plane", "ctr", "-n", "k8s.io", "images", "list") `
+            -FailureMessage "Could not retrieve the Kind containerd image table" |
+            Out-String
+    )
+    throw "Image '$KubernetesImage' is not present in Kind containerd. Available references:`n$($nodeImageReferences -join [Environment]::NewLine)`nContainerd image table:`n$nodeImageList"
+}
+Write-Host "Verified exact Kind containerd image reference: $KubernetesImage"
+
+# Render a temporary Job manifest with the exact version-specific image tag.
+# The tracked e2e/cluster-job.yaml remains unchanged.
+$jobManifestPath = Join-Path $RepoRoot "e2e\cluster-job.yaml"
+if (-not (Test-Path $jobManifestPath)) {
+    throw "Cluster audit Job manifest was not found: $jobManifestPath"
+}
+
+$jobManifest = Get-Content -Raw -Path $jobManifestPath
+$genericImageLine = 'image:\s*kubecis:e2e(?=\s*(#.*)?$)'
+if (-not [regex]::IsMatch($jobManifest, $genericImageLine, [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+    throw "Expected image reference 'image: kubecis:e2e' was not found in e2e\cluster-job.yaml. No manifest was applied."
+}
+
+$jobManifest = [regex]::Replace(
+    $jobManifest,
+    $genericImageLine,
+    "image: $KubernetesImage",
+    [System.Text.RegularExpressions.RegexOptions]::Multiline
+)
+Set-Content -Path $RenderedJobManifest -Value $jobManifest -Encoding utf8
+
+Write-Host "[4/8] Applying read-only auditor RBAC and intentionally insecure fixtures..."
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "apply", "-f", (Join-Path $RepoRoot "deploy\rbac.yaml")) `
+    -FailureMessage "Applying auditor RBAC failed" |
+    Out-Host
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "apply", "-f", (Join-Path $RepoRoot "e2e\fixtures.yaml")) `
+    -FailureMessage "Applying E2E fixtures failed" |
+    Out-Host
+
+Write-Host "[5/8] Running cluster/API audit Job..."
+
+# Jobs are immutable; replace only this named E2E Job, never the cluster or
+# unrelated workloads.
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "-n", "kube-system", "delete", "job", "kubecis-e2e-cluster-audit", "--ignore-not-found=true") `
+    -FailureMessage "Could not remove the previous KubeCIS E2E Job" |
+    Out-Host
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "apply", "-f", $RenderedJobManifest) `
+    -FailureMessage "Creating cluster audit Job failed" |
+    Out-Host
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "-n", "kube-system", "wait", "--for=condition=complete", "job/kubecis-e2e-cluster-audit", "--timeout=5m") `
+    -FailureMessage "Cluster audit Job did not complete" |
+    Out-Host
+
+$clusterLogs = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", "job/kubecis-e2e-cluster-audit") `
+        -FailureMessage "Could not retrieve cluster audit logs" |
+        Out-String
+)
+
+$clusterLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "cluster-audit.log")
+
+$jsonMatch = [regex]::Match($clusterLogs, '(?s)\{.*\}')
+if (-not $jsonMatch.Success) {
+    throw "Cluster audit did not emit a JSON report. See artifacts\e2e\cluster-audit.log"
+}
+
+$clusterReport = $jsonMatch.Value | ConvertFrom-Json
+$clusterReport | ConvertTo-Json -Depth 100 | Set-Content -Encoding utf8 (Join-Path $Artifacts "cluster-audit.json")
+
+if ($clusterReport.buildVersion -ne $Version) {
+    throw "Unexpected cluster build version: $($clusterReport.buildVersion); expected $Version. Confirm the Job used image '$Image'."
+}
+
+$expectedIds = @(
+    "KUBECIS-2.4.7",
+    "KUBECIS-2.5.1",
+    "KUBECIS-2.6.1",
+    "KUBECIS-2.7.1",
+    "KUBECIS-2.8.1",
+    "KUBECIS-2.9.1"
+)
+
+$actualIds = @($clusterReport.results | ForEach-Object { $_.id })
+foreach ($id in $expectedIds) {
+    if ($actualIds -notcontains $id) {
+        throw "Cluster report is missing expected check '$id'"
     }
 }
+
+$checksById = @{}
+foreach ($result in $clusterReport.results) {
+    $checksById[$result.id] = $result
+}
+
+foreach ($id in @("KUBECIS-2.4.2", "KUBECIS-2.4.5", "KUBECIS-2.5.1")) {
+    if ($checksById[$id].status -ne "FAIL") {
+        throw "Expected insecure fixture finding '$id' to be FAIL; got '$($checksById[$id].status)'"
+    }
+}
+
+Write-Host "Cluster report verified. Checks: $($clusterReport.results.Count); FAIL: $($clusterReport.summary.fail); NOT_ASSESSED: $($clusterReport.summary.notAssessed)"
+
+Write-Host "[6/8] Running node-local DaemonSet with metadata-only helper..."
+
+# Render the E2E DaemonSet with the same version-specific image as the Job.
+# Both the auditor and metadata-helper containers must use the freshly built image.
+$nodeDaemonSetPath = Join-Path $RepoRoot "e2e\node-auditor-daemonset.yaml"
+if (-not (Test-Path $nodeDaemonSetPath)) {
+    throw "Node auditor DaemonSet manifest was not found: $nodeDaemonSetPath"
+}
+
+$nodeDaemonSetManifest = Get-Content -Raw -Path $nodeDaemonSetPath
+$nodeImagePattern = '(?m)^([ \t]*image:[ \t]*)kubecis:e2e([ \t]*(?:#.*)?)$'
+$nodeImageMatches = [regex]::Matches($nodeDaemonSetManifest, $nodeImagePattern)
+if ($nodeImageMatches.Count -ne 2) {
+    throw "Expected exactly two 'image: kubecis:e2e' entries in e2e\node-auditor-daemonset.yaml (node-auditor and node-metadata-helper); found $($nodeImageMatches.Count). No DaemonSet manifest was applied."
+}
+
+$nodeDaemonSetManifest = [regex]::Replace(
+    $nodeDaemonSetManifest,
+    $nodeImagePattern,
+    ('$1' + $KubernetesImage + '$2')
+)
+Set-Content -Path $RenderedNodeDaemonSetManifest -Value $nodeDaemonSetManifest -Encoding utf8
+
+# Fail before apply if either container does not reference the intended image.
+$renderedNodeImageLines = @(
+    Get-Content -Path $RenderedNodeDaemonSetManifest |
+        Where-Object { $_.Trim() -ceq "image: $KubernetesImage" }
+)
+$renderedNodeImageCount = $renderedNodeImageLines.Count
+if ($renderedNodeImageCount -ne 2) {
+    throw "Generated node DaemonSet does not contain exactly two references to '$KubernetesImage'."
+}
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "apply", "-f", $RenderedNodeDaemonSetManifest) `
+    -FailureMessage "Applying node auditor DaemonSet failed" |
+    Out-Host
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "-n", "kube-system", "rollout", "restart", "daemonset/kubecis-e2e-node-auditor") `
+    -FailureMessage "Could not restart the E2E node auditor DaemonSet" |
+    Out-Host
+
+Invoke-Native -Command "kubectl" `
+    -Arguments @("--context", $Context, "-n", "kube-system", "rollout", "status", "daemonset/kubecis-e2e-node-auditor", "--timeout=180s") `
+    -FailureMessage "Node auditor DaemonSet did not become ready" |
+    Out-Host
+
+Start-Sleep -Seconds 40
+
+$nodePodsJson = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "get", "pods", "-l", "app=kubecis-e2e-node-auditor", "-o", "json") `
+        -FailureMessage "Could not list node auditor Pods" |
+        Out-String
+)
+
+$nodePods = @((ConvertFrom-Json $nodePodsJson).items)
+if ($nodePods.Count -lt 1) {
+    throw "No node auditor Pods were created."
+}
+
+$nodePod = $nodePods[0].metadata.name
+
+$helperLogs = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-metadata-helper", "--tail=30") `
+        -FailureMessage "Could not retrieve metadata helper logs" |
+        Out-String
+)
+
+$nodeLogs = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-auditor", "--tail=200") `
+        -FailureMessage "Could not retrieve node auditor logs" |
+        Out-String
+)
+
+$helperLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-metadata-helper.log")
+$nodeLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-audit.log")
+
+if ($helperLogs -notmatch "snapshot refreshed") {
+    throw "Metadata helper did not confirm a refreshed snapshot. See node-metadata-helper.log"
+}
+if ($nodeLogs -notmatch '"auditMode": "node-local"') {
+    throw "Node auditor did not emit a node-local JSON report. See node-audit.log"
+}
+if ($nodeLogs -notmatch ('"buildVersion": "' + [regex]::Escape($Version) + '"')) {
+    throw "Node report has an unexpected build version."
+}
+
+Write-Host "[7/8] Verifying runtime security boundaries..."
+
+$nodePodJsonText = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "get", "pod", $nodePod, "-o", "json") `
+        -FailureMessage "Could not inspect node auditor Pod" |
+        Out-String
+)
+$nodePodJson = $nodePodJsonText | ConvertFrom-Json
+
+$mainContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-auditor" }
+$helperContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-metadata-helper" }
+
+if (-not $mainContainer.securityContext.readOnlyRootFilesystem -or $mainContainer.securityContext.runAsUser -ne 65532) {
+    throw "Node auditor main container security context does not match the non-root/read-only design."
+}
+if ($helperContainer.securityContext.runAsUser -ne 0 -or $helperContainer.securityContext.capabilities.add -notcontains "DAC_READ_SEARCH") {
+    throw "Metadata helper does not have the narrowly scoped DAC_READ_SEARCH exception."
+}
+if ($nodePodJson.spec.automountServiceAccountToken -ne $false) {
+    throw "Node DaemonSet must not mount a service-account token."
+}
+
+Write-Host "[8/8] E2E checks completed. Existing cluster '$Context' was reused and left running."
+Write-Host "Image: $Image"
+Write-Host "Artifacts: $Artifacts"
+Write-Host "Cluster report summary: $($clusterReport.summary | ConvertTo-Json -Compress)"
+Write-Host "No Kind cluster was created, switched, or deleted by this script."

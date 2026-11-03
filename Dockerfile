@@ -4,7 +4,7 @@ WORKDIR /src
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG VERSION=dev
+ARG VERSION=3.0.0-dev
 
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
