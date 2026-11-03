@@ -1,0 +1,12 @@
+[
+  {
+    "control_id": "1.1.1",
+    "target": "master",
+    "source_kind": "path",
+    "source_value": "/etc/kubernetes/manifests/kube-apiserver.yaml",
+    "comparator_ops": ["eq"],
+    "evaluator_id": "node-file-mode",
+    "evidence_kind": "file_metadata",
+    "allow_evaluation": false
+  }
+]

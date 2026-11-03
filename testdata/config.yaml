@@ -1,0 +1,7 @@
+version_mapping:
+  - min_version: "1.24.0"
+    max_version: "1.24.99"
+    benchmark: cis-1.24
+  - min_version: "1.25.0"
+    max_version: "1.26.99"
+    benchmark: cis-1.24

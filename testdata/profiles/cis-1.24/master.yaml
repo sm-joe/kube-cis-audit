@@ -1,0 +1,15 @@
+groups:
+  - id: 1
+    text: Control Plane Components
+    checks:
+      - id: 1.1.1
+        text: Ensure that the API server pod specification file permissions are set to 644 or more restrictive (Automated)
+        scored: true
+        audit: stat -c %a /etc/kubernetes/manifests/kube-apiserver.yaml
+        tests:
+          - bin_op: or
+            path: /etc/kubernetes/manifests/kube-apiserver.yaml
+            compare:
+              op: lte
+              value: 644
+        remediation: Ensure the file permissions are appropriately set.

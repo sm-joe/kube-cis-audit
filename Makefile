@@ -1,4 +1,4 @@
-.PHONY: build test vet fmt image image-push clean
+.PHONY: build test vet fmt benchmark-inventory image image-push clean
 
 VERSION ?= dev
 CONTAINER_ENGINE ?= podman
@@ -15,6 +15,9 @@ vet:
 
 fmt:
 	gofmt -w ./cmd ./internal
+
+benchmark-inventory:
+	go run ./cmd/benchmark-inventory --root benchmarks/upstream/kube-bench/cfg --out docs/UPSTREAM-BENCHMARK-INVENTORY.md --json docs/UPSTREAM-BENCHMARK-INVENTORY.json
 
 image:
 	$(CONTAINER_ENGINE) build --build-arg VERSION=$(VERSION) -t $(IMAGE) .

@@ -1,0 +1,4 @@
+repository=https://github.com/aquasecurity/kube-bench.git
+tag=v0.16.0
+commit=5c6c22d51b926020e7414e1f1e051851d1a2feff
+imported_at=2026-11-03T13:57:17Z
