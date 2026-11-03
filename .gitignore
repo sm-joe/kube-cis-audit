@@ -1,5 +1,23 @@
-/bin/
+# Build outputs
 /dist/
-*.report.json
-kubecis-report.json
-kubecis.exe
+/kubecis.exe
+*.exe
+
+# Local scan reports
+/kubecis-report.json
+
+# Generated test artifacts
+/artifacts/e2e/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
