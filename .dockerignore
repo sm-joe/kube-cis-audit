@@ -1,6 +1,10 @@
-.git
-.github
-bin
-dist
-*.report.json
-kubecis-report.json
+# Keep the Docker build context limited to files required to compile KubeCIS
+**
+!go.mod
+!go.sum
+!cmd/
+!cmd/**
+!internal/
+!internal/**
+!benchmarks/
+!benchmarks/**
