@@ -50,6 +50,8 @@ type Result struct {
 	Status      string     `json:"status"`
 	Details     string     `json:"details"`
 	Method      string     `json:"method,omitempty"`
+	Applicability string   `json:"applicability,omitempty"`
+	EvidenceSource string  `json:"evidenceSource,omitempty"`
 	Evidence    []Evidence `json:"evidence,omitempty"`
 	Remediation string     `json:"remediation,omitempty"`
 	Scored      bool       `json:"scored"`
@@ -73,6 +75,8 @@ type Report struct {
 	GeneratedAt                   time.Time         `json:"generatedAt"`
 	ClusterVersion                string            `json:"clusterVersion"`
 	ClusterVersionSource          string            `json:"clusterVersionSource,omitempty"`
+	CloudProvider                 string            `json:"cloudProvider,omitempty"`
+	BenchmarkProfileCoverageNote  string            `json:"benchmarkProfileCoverageNote,omitempty"`
 	UpstreamBenchmark             string            `json:"upstreamBenchmark,omitempty"`
 	ExtensionsBenchmark           string            `json:"extensionsBenchmark,omitempty"`
 	ExtensionsCompatibilityStatus string            `json:"extensionsBenchmarkCompatibilityStatus,omitempty"`
