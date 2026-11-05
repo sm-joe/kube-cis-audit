@@ -65,7 +65,15 @@ func Run(o Options) (Report, error) {
 			workloadSummaryCheck = &checkCopy
 			continue
 		}
-		r := annotateProviderAssessment(provider, c, evaluate(ctx, client, c, o))
+		// An EKS API scan must not inspect the scanning machine's filesystem
+		// when assessing AWS-managed control-plane or EC2 worker-host controls.
+		var r Result
+		if provider == "eks" && strings.HasPrefix(c.Kind, "host_") && (c.Target == "master" || c.Target == "node") {
+			r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation}
+		} else {
+			r = evaluate(ctx, client, c, o)
+		}
+		r = annotateProviderAssessment(provider, c, r)
 		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
