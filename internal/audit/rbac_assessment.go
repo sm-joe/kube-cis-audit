@@ -90,10 +90,14 @@ func evaluateRBACRisk(ctx context.Context, client kubernetes.Interface, _ Check,
 			for _, risk := range risks {
 				if risk.level == 3 {
 					critical++
-					if platformHint { platformNamedCritical++ }
+					if platformHint {
+						platformNamedCritical++
+					}
 				} else {
 					high++
-					if platformHint { platformNamedHigh++ }
+					if platformHint {
+						platformNamedHigh++
+					}
 				}
 				appendEvidence(Evidence{Resource: ref.Kind, Namespace: namespace, Name: ref.Name, Field: fmt.Sprintf("rules[%d]", i), Observed: risk.description + "; verbs=" + strings.Join(rule.Verbs, ",") + "; apiGroups=" + strings.Join(rule.APIGroups, ",") + "; resources=" + strings.Join(rule.Resources, ",") + "; resourceNames=" + strings.Join(rule.ResourceNames, ","), Expected: "review role owner, necessity, and least privilege; AWS/Kubernetes platform-named roles are not automatically trusted"})
 			}
@@ -242,7 +246,6 @@ func stableStrings(values []string) []string {
 	sort.Strings(out)
 	return out
 }
-
 
 // platformNamedRBACBinding identifies possible built-in/EKS provider permissions
 // without trusting a name prefix as proof of ownership or suppressing risks.
