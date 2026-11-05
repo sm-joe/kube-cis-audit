@@ -8,7 +8,7 @@ EKS Auto Mode, and self-managed EC2 nodes are not covered by this example.
 
 Build the CLI from this branch (`go build -o kubecis.exe ./cmd/kubecis` on Windows).
 Build and publish the image from **the same commit**, updating the placeholder
-`ghcr.io/sm-joe/kubecis:eks-provider-rc` in
+`ghcr.io/sm-joe/kubecis:eks-provider-rc2` in
 `node-auditor-daemonset.yaml` to its immutable digest or release tag.
 Do not deploy the placeholder until an image exists. The collector deliberately
 requires the local CLI and in-cluster node auditor to have matching build
@@ -51,3 +51,14 @@ designed read-only AWS API collectors with explicit evidence models and
 AWS IAM permissions. This branch does not claim those evaluations.
 NetworkPolicy presence is not proof of enforcement; RBAC inventory can
 surface system controllers and needs customer-ownership triage.
+
+## AL2023 nodeadm evidence (RC2)
+
+The EKS node metadata helper mounts `/etc/kubernetes/kubelet` read-only
+as `/host-nodeadm` and only evaluates `config.json`. Legacy Kind/kubeadm
+uses `/var/lib/kubelet/config.yaml`; the EKS overlay does not use this
+fallback. The audit output records the actual source path, and the EKS
+acceptance gate now fails unless all three worker-kubelet checks are explicitly
+PASS or FAIL with AL2023 source evidence. A security FAIL is an assessed outcome
+and is not the same as an unavailable check. This still does not validate full
+upstream CIS EKS compliance.
