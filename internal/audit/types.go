@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-var BuildVersion = "3.0.0-dev"
+var BuildVersion = "3.1.0-native-integrated-rc3.2"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
@@ -43,6 +43,8 @@ type Evidence struct {
 
 type Result struct {
 	ID          string     `json:"id"`
+	FindingID   string     `json:"findingId,omitempty"`
+	Scope       string     `json:"scope,omitempty"`
 	Title       string     `json:"title"`
 	Target      string     `json:"target"`
 	Status      string     `json:"status"`
@@ -64,18 +66,22 @@ type Summary struct {
 }
 
 type Report struct {
-	BuildVersion        string            `json:"buildVersion"`
-	AuditMode           string            `json:"auditMode,omitempty"`
-	NodeName            string            `json:"nodeName,omitempty"`
-	Tool                string            `json:"tool"`
-	GeneratedAt         time.Time         `json:"generatedAt"`
-	ClusterVersion      string            `json:"clusterVersion"`
-	Benchmark           string            `json:"benchmark"`
-	CompatibilityStatus string            `json:"benchmarkCompatibilityStatus,omitempty"`
-	CompatibilityNote   string            `json:"benchmarkCompatibilityNote,omitempty"`
-	Results             []Result          `json:"results"`
-	Summary             Summary           `json:"summary"`
-	Compliance          ComplianceSummary `json:"compliance"`
+	BuildVersion                  string            `json:"buildVersion"`
+	AuditMode                     string            `json:"auditMode,omitempty"`
+	NodeName                      string            `json:"nodeName,omitempty"`
+	Tool                          string            `json:"tool"`
+	GeneratedAt                   time.Time         `json:"generatedAt"`
+	ClusterVersion                string            `json:"clusterVersion"`
+	ClusterVersionSource          string            `json:"clusterVersionSource,omitempty"`
+	UpstreamBenchmark             string            `json:"upstreamBenchmark,omitempty"`
+	ExtensionsBenchmark           string            `json:"extensionsBenchmark,omitempty"`
+	ExtensionsCompatibilityStatus string            `json:"extensionsBenchmarkCompatibilityStatus,omitempty"`
+	Benchmark                     string            `json:"benchmark"`
+	CompatibilityStatus           string            `json:"benchmarkCompatibilityStatus,omitempty"`
+	CompatibilityNote             string            `json:"benchmarkCompatibilityNote,omitempty"`
+	Results                       []Result          `json:"results"`
+	Summary                       Summary           `json:"summary"`
+	Compliance                    ComplianceSummary `json:"compliance"`
 }
 
 type Options struct {

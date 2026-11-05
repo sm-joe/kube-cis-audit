@@ -20,6 +20,37 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
+      # The init container publishes the first metadata snapshot before either
+      # long-running container starts. This removes the startup race between
+      # the auditor and the metadata helper without relying on a fixed sleep.
+      initContainers:
+        - name: node-metadata-init
+          image: kubecis:e2e
+          imagePullPolicy: Never
+          args: ["node-metadata", "--benchmark", "cis-2.1.0", "--host-root", "/host-kubelet", "--node-name", "$(NODE_NAME)", "--output-file", "/metadata/snapshot.json", "--interval", "0s"]
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["DAC_READ_SEARCH"]
+          volumeMounts:
+            - name: kubelet-config
+              mountPath: /host-kubelet
+              readOnly: true
+            - name: metadata
+              mountPath: /metadata
+          resources:
+            requests: { cpu: 5m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
       containers:
         - name: node-auditor
           image: kubecis:e2e

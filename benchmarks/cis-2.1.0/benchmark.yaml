@@ -161,3 +161,23 @@ checks:
     kind: report_compliance_summary
     scored: false
     remediation: Resolve incomplete scored controls and review individual evidence. A withheld percentage indicates that the assessment is incomplete or contains indeterminate scored results.
+
+  # Original KubeCIS Native controls (not official CIS benchmark controls).
+  - id: KUBECIS-NATIVE-NODE-1
+    title: Verify kubelet anonymous authentication setting from native host configuration
+    description: Explicit kubelet authentication.anonymous.enabled flag; missing data is NOT_ASSESSED.
+    target: node
+    kind: host_kubelet_config_field
+    path: var/lib/kubelet/config.yaml
+    field: authentication.anonymous.enabled
+    scored: false
+    remediation: Set authentication.anonymous.enabled to false in the kubelet configuration.
+  - id: KUBECIS-NATIVE-NODE-2
+    title: Verify kubelet authorization mode from native host configuration
+    description: Explicit kubelet authorization.mode setting; missing data is NOT_ASSESSED.
+    target: node
+    kind: host_kubelet_config_field
+    path: var/lib/kubelet/config.yaml
+    field: authorization.mode
+    scored: false
+    remediation: Configure kubelet authorization mode to Webhook according to your cluster architecture.

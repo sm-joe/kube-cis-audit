@@ -1,30 +1,25 @@
-# syntax=docker/dockerfile:1.7
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+# KubeCIS Native: no kube-bench executable, source or benchmark bundle.
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS build
 WORKDIR /src
-
-ARG TARGETOS
-ARG TARGETARCH
-ARG VERSION=3.0.0-dev
-
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG VERSION=3.1.0-native-integrated-rc3.2
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
-
+RUN go mod download
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath -buildvcs=false \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -buildvcs=false \
     -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=${VERSION}" \
     -o /out/kubecis ./cmd/kubecis
-
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
-WORKDIR /app
-COPY --from=build --chown=65532:65532 /out/kubecis /usr/local/bin/kubecis
+FROM alpine:3.24.1
+RUN apk --no-cache add ca-certificates && addgroup -S -g 65532 kubecis \
+    && adduser -S -D -H -u 65532 -G kubecis kubecis
+COPY --from=build /out/kubecis /usr/local/bin/kubecis
 COPY --chown=65532:65532 benchmarks /app/benchmarks
+WORKDIR /app
+ENV KUBECIS_CONFIG_DIR=/app/benchmarks
 USER 65532:65532
-
-LABEL org.opencontainers.image.title="KubeCIS" \
-      org.opencontainers.image.description="Read-only Kubernetes security and CIS benchmark auditor" \
+LABEL org.opencontainers.image.title="KubeCIS Native" \
+      org.opencontainers.image.description="Independent native Go Kubernetes security auditor" \
       org.opencontainers.image.source="https://github.com/sm-joe/kube-cis-audit"
-
 ENTRYPOINT ["/usr/local/bin/kubecis"]
-CMD ["scan", "--benchmark", "auto", "--target", "all", "--output", "json", "--exit-code-on-fail=false"]
+CMD ["scan", "--benchmark", "auto", "--target", "all", "--engine", "native", "--output", "json", "--exit-code-on-fail=false"]

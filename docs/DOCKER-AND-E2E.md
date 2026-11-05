@@ -80,7 +80,7 @@ kubectl -n kube-system logs -l app.kubernetes.io/name=kubecis-node-auditor -c no
 kubectl -n kube-system logs -l app.kubernetes.io/name=kubecis-node-auditor -c node-metadata-helper --prefix=true --tail=100
 ```
 
-The main node auditor runs as UID 65532, drops all capabilities, has a read-only root filesystem, receives no ServiceAccount token, and can read only the metadata snapshot. The helper is the explicit security exception: UID 0 with only `CAP_DAC_READ_SEARCH`, no privilege escalation, RuntimeDefault seccomp, a read-only `/var/lib/kubelet` mount, and a fixed benchmark-path allowlist. It calls `Lstat` and publishes file type/mode metadata; it never reads host file contents. Do not replace this with a privileged container or a writable host mount.
+The E2E DaemonSet runs a one-shot `node-metadata-init` init container first. Kubernetes does not start the auditor or periodic helper until that init container exits successfully, so the initial metadata snapshot exists before the auditor starts; no fixed sleep is needed. The main node auditor runs as UID 65532, drops all capabilities, has a read-only root filesystem, receives no ServiceAccount token, and can read only the metadata snapshot. The helper is the explicit security exception: UID 0 with only `CAP_DAC_READ_SEARCH`, no privilege escalation, RuntimeDefault seccomp, a read-only `/var/lib/kubelet` mount, and a fixed benchmark-path allowlist. It calls `Lstat` and publishes file type/mode metadata; it never reads host file contents. Do not replace this with a privileged container or a writable host mount.
 
 The snapshot is node-name bound and expires after two minutes. The helper refreshes it periodically; the main auditor consumes the snapshot. A missing, stale, malformed, or wrong-node snapshot produces `NOT_ASSESSED`.
 
@@ -107,7 +107,7 @@ If your existing context has a different name, specify it explicitly:
 .\scripts\e2e\Invoke-KubeCisE2E.ps1 -Context "YOUR-KIND-CONTEXT"
 ```
 
-The runner builds and inspects the Podman image, checks the non-root image user and version, exports the image and loads it into the existing Kind cluster, applies the E2E fixtures, runs the cluster/API Job, then runs the node-local DaemonSet and validates the metadata-helper security boundary. It uses explicit `kubectl --context` arguments and leaves the current kubeconfig context unchanged. Logs and reports are written to `artifacts\e2e`.
+The runner builds and inspects the Podman image, checks the non-root image user and version, exports the image and loads it into the existing Kind cluster, applies the E2E fixtures, runs the cluster/API Job, then runs the node-local DaemonSet. It verifies that `node-metadata-init` terminated successfully and that control `4.1.9` contains an observed octal mode with a `PASS` or `FAIL` result (never `NOT_ASSESSED`) before validating the metadata-helper security boundary. The runner uses bounded readiness polling rather than a fixed 40-second delay. It uses explicit `kubectl --context` arguments and leaves the current kubeconfig context unchanged. Logs and reports are written to `artifacts\e2e`.
 
 The E2E fixtures intentionally create security findings. The test verifies that selected expected checks are `FAIL`; the E2E Job uses `--exit-code-on-fail=false` so the Kubernetes Job completes after emitting its report. The runner replaces only its own named E2E Job when rerun. It does not delete the cluster or unrelated resources.
 

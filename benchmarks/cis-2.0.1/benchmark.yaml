@@ -35,12 +35,34 @@ checks:
   - id: 5.2.1
     title: Workloads use non-root execution and RuntimeDefault seccomp
     target: policies
-    kind: api_pod_security
+    kind: manual
     scored: true
-    remediation: "Set pod/container runAsNonRoot: true and seccompProfile.type: RuntimeDefault where compatible."
+    manual: true
+    description: The legacy combined check is not equivalent to either current native evaluator; verify both non-root execution and RuntimeDefault seccomp against the applicable platform guidance.
+    remediation: "Verify pod/container runAsNonRoot: true and seccompProfile.type: RuntimeDefault where compatible."
   - id: 5.3.2
     title: Application namespaces have NetworkPolicy resources
     target: policies
     kind: api_network_policy
     scored: true
     remediation: Define default-deny ingress/egress NetworkPolicies and explicit required traffic rules.
+
+  # Original KubeCIS Native controls (not official CIS benchmark controls).
+  - id: KUBECIS-NATIVE-NODE-1
+    title: Verify kubelet anonymous authentication setting from native host configuration
+    description: Explicit kubelet authentication.anonymous.enabled flag; missing data is NOT_ASSESSED.
+    target: node
+    kind: host_kubelet_config_field
+    path: var/lib/kubelet/config.yaml
+    field: authentication.anonymous.enabled
+    scored: false
+    remediation: Set authentication.anonymous.enabled to false in the kubelet configuration.
+  - id: KUBECIS-NATIVE-NODE-2
+    title: Verify kubelet authorization mode from native host configuration
+    description: Explicit kubelet authorization.mode setting; missing data is NOT_ASSESSED.
+    target: node
+    kind: host_kubelet_config_field
+    path: var/lib/kubelet/config.yaml
+    field: authorization.mode
+    scored: false
+    remediation: Configure kubelet authorization mode to Webhook according to your cluster architecture.

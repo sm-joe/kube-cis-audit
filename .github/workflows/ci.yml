@@ -26,7 +26,8 @@ jobs:
       - name: Verify Formatting
         shell: bash
         run: |
-          test -z "$(gofmt -l $(find cmd internal -name '*.go'))"
+          files=$(find . -type f -name '*.go' -not -path './vendor/*')
+          test -z "$(gofmt -l $files)"
 
       - name: Run Go Vet
         run: go vet ./...

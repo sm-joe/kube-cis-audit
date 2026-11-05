@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kubecis-native-cluster-scan
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: kubecis
+    app.kubernetes.io/component: cluster-audit
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubecis
+        app.kubernetes.io/component: cluster-audit
+    spec:
+      serviceAccountName: kubecis
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: kubecis
+        image: localhost/kubecis-native:integrated-rc3.2
+        imagePullPolicy: Never
+        args:
+        - scan
+        - --benchmark
+        - cis-2.1.0
+        - --target
+        - policies
+        - --output
+        - json
+        - --exit-code-on-fail=false
+        env:
+        - name: KUBECIS_CONFIG_DIR
+          value: /app/benchmarks
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi

@@ -1,5 +1,10 @@
 # KubeCIS Upstream Benchmark Integration Assessment
 
+> **Historical assessment (2026-11-03).** This document describes the pre-execution-engine
+> state of the earlier `kube-cis-audit(5).zip` snapshot. The pinned upstream engine
+> integration is documented in [UPSTREAM-ENGINE-INTEGRATION.md](UPSTREAM-ENGINE-INTEGRATION.md).
+> Do not treat the implementation recommendations below as the current integration status.
+
 **Assessment date:** 2026-11-03  
 **Repository snapshot:** `kube-cis-audit(5).zip`  
 **Assessment type:** Source-code and benchmark-format compatibility review  

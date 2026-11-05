@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "3.0.0-dev",
+    [string]$Version = "3.1.0-native-integrated-rc3.2",
     [string]$OutputDirectory = ".\dist"
 )
 
@@ -39,7 +39,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "KubeCIS build failed." }
 
     # Cobra's root --version output includes the application name
-    # (for example: "kubecis version 3.0.0-dev"). The explicit
+    # (for example: "kubecis version 3.1.0-native-integrated-rc3.2"). The explicit
     # "version" subcommand intentionally returns only the version value.
     $BuiltVersion = (& $BinaryPath version | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $BuiltVersion -ne $Version) {

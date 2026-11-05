@@ -1,0 +1,19 @@
+{
+  "profiles": [
+    {
+      "name": "example-not-production",
+      "benchmark_version": "REPLACE_WITH_PINNED_CIS_VERSION",
+      "kubernetes_range": "REPLACE_WITH_VALIDATED_RANGE",
+      "controls": [
+        {
+          "control_id": "REPLACE",
+          "title": "Example candidate mapping",
+          "profile": "example-not-production",
+          "status": "candidate",
+          "evidence_kind": "config-value",
+          "source_file": "REPLACE_WITH_UPSTREAM_SOURCE"
+        }
+      ]
+    }
+  ]
+}
