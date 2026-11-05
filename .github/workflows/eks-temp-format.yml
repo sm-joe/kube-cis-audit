@@ -1,0 +1,28 @@
+name: Temporary EKS Branch Go Formatting
+on:
+  push:
+    branches: [fix/eks-native-provider-audit]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.3'
+      - name: Format and push Go sources
+        shell: bash
+        run: |
+          gofmt -w internal/audit/provider.go internal/audit/provider_test.go internal/audit/types.go internal/audit/runner.go internal/audit/consolidate.go internal/audit/consolidate_test.go
+          if ! git diff --quiet; then
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git add internal/audit
+            git commit -m "style: gofmt EKS provider audit changes"
+            git push origin HEAD:fix/eks-native-provider-audit
+          fi
