@@ -87,3 +87,22 @@ func TestConsolidateRejectsWrongBenchmarkAndMissingSourceCounts(t *testing.T) {
 		t.Fatal("accepted incorrect source totals")
 	}
 }
+
+func TestConsolidateEKSManagedNodesWithoutControlPlaneHost(t *testing.T) {
+	now := time.Now().UTC()
+	cluster := fixtureSource("native", "", now, "FAIL")
+	cluster.CloudProvider = "eks"
+	node := fixtureSource("node-local", "ip-10-0-1-1", now, "PASS")
+	combined, err := ConsolidateReports(cluster, []Report{node}, []string{"ip-10-0-1-1"}, nil, 30*time.Minute, now)
+	if err != nil {
+		t.Fatalf("valid EKS aggregation rejected: %v", err)
+	}
+	if combined.CloudProvider != "eks" || len(combined.Sources) != 2 {
+		t.Fatalf("lost EKS identity or node audit source: %+v", combined)
+	}
+	master := fixtureSource("master-local", "ip-10-0-1-1", now, "NOT_ASSESSED")
+	_, err = ConsolidateReports(cluster, []Report{node, master}, []string{"ip-10-0-1-1"}, []string{"ip-10-0-1-1"}, 30*time.Minute, now)
+	if err == nil || !strings.Contains(err.Error(), "AWS-managed") {
+		t.Fatalf("expected managed control-plane rejection, got: %v", err)
+	}
+}
