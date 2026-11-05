@@ -11,8 +11,8 @@ determine kubelet file permissions. Scored results remain provisional.
 
 The separate [EKS deployment and collection guide](deploy/eks/README.md)
 covers EKS managed EC2 node groups and the fail-closed PowerShell collector.
-Build the `3.1.0-native-eks-rc1` candidate CLI and publish the matching
-`ghcr.io/sm-joe/kubecis:eks-provider-rc` image before deploying. The
+Build the `3.1.0-native-eks-rc2` candidate CLI and publish the matching
+`ghcr.io/sm-joe/kubecis:eks-provider-rc2` image before deploying. The
 example does **not** deploy a control-plane host auditor or claim complete
 EKS CIS compliance.
 
