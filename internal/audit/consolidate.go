@@ -64,6 +64,9 @@ func ConsolidateReports(cluster Report, locals []Report, expectedNodes, expected
 			return ConsolidatedReport{}, fmt.Errorf("control-plane node %q is not in expected nodes", n)
 		}
 	}
+	if cluster.CloudProvider == "eks" && len(masters) != 0 {
+		return ConsolidatedReport{}, fmt.Errorf("EKS control-plane nodes are AWS-managed; master-local source expectations are unsupported")
+	}
 	all := append([]Report{cluster}, locals...)
 	seenSources := map[string]bool{}
 	seenFindings := map[string]bool{}
