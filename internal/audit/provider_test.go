@@ -73,3 +73,12 @@ func TestPlatformNamedRBACBindingIsOnlyAnOwnershipHint(t *testing.T) {
 		}
 	}
 }
+
+func TestEKSProviderEvidenceForAPILimitations(t *testing.T) {
+	for _, kind := range []string{"api_control_plane_security", "api_audit_logging"} {
+		r := annotateProviderAssessment("eks", Check{Target: "policies", Kind: kind}, Result{Status: "MANUAL"})
+		if r.Status != "MANUAL" || r.Applicability != "PROVIDER_EVIDENCE_REQUIRED" {
+			t.Fatalf("%s: %#v", kind, r)
+		}
+	}
+}
