@@ -18,7 +18,7 @@ jobs:
       - name: Format and push Go sources
         shell: bash
         run: |
-          gofmt -w internal/audit/provider.go internal/audit/provider_test.go internal/audit/types.go internal/audit/runner.go internal/audit/consolidate.go internal/audit/consolidate_test.go
+          gofmt -w internal/audit/*.go
           if ! git diff --quiet; then
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git config user.name "github-actions[bot]"
