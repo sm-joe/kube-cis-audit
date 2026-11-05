@@ -37,7 +37,7 @@ managed Linux node, and validates all inputs with `consolidate`.
 Missing pods, old reports, version mismatches, and inconsistent node
 inventory fail closed. There is **no** expected control-plane-node list.
 
-The provisional `cis-2.1.0` profile is a starter set, not full CIS or
+After a successful collection, run `./scripts/Validate-EKSRelease.ps1` to assert\nprovider identity, node-source completeness, freshness, and withheld scoring.\nThis acceptance gate is intentionally strict and does not replace live AWS\nconfiguration validation or a certified benchmark assessment.\n\nThe provisional `cis-2.1.0` profile is a starter set, not full CIS or
 EKS benchmark certification. Its `coveragePercent` measures the seven
 configured scored controls before aggregation, not upstream CIS coverage.
 The compliance percentage stays withheld.
