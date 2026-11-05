@@ -2,6 +2,20 @@
 
 KubeCIS Native implements its own Kubernetes API and Linux host assessments in Go. The `kube-bench` executable, runtime invocation, upstream configuration corpus and runtime image dependency have been removed. This is **not** an independent reproduction of the full CIS Kubernetes Benchmark and **not** a certified CIS compliance tool. Existing starter benchmark profiles retain historical IDs for report compatibility and are explicitly provisional; compliance percentages remain gated by compatibility and assessment coverage.
 
+## Amazon EKS (experimental managed-node integration)
+
+EKS API scans auto-detect the `-eks-` Kubernetes server version and label
+AWS-managed control-plane host checks `NOT_ASSESSED`. Worker-host checks
+require a Linux node metadata collector; a Windows-hosted API scan cannot
+determine kubelet file permissions. Scored results remain provisional.
+
+The separate [EKS deployment and collection guide](deploy/eks/README.md)
+covers EKS managed EC2 node groups and the fail-closed PowerShell collector.
+Build the `3.1.0-native-eks-rc1` candidate CLI and publish the matching
+`ghcr.io/sm-joe/kubecis:eks-provider-rc` image before deploying. The
+example does **not** deploy a control-plane host auditor or claim complete
+EKS CIS compliance.
+
 ## Requirements
 
 - Go **1.26+** (repository `go.mod` specifies `go 1.26.0`); Go 1.27 on Windows 11 is appropriate.
