@@ -48,6 +48,8 @@ spec:
             - cis-2.1.0
             - --host-root
             - /host-kubelet
+            - --kubelet-config-root
+            - /host-nodeadm
             - --node-name
             - $(NODE_NAME)
             - --output-file
@@ -71,6 +73,9 @@ spec:
           volumeMounts:
             - name: kubelet-config
               mountPath: /host-kubelet
+              readOnly: true
+            - name: nodeadm-kubelet-config
+              mountPath: /host-nodeadm
               readOnly: true
             - name: metadata
               mountPath: /metadata
@@ -134,6 +139,8 @@ spec:
             - cis-2.1.0
             - --host-root
             - /host-kubelet
+            - --kubelet-config-root
+            - /host-nodeadm
             - --node-name
             - $(NODE_NAME)
             - --output-file
@@ -158,6 +165,9 @@ spec:
             - name: kubelet-config
               mountPath: /host-kubelet
               readOnly: true
+            - name: nodeadm-kubelet-config
+              mountPath: /host-nodeadm
+              readOnly: true
             - name: metadata
               mountPath: /metadata
           resources:
@@ -171,6 +181,10 @@ spec:
         - name: kubelet-config
           hostPath:
             path: /var/lib/kubelet
+            type: Directory
+        - name: nodeadm-kubelet-config
+          hostPath:
+            path: /etc/kubernetes/kubelet
             type: Directory
         - name: metadata
           emptyDir:
