@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - fix/eks-native-provider-audit
+concurrency:
+  group: kubecis-eks-candidate
+  cancel-in-progress: true
 permissions:
   contents: read
   packages: write
@@ -34,7 +37,9 @@ jobs:
           push: true
           build-args: |
             VERSION=3.1.0-native-eks-rc1
-          tags: ghcr.io/sm-joe/kubecis:eks-provider-rc
+          tags: |
+            ghcr.io/sm-joe/kubecis:eks-provider-rc
+            ghcr.io/sm-joe/kubecis:eks-provider-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
