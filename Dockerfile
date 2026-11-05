@@ -5,7 +5,7 @@ WORKDIR /src
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG VERSION=3.1.0-native-eks-rc1
+ARG VERSION=3.1.0-native-eks-rc2
 
 COPY go.mod go.sum ./
 
