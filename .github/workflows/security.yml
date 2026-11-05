@@ -124,7 +124,7 @@ jobs:
 
       - name: Build KubeCIS Image
         run: |
-          docker build \
+          docker build --pull --no-cache \
             -t kubecis-native:security-${{ github.sha }} \
             .
 

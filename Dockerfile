@@ -16,11 +16,14 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -buildvcs=false \
     -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=${VERSION}" \
     -o /out/kubecis ./cmd/kubecis
+RUN go version -m /out/kubecis
 
 
-FROM alpine:3.24.1
+FROM alpine:3.24.3
 
-RUN apk --no-cache add ca-certificates && addgroup -S -g 65532 kubecis \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates \
+    && addgroup -S -g 65532 kubecis \
     && adduser -S -D -H -u 65532 -G kubecis kubecis
 
 COPY --from=build /out/kubecis /usr/local/bin/kubecis
