@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-var BuildVersion = "3.1.0-native-integrated-rc3.2"
+var BuildVersion = "3.1.0-native-eks-rc1"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
