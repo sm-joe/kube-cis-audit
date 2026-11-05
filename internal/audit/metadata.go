@@ -3,6 +3,8 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v3"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,12 +12,26 @@ import (
 	"time"
 )
 
-// NodeMetadataSnapshot contains metadata only; it never contains host file contents.
+// NodeMetadataSnapshot contains allowlisted file metadata and two validated kubelet settings.
+// It never includes raw host-file content, secrets, or arbitrary configuration values.
 type NodeMetadataSnapshot struct {
-	NodeName    string                      `json:"nodeName"`
-	GeneratedAt time.Time                   `json:"generatedAt"`
-	Files       map[string]NodeFileMetadata `json:"files"`
+	SchemaVersion   int                         `json:"schemaVersion"`
+	Benchmark       string                      `json:"benchmark"`
+	Target          string                      `json:"target"`
+	KubeletSettings map[string]KubeletSetting   `json:"kubeletSettings,omitempty"`
+	NodeName        string                      `json:"nodeName"`
+	GeneratedAt     time.Time                   `json:"generatedAt"`
+	Files           map[string]NodeFileMetadata `json:"files"`
 }
+
+// KubeletSetting is bounded, allowlisted, evaluated configuration evidence.
+// Only explicit bool(false/true) and a known authorization mode are exported.
+type KubeletSetting struct {
+	Value string `json:"value,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+const nodeSnapshotSchemaVersion = 2
 
 type NodeFileMetadata struct {
 	Mode    uint32 `json:"mode,omitempty"`
@@ -29,6 +45,12 @@ const nodeMetadataMaxAge = 2 * time.Minute
 // RunNodeMetadataSnapshot inspects only explicitly approved node paths and
 // atomically publishes their metadata for the unprivileged auditor container.
 func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFile string) error {
+	return RunHostMetadataSnapshot(configDir, benchmark, "node", hostRoot, nodeName, outputFile)
+}
+
+// RunHostMetadataSnapshot collects metadata for one explicitly selected host target.
+// The caller must mount only the target's dedicated host directory read-only.
+func RunHostMetadataSnapshot(configDir, benchmark, target, hostRoot, nodeName, outputFile string) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("node metadata helper requires Linux; current OS is %s", runtime.GOOS)
 	}
@@ -37,6 +59,9 @@ func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFil
 	}
 	if strings.TrimSpace(hostRoot) == "" || strings.TrimSpace(outputFile) == "" {
 		return fmt.Errorf("host root and output file are required")
+	}
+	if !strings.EqualFold(target, "node") && !strings.EqualFold(target, "master") {
+		return fmt.Errorf("unsupported host metadata target %q (use node or master)", target)
 	}
 	bench, err := readSelectedBenchmark(configDir, benchmark)
 	if err != nil {
@@ -48,16 +73,19 @@ func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFil
 	}
 
 	snapshot := NodeMetadataSnapshot{
-		NodeName:    nodeName,
-		GeneratedAt: time.Now().UTC(),
-		Files:       make(map[string]NodeFileMetadata),
+		SchemaVersion: nodeSnapshotSchemaVersion,
+		Benchmark:     benchmark,
+		Target:        strings.ToLower(target),
+		NodeName:      nodeName,
+		GeneratedAt:   time.Now().UTC(),
+		Files:         make(map[string]NodeFileMetadata),
 	}
 	for _, check := range bench.Checks {
-		if !strings.EqualFold(check.Target, "node") || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists") {
+		if !strings.EqualFold(check.Target, target) || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists") {
 			continue
 		}
 		metadata := NodeFileMetadata{}
-		relativePath, ok := approvedNodeMetadataPath(check.Path)
+		relativePath, ok := approvedHostMetadataPath(target, check.Path)
 		if !ok {
 			metadata.Error = "path is not approved for metadata inspection"
 			snapshot.Files[check.Path] = metadata
@@ -76,6 +104,12 @@ func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFil
 		snapshot.Files[check.Path] = metadata
 	}
 
+	// The helper mounts exactly /var/lib/kubelet. Read only its regular,
+	// non-symlinked config.yaml and export two narrowly scoped settings.
+	// Control-plane metadata mode never accesses kubelet configuration.
+	if strings.EqualFold(target, "node") {
+		snapshot.KubeletSettings = collectKubeletSettings(root)
+	}
 	data, err := json.Marshal(snapshot)
 	if err != nil {
 		return fmt.Errorf("encode node metadata: %w", err)
@@ -118,14 +152,27 @@ func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFil
 // approvedNodeMetadataPath maps benchmark paths to paths beneath the dedicated
 // /var/lib/kubelet hostPath mount. Extend deliberately when adding new checks.
 func approvedNodeMetadataPath(benchmarkPath string) (string, bool) {
-	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(benchmarkPath)))
-	if clean != "var/lib/kubelet/config.yaml" {
-		return "", false
-	}
-	return "config.yaml", true
+	return approvedHostMetadataPath("node", benchmarkPath)
 }
 
-func readNodeMetadataSnapshot(path, expectedNode string) (NodeMetadataSnapshot, error) {
+// approvedHostMetadataPath is a strict per-target allowlist. The control-plane
+// collector sees only the static-pod manifest directory, never the host root.
+func approvedHostMetadataPath(target, benchmarkPath string) (string, bool) {
+	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(benchmarkPath)))
+	switch strings.ToLower(target) {
+	case "node":
+		if clean == "var/lib/kubelet/config.yaml" {
+			return "config.yaml", true
+		}
+	case "master", "controlplane", "control-plane":
+		if clean == "etc/kubernetes/manifests/kube-apiserver.yaml" {
+			return "kube-apiserver.yaml", true
+		}
+	}
+	return "", false
+}
+
+func readNodeMetadataSnapshot(path, expectedNode, expectedBenchmark, expectedTarget string) (NodeMetadataSnapshot, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return NodeMetadataSnapshot{}, fmt.Errorf("node metadata unavailable: %w", err)
@@ -133,6 +180,12 @@ func readNodeMetadataSnapshot(path, expectedNode string) (NodeMetadataSnapshot, 
 	var snapshot NodeMetadataSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
 		return NodeMetadataSnapshot{}, fmt.Errorf("decode node metadata: %w", err)
+	}
+	if snapshot.SchemaVersion != nodeSnapshotSchemaVersion {
+		return NodeMetadataSnapshot{}, fmt.Errorf("incompatible node metadata schema %d (expected %d); update metadata helper and auditor together", snapshot.SchemaVersion, nodeSnapshotSchemaVersion)
+	}
+	if snapshot.Benchmark != expectedBenchmark || snapshot.Target != strings.ToLower(expectedTarget) {
+		return NodeMetadataSnapshot{}, fmt.Errorf("node metadata benchmark/target mismatch")
 	}
 	if snapshot.NodeName != expectedNode {
 		return NodeMetadataSnapshot{}, fmt.Errorf("node metadata identity mismatch: got %q, expected %q", snapshot.NodeName, expectedNode)
@@ -147,9 +200,9 @@ func readNodeMetadataSnapshot(path, expectedNode string) (NodeMetadataSnapshot, 
 	return snapshot, nil
 }
 
-func evaluateNodeHostCheckFromMetadata(nodeName string, c Check, snapshot NodeMetadataSnapshot) Result {
+func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, snapshot NodeMetadataSnapshot) Result {
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "identity", Observed: nodeName, Expected: "Kubernetes node being assessed"}}}
-	if _, ok := approvedNodeMetadataPath(c.Path); !ok {
+	if _, ok := approvedHostMetadataPath(target, c.Path); !ok {
 		r.Details = fmt.Sprintf("Host path %q is not approved for metadata inspection.", c.Path)
 		return r
 	}
@@ -184,4 +237,110 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, c Check, snapshot NodeMe
 		return r
 	}
 	return evaluateHostFileMode(os.FileMode(metadata.Mode), c, r)
+}
+
+// collectKubeletSettings reads only the explicitly mounted kubelet config file.
+// Never serialize arbitrary YAML content or parser errors containing source text.
+func collectKubeletSettings(root string) map[string]KubeletSetting {
+	names := []string{"authentication.anonymous.enabled", "authorization.mode"}
+	result := make(map[string]KubeletSetting, len(names))
+	fail := func(reason string) map[string]KubeletSetting {
+		for _, key := range names {
+			result[key] = KubeletSetting{Error: reason}
+		}
+		return result
+	}
+	path := filepath.Join(root, "config.yaml")
+	info, err := os.Lstat(path)
+	if err != nil {
+		return fail("kubelet configuration unavailable")
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return fail("kubelet configuration must be a regular non-symlinked file")
+	}
+	if info.Size() > 1024*1024 {
+		return fail("kubelet configuration exceeds 1 MiB")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return fail("kubelet configuration unreadable")
+	}
+	defer file.Close()
+	limited, err := io.ReadAll(io.LimitReader(file, 1024*1024+1))
+	if err != nil || len(limited) > 1024*1024 {
+		return fail("kubelet configuration unreadable or too large")
+	}
+	var cfg map[string]interface{}
+	if err := yaml.Unmarshal(limited, &cfg); err != nil {
+		return fail("kubelet configuration is invalid YAML")
+	}
+	auth, ok := cfg["authentication"].(map[string]interface{})
+	if !ok {
+		result[names[0]] = KubeletSetting{Error: "authentication block not explicit"}
+	} else {
+		anonymous, ok := auth["anonymous"].(map[string]interface{})
+		if !ok {
+			result[names[0]] = KubeletSetting{Error: "anonymous authentication block not explicit"}
+		} else {
+			enabled, ok := anonymous["enabled"].(bool)
+			if !ok {
+				result[names[0]] = KubeletSetting{Error: "anonymous.enabled not an explicit boolean"}
+			} else {
+				result[names[0]] = KubeletSetting{Value: fmt.Sprint(enabled)}
+			}
+		}
+	}
+	authorization, ok := cfg["authorization"].(map[string]interface{})
+	if !ok {
+		result[names[1]] = KubeletSetting{Error: "authorization block not explicit"}
+	} else {
+		mode, ok := authorization["mode"].(string)
+		if !ok || strings.TrimSpace(mode) == "" {
+			result[names[1]] = KubeletSetting{Error: "authorization.mode not explicit"}
+		} else {
+			switch mode {
+			case "Webhook", "AlwaysAllow", "AlwaysDeny", "ABAC", "RBAC", "Node":
+				result[names[1]] = KubeletSetting{Value: mode}
+			default:
+				result[names[1]] = KubeletSetting{Error: "authorization.mode is not a recognized allowlisted mode"}
+			}
+		}
+	}
+	return result
+}
+
+// evaluateKubeletSettingFromMetadata uses only checked, fresh snapshot evidence.
+func evaluateKubeletSettingFromMetadata(nodeName string, c Check, snapshot NodeMetadataSnapshot) Result {
+	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation}
+	if c.Path != "var/lib/kubelet/config.yaml" || (c.Field != "authentication.anonymous.enabled" && c.Field != "authorization.mode") {
+		r.Details = "Unapproved kubelet configuration path or field"
+		return r
+	}
+	setting, ok := snapshot.KubeletSettings[c.Field]
+	if !ok || setting.Error != "" || setting.Value == "" {
+		r.Details = "Kubelet configuration evidence unavailable"
+		if setting.Error != "" {
+			r.Details += ": " + setting.Error
+		}
+		return r
+	}
+	expected := "false"
+	if c.Field == "authorization.mode" {
+		expected = "Webhook"
+	}
+	if c.Field == "authentication.anonymous.enabled" && setting.Value != "true" && setting.Value != "false" {
+		r.Details = "Invalid anonymous authentication evidence"
+		return r
+	}
+	if c.Field == "authorization.mode" && setting.Value != "Webhook" && setting.Value != "AlwaysAllow" && setting.Value != "AlwaysDeny" && setting.Value != "ABAC" && setting.Value != "RBAC" && setting.Value != "Node" {
+		r.Details = "Invalid kubelet authorization evidence"
+		return r
+	}
+	r.Status = "FAIL"
+	if setting.Value == expected {
+		r.Status = "PASS"
+	}
+	r.Details = fmt.Sprintf("Evaluated kubelet configuration field %s on node %s", c.Field, nodeName)
+	r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: c.Field, Observed: setting.Value, Expected: expected}}
+	return r
 }

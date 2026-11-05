@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubecis-controlplane-auditor
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: kubecis-controlplane-auditor
+  template:
+    metadata:
+      labels:
+        app: kubecis-controlplane-auditor
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/control-plane: ''
+      tolerations:
+      - operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: controlplane-metadata-init
+        image: localhost/kubecis-native:integrated-rc3.2
+        imagePullPolicy: Never
+        args:
+        - node-metadata
+        - --benchmark
+        - cis-2.1.0
+        - --target
+        - master
+        - --host-root
+        - /host-manifests
+        - --node-name
+        - $(NODE_NAME)
+        - --output-file
+        - /metadata/snapshot.json
+        - --interval
+        - 0s
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - DAC_READ_SEARCH
+        volumeMounts:
+        - name: manifests
+          mountPath: /host-manifests
+          readOnly: true
+        - name: metadata
+          mountPath: /metadata
+      containers:
+      - name: controlplane-auditor
+        image: localhost/kubecis-native:integrated-rc3.2
+        imagePullPolicy: Never
+        args:
+        - node-audit
+        - --benchmark
+        - cis-2.1.0
+        - --target
+        - master
+        - --metadata-file
+        - /metadata/snapshot.json
+        - --node-name
+        - $(NODE_NAME)
+        - --output
+        - json
+        - --interval
+        - 24h
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: metadata
+          mountPath: /metadata
+          readOnly: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 96Mi
+      - name: controlplane-metadata-helper
+        image: localhost/kubecis-native:integrated-rc3.2
+        imagePullPolicy: Never
+        args:
+        - node-metadata
+        - --benchmark
+        - cis-2.1.0
+        - --target
+        - master
+        - --host-root
+        - /host-manifests
+        - --node-name
+        - $(NODE_NAME)
+        - --output-file
+        - /metadata/snapshot.json
+        - --interval
+        - 30s
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - DAC_READ_SEARCH
+        volumeMounts:
+        - name: manifests
+          mountPath: /host-manifests
+          readOnly: true
+        - name: metadata
+          mountPath: /metadata
+        resources:
+          requests:
+            cpu: 5m
+            memory: 16Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+      volumes:
+      - name: manifests
+        hostPath:
+          path: /etc/kubernetes/manifests
+          type: Directory
+      - name: metadata
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Mi

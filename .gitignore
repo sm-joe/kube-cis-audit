@@ -6,8 +6,8 @@
 # Local scan reports
 /kubecis-report.json
 
-# Generated test artifacts
-/artifacts/e2e/
+# Generated test artifacts and local E2E reports/images
+/artifacts/
 
 # Local environment
 .env
@@ -23,3 +23,15 @@
 Thumbs.db
 
 eks-test/
+# Local build outputs
+/bin/
+
+# Local validation output and generated reports
+/reports/
+/test-results/
+/release-evidence/
+*.log
+*.tar
+*.tfstate*
+*.tfvars
+/kubecis-hybrid-full.json

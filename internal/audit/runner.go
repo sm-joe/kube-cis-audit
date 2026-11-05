@@ -38,7 +38,11 @@ func Run(o Options) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	report := Report{BuildVersion: BuildVersion, Tool: "KubeCIS", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, Benchmark: bench.ID, CompatibilityStatus: bench.CompatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
+	compatibilityStatus := bench.CompatibilityStatus
+	if strings.TrimSpace(compatibilityStatus) == "" {
+		compatibilityStatus = "unknown"
+	}
+	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
@@ -61,11 +65,13 @@ func Run(o Options) (Report, error) {
 			continue
 		}
 		r := evaluate(ctx, client, c, o)
+		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
 	if workloadSummaryCheck != nil {
 		r := buildWorkloadSecuritySummary(*workloadSummaryCheck, report.Results)
+		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
@@ -75,10 +81,12 @@ func Run(o Options) (Report, error) {
 		complianceResult.ID = complianceSummaryCheck.ID
 		complianceResult.Title = complianceSummaryCheck.Title
 		complianceResult.Remediation = complianceSummaryCheck.Remediation
+		complianceResult.FindingID = StableFindingID(complianceResult)
 		report.Results = append(report.Results, complianceResult)
 		incrementSummary(&report.Summary, complianceResult.Status)
 	}
 	report.Summary.Total = len(report.Results)
+	report.enforceNativeCompatibility()
 	return report, nil
 }
 
@@ -104,48 +112,70 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	target := strings.TrimSpace(o.Target)
+	if target == "" {
+		target = "node"
+	}
+	if !strings.EqualFold(target, "node") && !strings.EqualFold(target, "master") {
+		return Report{}, fmt.Errorf("unsupported host audit target %q (use node or master)", target)
+	}
 	report := Report{
-		BuildVersion:        BuildVersion,
-		AuditMode:           "node-local",
-		NodeName:            nodeName,
-		Tool:                "KubeCIS",
-		GeneratedAt:         time.Now().UTC(),
-		ClusterVersion:      "not queried (node-local mode)",
-		Benchmark:           bench.ID,
-		CompatibilityStatus: bench.CompatibilityStatus,
-		CompatibilityNote:   bench.CompatibilityNote,
+		BuildVersion:         BuildVersion,
+		AuditMode:            strings.ToLower(target) + "-local",
+		NodeName:             nodeName,
+		Tool:                 "KubeCIS Native",
+		GeneratedAt:          time.Now().UTC(),
+		ClusterVersion:       "not queried (node-local mode)",
+		ClusterVersionSource: "node-local-no-api",
+		Benchmark:            bench.ID,
+		CompatibilityStatus:  bench.CompatibilityStatus,
+		CompatibilityNote:    bench.CompatibilityNote,
 	}
 	var metadata NodeMetadataSnapshot
 	var metadataErr error
 	if strings.TrimSpace(o.MetadataFile) != "" {
-		metadata, metadataErr = readNodeMetadataSnapshot(o.MetadataFile, nodeName)
+		metadata, metadataErr = readNodeMetadataSnapshot(o.MetadataFile, nodeName, o.Benchmark, target)
 	}
+	localChecks := make([]Check, 0, len(bench.Checks))
 	for _, c := range bench.Checks {
 		// Node-local mode intentionally runs only checks explicitly targeted at
 		// worker/control-plane node configuration and backed by host file data.
-		if !strings.EqualFold(c.Target, "node") {
+		// Manual and API-backed checks are outside this report's evidence scope.
+		if !strings.EqualFold(c.Target, target) {
 			continue
 		}
-		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" {
+		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_kubelet_config_field" {
 			continue
 		}
+		localChecks = append(localChecks, c)
 		var r Result
 		if strings.TrimSpace(o.MetadataFile) != "" {
 			if metadataErr != nil {
 				r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Details: "Node metadata snapshot unavailable: " + metadataErr.Error(), Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "metadata", Observed: "unavailable", Expected: "fresh metadata snapshot from the node metadata helper"}}}
+			} else if c.Kind == "host_kubelet_config_field" {
+				r = evaluateKubeletSettingFromMetadata(nodeName, c, metadata)
 			} else {
-				r = evaluateNodeHostCheckFromMetadata(nodeName, c, metadata)
+				r = evaluateNodeHostCheckFromMetadata(nodeName, target, c, metadata)
 			}
+		} else if c.Kind == "host_kubelet_config_field" {
+			r = evaluateKubeletConfigField(hostRoot, nodeName, c)
 		} else {
 			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
 		}
+		r.Scope = nodeName
+		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
 	}
 	report.Summary.Total = len(report.Results)
 	if report.Summary.Total == 0 {
-		return Report{}, fmt.Errorf("benchmark %s contains no supported node-local host checks", bench.ID)
+		return Report{}, fmt.Errorf("benchmark %s contains no supported %s-local host checks", bench.ID, target)
 	}
+	// Compliance is scoped to the host checks actually selected for this
+	// node-local report. Do not count unrelated API/manual controls as missing
+	// evidence, and do not leave a scored local result out of aggregation.
+	report.Compliance, _ = buildComplianceSummary(localChecks, report.Results)
+	report.enforceNativeCompatibility()
 	return report, nil
 }
 
@@ -337,6 +367,8 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		r.Status = "NOT_ASSESSED"
 		r.Details = "Workload security summary is generated after individual benchmark checks."
 		return r
+	case "host_kubelet_config_field":
+		return evaluateKubeletConfigField(o.HostRoot, "cluster-host", c)
 	case "host_file_exists", "host_file_mode":
 		p := filepath.Join(o.HostRoot, strings.TrimLeft(filepath.Clean(c.Path), "/"))
 		st, err := os.Stat(p)
@@ -810,4 +842,52 @@ func subjectIdentity(subject rbacv1.Subject) string {
 		identity += " (namespace=" + subject.Namespace + ")"
 	}
 	return identity
+}
+
+// enforceNativeCompatibility prevents incomplete or provisional native
+// assessments from being presented as verified CIS compliance scores.
+func (r *Report) enforceNativeCompatibility() {
+	status := strings.ToLower(strings.TrimSpace(r.CompatibilityStatus))
+
+	if status == "" {
+		status = "unknown"
+		r.CompatibilityStatus = status
+	}
+
+	c := &r.Compliance
+
+	// A verified profile is still insufficient when the report does not
+	// contain complete scored evidence.
+	complete := c.ScoredTotal > 0 &&
+		c.ScoredPass+c.ScoredFail == c.ScoredTotal &&
+		c.ScoredWarn == 0 &&
+		c.ScoredManual == 0 &&
+		c.ScoredNotAssessed == 0 &&
+		c.ScoredOther == 0
+
+	// Node-local reports assess only a subset of cluster controls.
+	// They must never claim cluster-wide CIS compliance.
+	clusterWide := r.AuditMode == "native"
+
+	if status == "verified" && complete && clusterWide {
+		// Retain the compliance summary calculated by
+		// buildComplianceSummary.
+		return
+	}
+
+	// Fail closed: a percentage is not a verified compliance score
+	// without a verified, complete assessment.
+	c.CompliancePercent = nil
+
+	reason := "withheld: KubeCIS Native assessment is not a verified complete CIS benchmark"
+
+	if status != "verified" {
+		reason += "; benchmark compatibility is " + status
+	} else if !clusterWide {
+		reason += "; node-local assessment is not cluster-wide"
+	} else {
+		reason += "; scored assessment evidence is incomplete"
+	}
+
+	c.ScoreStatus = reason
 }

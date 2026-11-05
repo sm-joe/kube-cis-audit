@@ -8,8 +8,45 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Release validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Verify formatting
+        shell: bash
+        run: |
+          files=$(find . -type f -name '*.go' -not -path './vendor/*')
+          test -z "$(gofmt -l $files)"
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Run complete Go test suite
+        run: go test ./... -count=1
+
+      - name: Build release CLI
+        run: CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /tmp/kubecis ./cmd/kubecis
+
   binaries:
     name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: validate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -90,9 +127,11 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
   container:
     name: Publish Container Image
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -113,6 +152,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image tags
+        id: image-tags
+        shell: bash
+        run: |
+          tags="ghcr.io/${GITHUB_REPOSITORY_OWNER}/kubecis:${GITHUB_REF_NAME}"
+          # A prerelease (for example v3.0.0-rc4) must never move the stable
+          # latest tag. Only a stable semantic-version tag may publish latest.
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags+=$'\nghcr.io/'"${GITHUB_REPOSITORY_OWNER}"'/kubecis:latest'
+          fi
+          { echo 'tags<<EOF'; printf '%s\n' "$tags"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
       - name: Build and Push Multi-architecture Image
         uses: docker/build-push-action@v7
         with:
@@ -121,9 +172,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ github.ref_name }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/kubecis:${{ github.ref_name }}
-            ghcr.io/${{ github.repository_owner }}/kubecis:latest
+          tags: ${{ steps.image-tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ github.ref_name }}

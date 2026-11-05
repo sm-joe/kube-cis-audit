@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Context = "kind-kind",
-    [string]$Version = "3.0.0-dev"
+    [string]$Version = "3.1.0-native-integrated-rc3.2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -292,8 +292,8 @@ if (-not (Test-Path $nodeDaemonSetPath)) {
 $nodeDaemonSetManifest = Get-Content -Raw -Path $nodeDaemonSetPath
 $nodeImagePattern = '(?m)^([ \t]*image:[ \t]*)kubecis:e2e([ \t]*(?:#.*)?)$'
 $nodeImageMatches = [regex]::Matches($nodeDaemonSetManifest, $nodeImagePattern)
-if ($nodeImageMatches.Count -ne 2) {
-    throw "Expected exactly two 'image: kubecis:e2e' entries in e2e\node-auditor-daemonset.yaml (node-auditor and node-metadata-helper); found $($nodeImageMatches.Count). No DaemonSet manifest was applied."
+if ($nodeImageMatches.Count -ne 3) {
+    throw "Expected exactly three 'image: kubecis:e2e' entries in e2e\node-auditor-daemonset.yaml (node-metadata-init, node-auditor and node-metadata-helper); found $($nodeImageMatches.Count). No DaemonSet manifest was applied."
 }
 
 $nodeDaemonSetManifest = [regex]::Replace(
@@ -309,8 +309,8 @@ $renderedNodeImageLines = @(
         Where-Object { $_.Trim() -ceq "image: $KubernetesImage" }
 )
 $renderedNodeImageCount = $renderedNodeImageLines.Count
-if ($renderedNodeImageCount -ne 2) {
-    throw "Generated node DaemonSet does not contain exactly two references to '$KubernetesImage'."
+if ($renderedNodeImageCount -ne 3) {
+    throw "Generated node DaemonSet does not contain exactly three references to '$KubernetesImage'."
 }
 
 Invoke-Native -Command "kubectl" `
@@ -328,8 +328,6 @@ Invoke-Native -Command "kubectl" `
     -FailureMessage "Node auditor DaemonSet did not become ready" |
     Out-Host
 
-Start-Sleep -Seconds 40
-
 $nodePodsJson = (
     Invoke-Native -Command "kubectl" `
         -Arguments @("--context", $Context, "-n", "kube-system", "get", "pods", "-l", "app=kubecis-e2e-node-auditor", "-o", "json") `
@@ -343,47 +341,90 @@ if ($nodePods.Count -lt 1) {
 }
 
 $nodePod = $nodePods[0].metadata.name
+$nodePodJson = $null
+$initSucceeded = $false
+for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    $podJsonText = (
+        Invoke-Native -Command "kubectl" `
+            -Arguments @("--context", $Context, "-n", "kube-system", "get", "pod", $nodePod, "-o", "json") `
+            -FailureMessage "Could not inspect node auditor Pod readiness" |
+            Out-String
+    )
+    $nodePodJson = $podJsonText | ConvertFrom-Json
+    $initStatus = $nodePodJson.status.initContainerStatuses |
+        Where-Object { $_.name -eq "node-metadata-init" } |
+        Select-Object -First 1
 
+    if ($initStatus -and $initStatus.state.terminated) {
+        if ($initStatus.state.terminated.exitCode -ne 0) {
+            throw "node-metadata-init failed with exit code $($initStatus.state.terminated.exitCode). See node-metadata-init.log."
+        }
+        $initSucceeded = $true
+        break
+    }
+    Start-Sleep -Seconds 2
+}
+if (-not $initSucceeded) {
+    throw "Timed out waiting for node-metadata-init to publish the initial snapshot."
+}
+
+# Init-container success proves the first snapshot was atomically published
+# before node-auditor started. Capture init logs and the periodic helper logs.
+$initLogs = (
+    Invoke-Native -Command "kubectl" `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-metadata-init") `
+        -FailureMessage "Could not retrieve initial metadata helper logs" |
+        Out-String
+)
 $helperLogs = (
     Invoke-Native -Command "kubectl" `
-        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-metadata-helper", "--tail=30") `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-metadata-helper", "--tail=50") `
         -FailureMessage "Could not retrieve metadata helper logs" |
         Out-String
 )
-
 $nodeLogs = (
     Invoke-Native -Command "kubectl" `
-        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-auditor", "--tail=200") `
+        -Arguments @("--context", $Context, "-n", "kube-system", "logs", $nodePod, "-c", "node-auditor", "--tail=300") `
         -FailureMessage "Could not retrieve node auditor logs" |
         Out-String
 )
 
+$initLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-metadata-init.log")
 $helperLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-metadata-helper.log")
 $nodeLogs | Set-Content -Encoding utf8 (Join-Path $Artifacts "node-audit.log")
 
-if ($helperLogs -notmatch "snapshot refreshed") {
-    throw "Metadata helper did not confirm a refreshed snapshot. See node-metadata-helper.log"
-}
 if ($nodeLogs -notmatch '"auditMode": "node-local"') {
     throw "Node auditor did not emit a node-local JSON report. See node-audit.log"
 }
 if ($nodeLogs -notmatch ('"buildVersion": "' + [regex]::Escape($Version) + '"')) {
     throw "Node report has an unexpected build version."
 }
+# The first assessment must contain actual file-mode evidence. NOT_ASSESSED
+# here means the snapshot handoff failed and is an E2E failure, not a security
+# finding to be silently accepted.
+$nodeControlEvidence = [regex]::Match(
+    $nodeLogs,
+    '(?s)"id"\s*:\s*"4\.1\.9".*?"status"\s*:\s*"(PASS|FAIL|NOT_ASSESSED)"'
+)
+if (-not $nodeControlEvidence.Success) {
+    throw "Node report did not contain control 4.1.9. See node-audit.log"
+}
+if ($nodeControlEvidence.Groups[1].Value -eq "NOT_ASSESSED") {
+    throw "Node control 4.1.9 was NOT_ASSESSED; initial metadata snapshot was not consumed. See node-metadata-init.log and node-audit.log."
+}
+if ($nodeLogs -notmatch '"observed"\s*:\s*"0[0-7]{3}"') {
+    throw "Node report did not include an observed octal file mode for control 4.1.9."
+}
 
 Write-Host "[7/8] Verifying runtime security boundaries..."
 
-$nodePodJsonText = (
-    Invoke-Native -Command "kubectl" `
-        -Arguments @("--context", $Context, "-n", "kube-system", "get", "pod", $nodePod, "-o", "json") `
-        -FailureMessage "Could not inspect node auditor Pod" |
-        Out-String
-)
-$nodePodJson = $nodePodJsonText | ConvertFrom-Json
-
 $mainContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-auditor" }
 $helperContainer = $nodePodJson.spec.containers | Where-Object { $_.name -eq "node-metadata-helper" }
+$initContainer = $nodePodJson.spec.initContainers | Where-Object { $_.name -eq "node-metadata-init" }
 
+if (-not $initContainer -or $initContainer.securityContext.runAsUser -ne 0 -or $initContainer.securityContext.capabilities.add -notcontains "DAC_READ_SEARCH") {
+    throw "Initial metadata collector does not have the expected narrowly scoped DAC_READ_SEARCH exception."
+}
 if (-not $mainContainer.securityContext.readOnlyRootFilesystem -or $mainContainer.securityContext.runAsUser -ne 65532) {
     throw "Node auditor main container security context does not match the non-root/read-only design."
 }

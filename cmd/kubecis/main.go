@@ -14,13 +14,13 @@ import (
 )
 
 func main() {
-	var kubeconfig, kubeContext, configDir, benchmark, target, output, outputFile, namespace string
+	var kubeconfig, kubeContext, configDir, benchmark, target, output, outputFile, namespace, engine, upstreamBenchmark string
 	var hostRoot string
 	var exitCodeOnFail bool
 
 	root := &cobra.Command{
 		Use:           "kubecis",
-		Short:         "Read-only Kubernetes security and CIS benchmark auditor",
+		Short:         "Read-only native Go Kubernetes security auditor",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       audit.BuildVersion,
@@ -31,7 +31,17 @@ func main() {
 		Short: "Audit a Kubernetes cluster using the Kubernetes API",
 		Long:  "Run a read-only Kubernetes security assessment. Credentials are taken from --kubeconfig, in-cluster ServiceAccount credentials, KUBECONFIG, or the default kubeconfig.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			report, err := audit.Run(audit.Options{
+			var report audit.Report
+			var err error
+			// kube-bench has been removed; retain the legacy flags so older
+			// automation receives an actionable error rather than an unknown flag.
+			if strings.ToLower(engine) != "native" {
+				return fmt.Errorf("engine %q is no longer available: KubeCIS Native supports --engine native only; remove --upstream-benchmark and use native node-audit for host checks", engine)
+			}
+			if upstreamBenchmark != "auto" {
+				return fmt.Errorf("--upstream-benchmark has been removed; use --benchmark for KubeCIS Native")
+			}
+			report, err = audit.Run(audit.Options{
 				Kubeconfig: kubeconfig, KubeContext: kubeContext, ConfigDir: configDir,
 				Benchmark: benchmark, Target: target, HostRoot: hostRoot, Namespace: namespace,
 			})
@@ -56,9 +66,11 @@ func main() {
 	scan.Flags().StringVar(&outputFile, "output-file", "", "Write the report to this file instead of standard output")
 	scan.Flags().StringVar(&hostRoot, "host-root", "/host", "Mounted host filesystem root for host-file checks")
 	scan.Flags().StringVar(&namespace, "namespace", "", "Limit namespaced API checks to one namespace (empty means all)")
+	scan.Flags().StringVar(&engine, "engine", "native", "Audit engine (native only; legacy values are rejected)")
+	scan.Flags().StringVar(&upstreamBenchmark, "upstream-benchmark", "auto", "Deprecated: upstream profile selection is unsupported; only auto accepted")
 	scan.Flags().BoolVar(&exitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when one or more checks are FAIL (set false for observational scans)")
 
-	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile string
+	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile, nodeTarget string
 	var nodeInterval time.Duration
 	var nodeExitCodeOnFail bool
 	nodeAudit := &cobra.Command{
@@ -72,7 +84,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: "node", HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile}, nodeName)
+				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: nodeTarget, HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile}, nodeName)
 				if err != nil {
 					return err
 				}
@@ -95,7 +107,8 @@ func main() {
 			}
 		},
 	}
-	nodeAudit.Flags().StringVar(&nodeBenchmark, "benchmark", "", "Explicit benchmark ID (required in node mode)")
+	nodeAudit.Flags().StringVar(&nodeBenchmark, "benchmark", "", "Explicit benchmark ID (required in host mode)")
+	nodeAudit.Flags().StringVar(&nodeTarget, "target", "node", "Host target: node or master (control-plane)")
 	nodeAudit.Flags().StringVar(&nodeConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeAudit.Flags().StringVar(&nodeHostRoot, "host-root", "/host", "Read-only mounted node filesystem root (direct mode)")
 	nodeAudit.Flags().StringVar(&nodeMetadataFile, "metadata-file", "", "Fresh metadata snapshot path produced by node-metadata")
@@ -105,7 +118,7 @@ func main() {
 	nodeAudit.Flags().DurationVar(&nodeInterval, "interval", 0, "Repeat assessment interval (e.g. 24h); zero runs once")
 	nodeAudit.Flags().BoolVar(&nodeExitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when a one-shot node audit has FAIL results")
 
-	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataNodeName, metadataOutputFile string
+	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataNodeName, metadataOutputFile, metadataTarget string
 	var metadataInterval time.Duration
 	nodeMetadata := &cobra.Command{
 		Use:   "node-metadata",
@@ -118,7 +131,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				return audit.RunNodeMetadataSnapshot(metadataConfigDir, metadataBenchmark, metadataHostRoot, metadataNodeName, metadataOutputFile)
+				return audit.RunHostMetadataSnapshot(metadataConfigDir, metadataBenchmark, metadataTarget, metadataHostRoot, metadataNodeName, metadataOutputFile)
 			}
 			if metadataInterval <= 0 {
 				return run()
@@ -134,6 +147,7 @@ func main() {
 		},
 	}
 	nodeMetadata.Flags().StringVar(&metadataBenchmark, "benchmark", "", "Explicit benchmark ID (required)")
+	nodeMetadata.Flags().StringVar(&metadataTarget, "target", "node", "Host target: node or master (control-plane)")
 	nodeMetadata.Flags().StringVar(&metadataConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeMetadata.Flags().StringVar(&metadataHostRoot, "host-root", "/host-kubelet", "Read-only mount of the node kubelet directory")
 	nodeMetadata.Flags().StringVar(&metadataNodeName, "node-name", "", "Kubernetes node name (defaults to NODE_NAME)")
@@ -143,7 +157,106 @@ func main() {
 	version := &cobra.Command{Use: "version", Short: "Print KubeCIS build version", Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(audit.BuildVersion)
 	}}
-	root.AddCommand(scan, nodeAudit, nodeMetadata, version)
+	var compareBaseline, compareCurrent, compareOutput string
+	compare := &cobra.Command{
+		Use:   "compare",
+		Short: "Compare two KubeCIS JSON reports using stable finding identities",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			baselineBytes, err := os.ReadFile(compareBaseline)
+			if err != nil {
+				return fmt.Errorf("read baseline report: %w", err)
+			}
+			currentBytes, err := os.ReadFile(compareCurrent)
+			if err != nil {
+				return fmt.Errorf("read current report: %w", err)
+			}
+			baseline, err := audit.DecodeReport(baselineBytes)
+			if err != nil {
+				return fmt.Errorf("baseline report: %w", err)
+			}
+			current, err := audit.DecodeReport(currentBytes)
+			if err != nil {
+				return fmt.Errorf("current report: %w", err)
+			}
+			comparison := audit.CompareReports(baseline, current)
+			var out io.Writer = os.Stdout
+			if compareOutput != "" {
+				if err := os.MkdirAll(filepath.Dir(compareOutput), 0o755); err != nil && filepath.Dir(compareOutput) != "." {
+					return err
+				}
+				f, err := os.Create(compareOutput)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				out = f
+			}
+			enc := json.NewEncoder(out)
+			enc.SetIndent("", "  ")
+			return enc.Encode(comparison)
+		},
+	}
+	compare.Flags().StringVar(&compareBaseline, "baseline", "", "Baseline KubeCIS JSON report (required)")
+	compare.Flags().StringVar(&compareCurrent, "current", "", "Current KubeCIS JSON report (required)")
+	compare.Flags().StringVar(&compareOutput, "output-file", "", "Write comparison JSON to this file (defaults to stdout)")
+	_ = compare.MarkFlagRequired("baseline")
+	_ = compare.MarkFlagRequired("current")
+	var mergeCluster, mergeOutput, mergeNodes, mergeMasters string
+	var mergeLocals []string
+	var mergeMaxAge time.Duration
+	consolidate := &cobra.Command{
+		Use: "consolidate", Short: "Validate and merge cluster, node and control-plane reports",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			read := func(path string) (audit.Report, error) {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return audit.Report{}, fmt.Errorf("read %s: %w", path, err)
+				}
+				return audit.DecodeReport(data)
+			}
+			clusterReport, err := read(mergeCluster)
+			if err != nil {
+				return err
+			}
+			locals := make([]audit.Report, 0, len(mergeLocals))
+			for _, path := range mergeLocals {
+				r, err := read(path)
+				if err != nil {
+					return err
+				}
+				locals = append(locals, r)
+			}
+			merged, err := audit.ConsolidateReports(clusterReport, locals, strings.Split(mergeNodes, ","), splitOptionalCSV(mergeMasters), mergeMaxAge, time.Now().UTC())
+			if err != nil {
+				return err
+			}
+			var dst io.Writer = os.Stdout
+			if mergeOutput != "" {
+				if err := os.MkdirAll(filepath.Dir(mergeOutput), 0o755); err != nil {
+					return err
+				}
+				f, err := os.Create(mergeOutput)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				dst = f
+			}
+			encoder := json.NewEncoder(dst)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(merged)
+		},
+	}
+	consolidate.Flags().StringVar(&mergeCluster, "cluster", "", "Cluster-policy JSON report")
+	consolidate.Flags().StringSliceVar(&mergeLocals, "local", nil, "Node/control-plane JSON reports (repeat flag)")
+	consolidate.Flags().StringVar(&mergeNodes, "expected-nodes", "", "Comma-separated names of ALL expected Linux nodes")
+	consolidate.Flags().StringVar(&mergeMasters, "expected-control-planes", "", "Comma-separated names of expected control-plane nodes")
+	consolidate.Flags().DurationVar(&mergeMaxAge, "max-age", 30*time.Minute, "Maximum age of each source report")
+	consolidate.Flags().StringVar(&mergeOutput, "output-file", "", "Consolidated JSON output file (default stdout)")
+	_ = consolidate.MarkFlagRequired("cluster")
+	_ = consolidate.MarkFlagRequired("expected-nodes")
+	root.AddCommand(consolidate)
+	root.AddCommand(scan, nodeAudit, nodeMetadata, compare, version)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)
 		os.Exit(1)
@@ -204,4 +317,11 @@ func defaultConfigDir() string {
 		}
 	}
 	return local
+}
+
+func splitOptionalCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
 }
