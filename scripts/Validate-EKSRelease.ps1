@@ -12,9 +12,9 @@ if ($r.cloudProvider -ne 'eks') { throw "Expected EKS; got $($r.cloudProvider)" 
 if ($r.benchmarkCompatibilityStatus -ne 'provisional') { throw 'This gate expects the explicitly provisional benchmark profile' }
 if ($null -ne $r.compliance.compliancePercent) { throw 'Provisional EKS assessment must not publish compliance percentage' }
 if ($r.compliance.scoreStatus -notlike 'withheld:*') { throw 'Compliance score was not withheld' }
-$nodes = @($r.expectedNodes)
+$nodes = @($r.expectedNodes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($nodes.Count -eq 0) { throw 'No expected EKS managed EC2 worker nodes' }
-if (@($r.expectedControlPlaneNodes).Count -ne 0) { throw 'Unexpected master-local expectations on AWS-managed EKS control plane' }
+if (@($r.expectedControlPlaneNodes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -ne 0) { throw 'Unexpected master-local expectations on AWS-managed EKS control plane' }
 $sources = @($r.sources)
 if ($sources.Count -ne (1 + $nodes.Count)) { throw "Expected $($nodes.Count + 1) sources, got $($sources.Count)" }
 if (@($sources | Where-Object { $_.auditMode -eq 'native' -and -not $_.nodeName }).Count -ne 1) {
