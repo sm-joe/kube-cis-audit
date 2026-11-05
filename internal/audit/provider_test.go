@@ -56,11 +56,11 @@ func TestEKSAPIResultRetainsStatus(t *testing.T) {
 
 func TestPlatformNamedRBACBindingIsOnlyAnOwnershipHint(t *testing.T) {
 	tests := []struct {
-		name string
+		name    string
 		binding string
-		role string
+		role    string
 		subject string
-		want bool
+		want    bool
 	}{
 		{"EKS binding", "eks:addon-cluster-admin", "cluster-admin", "eks:addon-manager", true},
 		{"controller role", "workload", "system:controller:deployment-controller", "deployment", true},
