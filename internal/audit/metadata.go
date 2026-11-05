@@ -28,18 +28,18 @@ type NodeMetadataSnapshot struct {
 // Only explicit bool(false/true) and a known authorization mode are exported.
 type KubeletSetting struct {
 	SourcePath string `json:"sourcePath,omitempty"`
-	Value string `json:"value,omitempty"`
-	Error string `json:"error,omitempty"`
+	Value      string `json:"value,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 const nodeSnapshotSchemaVersion = 3
 
 type NodeFileMetadata struct {
 	SourcePath string `json:"sourcePath,omitempty"`
-	Mode    uint32 `json:"mode,omitempty"`
-	Regular bool   `json:"regular"`
-	Symlink bool   `json:"symlink"`
-	Error   string `json:"error,omitempty"`
+	Mode       uint32 `json:"mode,omitempty"`
+	Regular    bool   `json:"regular"`
+	Symlink    bool   `json:"symlink"`
+	Error      string `json:"error,omitempty"`
 }
 
 const nodeMetadataMaxAge = 2 * time.Minute
