@@ -38,10 +38,10 @@ jobs:
       - name: Package Windows EKS candidate
         shell: bash
         run: |
-          mkdir -p dist/eks-candidate/scripts
+          mkdir -p dist/eks-candidate/scripts dist/eks-candidate/deploy
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -o dist/eks-candidate/kubecis.exe ./cmd/kubecis
           cp -R benchmarks dist/eks-candidate/benchmarks
-          cp -R deploy/eks dist/eks-candidate/deploy-eks
+          cp -R deploy/eks dist/eks-candidate/deploy/eks
           cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 dist/eks-candidate/scripts/
           (cd dist/eks-candidate && find . -type f ! -name SHA256SUMS -print0 | xargs -0 sha256sum > SHA256SUMS)
           (cd dist && zip -qr kubecis-eks-candidate-windows-amd64.zip eks-candidate)
