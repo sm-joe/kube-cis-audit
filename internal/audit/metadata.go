@@ -259,10 +259,15 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, 
 		r.Details = fmt.Sprintf("Metadata helper returned invalid permission mode %04o.", metadata.Mode)
 		return r
 	}
+	result := evaluateHostFileMode(os.FileMode(metadata.Mode), c, r)
 	if metadata.SourcePath != "" {
-		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: metadata.SourcePath, Field: "sourcePath", Observed: metadata.SourcePath, Expected: "allowlisted kubelet configuration"})
+		for i := range result.Evidence {
+			if result.Evidence[i].Resource == "host-file" {
+				result.Evidence[i].Name = metadata.SourcePath
+			}
+		}
 	}
-	return evaluateHostFileMode(os.FileMode(metadata.Mode), c, r)
+	return result
 }
 
 // collectKubeletSettings reads only the explicitly mounted kubelet config file.
@@ -383,7 +388,9 @@ func evaluateKubeletSettingFromMetadata(nodeName string, c Check, snapshot NodeM
 	}
 	r.Details = fmt.Sprintf("Evaluated kubelet configuration field %s on node %s", c.Field, nodeName)
 	source := c.Path
-	if setting.SourcePath != "" { source = setting.SourcePath }
+	if setting.SourcePath != "" {
+		source = setting.SourcePath
+	}
 	r.Evidence = []Evidence{{Resource: "host-file", Name: source, Field: c.Field, Observed: setting.Value, Expected: expected}}
 	return r
 }
