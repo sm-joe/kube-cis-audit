@@ -43,6 +43,9 @@ func annotateProviderAssessment(provider string, check Check, result Result) Res
 	case check.Target == "master":
 		result.Applicability = "PROVIDER_EVIDENCE_REQUIRED"
 		result.EvidenceSource = "aws-provider-evidence"
+	case check.Kind == "api_control_plane_security" || check.Kind == "api_audit_logging":
+		result.Applicability = "PROVIDER_EVIDENCE_REQUIRED"
+		result.EvidenceSource = "kubernetes-api-and-aws-provider-evidence"
 	case check.Target == "policies":
 		result.Applicability = "KUBERNETES_API"
 		result.EvidenceSource = "kubernetes-api"
