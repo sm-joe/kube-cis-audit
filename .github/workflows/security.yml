@@ -1,0 +1,152 @@
+name: KubeCIS Supply Chain Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  licensing:
+    name: Licensing and Attribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify License and Attribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s LICENSE || {
+            echo "::error::Root LICENSE is missing"
+            exit 1
+          }
+          grep -q "Apache License" LICENSE || {
+            echo "::error::Expected Apache-2.0 license"
+            exit 1
+          }
+          test -s ATTRIBUTION.md || {
+            echo "::error::ATTRIBUTION.md is missing"
+            exit 1
+          }
+          echo "License and attribution files exist."
+          echo "Human review of third-party obligations is still required."
+
+  go-vulnerabilities:
+    name: Go Vulnerability Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Scan Go Packages
+        run: |
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+  source-security:
+    name: Source Vulnerability and Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Scan Source
+        id: source-scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: "latest"
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          format: json
+          output: source-security.json
+          exit-code: '1'
+
+      - name: Upload Source Scan Report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kubecis-source-security
+          path: source-security.json
+          if-no-files-found: warn
+
+      - name: Enforce Source Scan Gate
+        if: always()
+        env:
+          RESULT: ${{ steps.source-scan.outcome }}
+        run: |
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::Source security scan failed"
+            exit 1
+          fi
+
+  image-security:
+    name: Container Vulnerability Scan and SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build KubeCIS Image
+        run: |
+          docker build \
+            -t kubecis-native:security-${{ github.sha }} \
+            .
+
+      - name: Generate Image SBOM
+        uses: anchore/sbom-action@v0.24.3
+        with:
+          image: kubecis-native:security-${{ github.sha }}
+          format: spdx-json
+          artifact-name: kubecis-image-sbom.spdx.json
+          upload-release-assets: false
+
+      - name: Scan Container Image
+        id: image-scan
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: kubecis-native:security-${{ github.sha }}
+          version: "latest"
+          scan-type: image
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          format: json
+          output: image-security.json
+          exit-code: '1'
+
+      - name: Upload Image Security Report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kubecis-image-security
+          path: image-security.json
+          if-no-files-found: warn
+
+      - name: Enforce Image Scan Gate
+        if: always()
+        env:
+          RESULT: ${{ steps.image-scan.outcome }}
+        run: |
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::Container image security scan failed"
+            exit 1
+          fi
