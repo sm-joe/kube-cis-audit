@@ -42,19 +42,19 @@ type Evidence struct {
 }
 
 type Result struct {
-	ID          string     `json:"id"`
-	FindingID   string     `json:"findingId,omitempty"`
-	Scope       string     `json:"scope,omitempty"`
-	Title       string     `json:"title"`
-	Target      string     `json:"target"`
-	Status      string     `json:"status"`
-	Details     string     `json:"details"`
-	Method      string     `json:"method,omitempty"`
-	Applicability string   `json:"applicability,omitempty"`
-	EvidenceSource string  `json:"evidenceSource,omitempty"`
-	Evidence    []Evidence `json:"evidence,omitempty"`
-	Remediation string     `json:"remediation,omitempty"`
-	Scored      bool       `json:"scored"`
+	ID             string     `json:"id"`
+	FindingID      string     `json:"findingId,omitempty"`
+	Scope          string     `json:"scope,omitempty"`
+	Title          string     `json:"title"`
+	Target         string     `json:"target"`
+	Status         string     `json:"status"`
+	Details        string     `json:"details"`
+	Method         string     `json:"method,omitempty"`
+	Applicability  string     `json:"applicability,omitempty"`
+	EvidenceSource string     `json:"evidenceSource,omitempty"`
+	Evidence       []Evidence `json:"evidence,omitempty"`
+	Remediation    string     `json:"remediation,omitempty"`
+	Scored         bool       `json:"scored"`
 }
 
 type Summary struct {
