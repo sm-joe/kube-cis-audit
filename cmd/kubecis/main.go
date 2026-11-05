@@ -118,7 +118,7 @@ func main() {
 	nodeAudit.Flags().DurationVar(&nodeInterval, "interval", 0, "Repeat assessment interval (e.g. 24h); zero runs once")
 	nodeAudit.Flags().BoolVar(&nodeExitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when a one-shot node audit has FAIL results")
 
-	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataNodeName, metadataOutputFile, metadataTarget string
+	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataKubeletConfigRoot, metadataNodeName, metadataOutputFile, metadataTarget string
 	var metadataInterval time.Duration
 	nodeMetadata := &cobra.Command{
 		Use:   "node-metadata",
@@ -131,7 +131,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				return audit.RunHostMetadataSnapshot(metadataConfigDir, metadataBenchmark, metadataTarget, metadataHostRoot, metadataNodeName, metadataOutputFile)
+				return audit.RunHostMetadataSnapshotWithKubeletRoot(metadataConfigDir, metadataBenchmark, metadataTarget, metadataHostRoot, metadataKubeletConfigRoot, metadataNodeName, metadataOutputFile)
 			}
 			if metadataInterval <= 0 {
 				return run()
@@ -150,6 +150,7 @@ func main() {
 	nodeMetadata.Flags().StringVar(&metadataTarget, "target", "node", "Host target: node or master (control-plane)")
 	nodeMetadata.Flags().StringVar(&metadataConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeMetadata.Flags().StringVar(&metadataHostRoot, "host-root", "/host-kubelet", "Read-only mount of the node kubelet directory")
+	nodeMetadata.Flags().StringVar(&metadataKubeletConfigRoot, "kubelet-config-root", "", "Optional read-only AL2023 /etc/kubernetes/kubelet mount containing config.json")
 	nodeMetadata.Flags().StringVar(&metadataNodeName, "node-name", "", "Kubernetes node name (defaults to NODE_NAME)")
 	nodeMetadata.Flags().StringVar(&metadataOutputFile, "output-file", "/metadata/snapshot.json", "Writable shared-volume path for metadata-only JSON snapshot")
 	nodeMetadata.Flags().DurationVar(&metadataInterval, "interval", 30*time.Second, "Snapshot refresh interval; zero runs once")
