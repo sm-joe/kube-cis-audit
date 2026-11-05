@@ -32,10 +32,105 @@ function Write-JsonResult([string]$Path, [string[]]$Content) {
     $null = $raw | ConvertFrom-Json
     [System.IO.File]::WriteAllText($Path, $raw + "`n", $utf8)
 }
+# Create a fresh cluster scan from the already deployed Job template.
+# The new Job retains the existing container, service account and
+# security configuration while avoiding stale logs from older scans.
+
 $clusterPath = Join-Path $directory 'cluster.json'
-$clusterJson = @(& kubectl -n $Namespace logs job/kubecis-native-cluster-scan -c kubecis)
-if ($LASTEXITCODE -ne 0) {throw 'Cluster audit Job logs unavailable. Redeploy the scan Job.'}
+
+$templateJobName = 'kubecis-native-cluster-scan'
+$runId = [DateTimeOffset]::UtcNow.ToString('yyyyMMddHHmmss')
+$newJobName = "kubecis-native-e2e-$runId"
+
+$templateJob = & kubectl -n $Namespace get job $templateJobName -o json |
+    ConvertFrom-Json
+
+if ($LASTEXITCODE -ne 0 -or $null -eq $templateJob) {
+    throw "Cluster scan template Job '$templateJobName' not found"
+}
+
+# Build a new Job using the original Pod template.
+$newJob = @{
+    apiVersion = 'batch/v1'
+    kind       = 'Job'
+    metadata   = @{
+        name      = $newJobName
+        namespace = $Namespace
+        labels    = @{
+            'app.kubernetes.io/name' = 'kubecis-native-e2e'
+        }
+    }
+    spec       = @{
+        backoffLimit = 0
+        template     = $templateJob.spec.template
+    }
+}
+
+# The original Job's Pod template may contain generated metadata
+# that must not be reused on a newly created Job.
+$podTemplate = $templateJob.spec.template
+
+if ($null -ne $podTemplate.metadata) {
+    $podTemplate.metadata.PSObject.Properties.Remove('creationTimestamp')
+    $podTemplate.metadata.PSObject.Properties.Remove('uid')
+    $podTemplate.metadata.PSObject.Properties.Remove('resourceVersion')
+
+    # Remove labels injected by the Kubernetes Job controller.
+    if ($null -ne $podTemplate.metadata.labels) {
+        $podTemplate.metadata.labels.PSObject.Properties.Remove('controller-uid')
+        $podTemplate.metadata.labels.PSObject.Properties.Remove('batch.kubernetes.io/controller-uid')
+        $podTemplate.metadata.labels.PSObject.Properties.Remove('job-name')
+        $podTemplate.metadata.labels.PSObject.Properties.Remove('batch.kubernetes.io/job-name')
+    }
+}
+
+$newJob.spec.template = $podTemplate
+
+$jobJson = $newJob | ConvertTo-Json -Depth 100
+
+$jobJson | kubectl -n $Namespace apply -f -
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to create fresh cluster scan Job '$newJobName'"
+}
+
+# Wait for the newly created scan to finish successfully.
+kubectl -n $Namespace wait `
+    --for=condition=complete `
+    "job/$newJobName" `
+    --timeout=180s
+
+if ($LASTEXITCODE -ne 0) {
+    kubectl -n $Namespace describe job $newJobName
+    kubectl -n $Namespace logs "job/$newJobName" -c kubecis --tail=100
+
+    throw "Fresh cluster scan Job '$newJobName' failed"
+}
+
+# Read only this run's logs, not the old template Job's logs.
+$clusterJson = @(
+    & kubectl -n $Namespace logs "job/$newJobName" -c kubecis
+)
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to collect fresh cluster report from '$newJobName'"
+}
+
 Write-JsonResult $clusterPath $clusterJson
+
+# Validate freshness before proceeding to local reports.
+$clusterReport = Get-Content $clusterPath -Raw |
+    ConvertFrom-Json
+
+$generated = [DateTimeOffset]::Parse($clusterReport.generatedAt)
+$age = [DateTimeOffset]::UtcNow - $generated
+
+if ($age.TotalMinutes -lt 0 -or $age.TotalMinutes -gt 30) {
+    throw "Fresh cluster Job returned invalid report timestamp: $($clusterReport.generatedAt)"
+}
+
+Write-Host "Fresh cluster audit collected from: $newJobName"
+Write-Host "Cluster report timestamp: $($clusterReport.generatedAt)"
 foreach ($node in $nodes) {
     $matching = @($nodePods.items | Where-Object { $_.spec.nodeName -eq $node -and $_.status.phase -eq 'Running' })
     if ($matching.Count -ne 1) {throw "Expected exactly one Running node auditor Pod on '$node'; found $($matching.Count)"}
