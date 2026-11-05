@@ -41,6 +41,28 @@ if ($r.compliance.scoredTotal -lt 1) { throw 'No scored checks were included' }
 if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scoredTotal) {
     throw 'Decisive statuses exceed total scored controls'
 }
+# A consolidated report is not an acceptable EKS node audit if every kubelet
+# configuration result is NOT_ASSESSED. Require explicit verified AL2023
+# source evidence for all three essential worker checks on every expected node.
+$requiredNodeChecks = @('4.1.9', 'KUBECIS-NATIVE-NODE-1', 'KUBECIS-NATIVE-NODE-2')
+foreach ($node in $nodes) {
+    foreach ($checkId in $requiredNodeChecks) {
+        $found = @($r.results | Where-Object { $_.id -eq $checkId -and $_.scope -eq $node })
+        if ($found.Count -ne 1) {
+            throw "Missing or duplicate EKS kubelet control $checkId for worker $node"
+        }
+        $finding = $found[0]
+        if (@('PASS','FAIL') -notcontains $finding.status) {
+            throw "EKS node evidence incomplete: $checkId on $node is $($finding.status). $($finding.details)"
+        }
+        $sourceEvidence = @($finding.evidence | Where-Object {
+            $_.name -eq 'etc/kubernetes/kubelet/config.json'
+        })
+        if ($sourceEvidence.Count -eq 0) {
+            throw "EKS node control $checkId on $node lacks AL2023 nodeadm config.json evidence"
+        }
+    }
+}
 Write-Host "PASS: EKS API + $($nodes.Count) managed EC2 node source(s) verified"
 Write-Host "Benchmark: $($r.benchmark) ($($r.benchmarkCompatibilityStatus)); score withheld as required"
 Write-Host "Scored evidence coverage: $($r.compliance.coveragePercent)% within configured starter profile"
