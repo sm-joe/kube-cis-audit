@@ -42,7 +42,8 @@ func Run(o Options) (Report, error) {
 	if strings.TrimSpace(compatibilityStatus) == "" {
 		compatibilityStatus = "unknown"
 	}
-	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
+	provider := DetectCloudProvider(version.GitVersion)
+	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "CoveragePercent describes only the configured starter-profile scored controls, not the full upstream CIS benchmark.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
@@ -64,7 +65,7 @@ func Run(o Options) (Report, error) {
 			workloadSummaryCheck = &checkCopy
 			continue
 		}
-		r := evaluate(ctx, client, c, o)
+		r := annotateProviderAssessment(provider, c, evaluate(ctx, client, c, o))
 		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
