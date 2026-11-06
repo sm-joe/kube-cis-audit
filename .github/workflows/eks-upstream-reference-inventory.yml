@@ -1,0 +1,44 @@
+name: Validate EKS benchmark reference inventory
+on:
+  push:
+    branches:
+      - feature/cis-eks-upstream-reference-inventory
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.3'
+      - name: Validate benchmark inventory parser
+        run: |
+          test -z "$(gofmt -l cmd/benchmark-inventory/*.go)"
+          go test ./cmd/benchmark-inventory/... -count=1
+      - name: Inventory pinned EKS controls without executing upstream audits
+        run: |
+          mkdir -p dist
+          go run ./cmd/benchmark-inventory \
+            -root benchmarks/upstream/kube-bench/cfg \
+            -out dist/UPSTREAM-EKS-1.8.0-INVENTORY.md \
+            -json dist/UPSTREAM-EKS-1.8.0-INVENTORY.json
+          python3 - <<'PY'
+          import json
+          data=json.load(open("dist/UPSTREAM-EKS-1.8.0-INVENTORY.json",encoding="utf-8"))
+          ps=[p for p in data["profiles"] if p["name"]=="eks-1.8.0"]
+          assert len(ps)==1, "missing pin to upstream EKS 1.8.0"
+          p=ps[0]
+          assert p["files"]==5, p["files"]
+          assert len(p["controls"])>=15, len(p["controls"])
+          assert all(c["profile"]=="eks-1.8.0" for c in p["controls"])
+          assert all(c["id"] and c["title"] for c in p["controls"])
+          assert p["scored"]>0 and p["not_scored"]>0, p
+          print("EKS 1.8.0 reference profile controls:",len(p["controls"]))
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: eks-1.8.0-reference-control-inventory
+          path: dist/
+          if-no-files-found: error
