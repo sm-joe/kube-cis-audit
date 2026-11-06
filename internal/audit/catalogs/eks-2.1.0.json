@@ -8,7 +8,7 @@
     "37"
   ],
   "source": "user-provided official CIS 2.1.0 PDF, Appendix Summary Table",
-  "note": "Factual control ID and automated/manual classification only. No CIS benchmark content reproduced. Implemented means native code exists, not full release acceptance.",
+  "note": "Factual control inventory; implemented indicates a native evaluator, not accepted complete benchmark coverage. Explicit configuration evidence is required; unknown inputs remain NOT_ASSESSED.",
   "controls": [
     {
       "id": "2.1.1",
@@ -56,37 +56,37 @@
       "id": "3.2.3",
       "assessment": "automated",
       "pdfPage": 228,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "3.2.4",
       "assessment": "automated",
       "pdfPage": 228,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "3.2.5",
       "assessment": "automated",
       "pdfPage": 228,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "3.2.6",
       "assessment": "automated",
       "pdfPage": 229,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "3.2.7",
       "assessment": "automated",
       "pdfPage": 229,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "3.2.8",
       "assessment": "automated",
       "pdfPage": 229,
-      "implemented": false
+      "implemented": true
     },
     {
       "id": "4.1.1",
