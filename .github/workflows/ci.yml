@@ -28,6 +28,7 @@ jobs:
         run: |
           files=$(find . -type f -name '*.go' -not -path './vendor/*')
           gofmt -l $files
+          gofmt -d internal/audit/eks_kubelet_extended.go internal/audit/eks_kubelet_extended_test.go
           test -z "$(gofmt -l $files)"
 
       - name: Run Go Vet
