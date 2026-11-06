@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/cis-210-source-validated-core
+      - feature/cis210-official-native-implementation
 permissions:
   contents: read
   packages: write
