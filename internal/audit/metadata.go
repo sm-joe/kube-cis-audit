@@ -32,11 +32,13 @@ type KubeletSetting struct {
 	Error      string `json:"error,omitempty"`
 }
 
-const nodeSnapshotSchemaVersion = 3
+const nodeSnapshotSchemaVersion = 4
 
 type NodeFileMetadata struct {
 	SourcePath string `json:"sourcePath,omitempty"`
 	Mode       uint32 `json:"mode,omitempty"`
+	OwnerUID   *uint32 `json:"ownerUid,omitempty"`
+	OwnerGID   *uint32 `json:"ownerGid,omitempty"`
 	Regular    bool   `json:"regular"`
 	Symlink    bool   `json:"symlink"`
 	Error      string `json:"error,omitempty"`
@@ -90,7 +92,7 @@ func RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRo
 		Files:         make(map[string]NodeFileMetadata),
 	}
 	for _, check := range bench.Checks {
-		if !strings.EqualFold(check.Target, target) || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists") {
+		if !strings.EqualFold(check.Target, target) || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists" && check.Kind != "host_file_owner") {
 			continue
 		}
 		metadata := NodeFileMetadata{}
@@ -116,6 +118,10 @@ func RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRo
 		metadata.Symlink = info.Mode()&os.ModeSymlink != 0
 		metadata.Regular = info.Mode().IsRegular()
 		metadata.Mode = uint32(info.Mode().Perm())
+		if uid, gid, ok := hostFileOwner(info); ok {
+			metadata.OwnerUID = &uid
+			metadata.OwnerGID = &gid
+		}
 		snapshot.Files[check.Path] = metadata
 	}
 
@@ -180,6 +186,9 @@ func approvedHostMetadataPath(target, benchmarkPath string) (string, bool) {
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(benchmarkPath)))
 	switch strings.ToLower(target) {
 	case "node":
+		if clean == "var/lib/kubelet/kubeconfig" {
+			return "kubeconfig", true
+		}
 		if clean == "var/lib/kubelet/config.yaml" {
 			return "config.yaml", true
 		}
@@ -250,6 +259,19 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, 
 	if !metadata.Regular {
 		r.Details = fmt.Sprintf("Host path %s is not a regular file.", c.Path)
 		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: c.Path, Field: "type", Observed: "non-regular file", Expected: "regular file"})
+		return r
+	}
+	if c.Kind == "host_file_owner" {
+		if metadata.OwnerUID == nil || metadata.OwnerGID == nil {
+			r.Details = "Node owner metadata unavailable; ownership cannot be inferred from permission bits."
+			return r
+		}
+		r.Status = "FAIL"
+		if *metadata.OwnerUID == 0 && *metadata.OwnerGID == 0 {
+			r.Status = "PASS"
+		}
+		r.Details = fmt.Sprintf("Node %s: host file %s ownership is %d:%d; expected root:root (0:0).", nodeName, metadata.SourcePath, *metadata.OwnerUID, *metadata.OwnerGID)
+		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: metadata.SourcePath, Field: "owner", Observed: fmt.Sprintf("%d:%d", *metadata.OwnerUID, *metadata.OwnerGID), Expected: "0:0"})
 		return r
 	}
 	if c.Kind == "host_file_exists" {
