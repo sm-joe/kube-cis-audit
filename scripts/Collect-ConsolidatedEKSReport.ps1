@@ -79,6 +79,22 @@ foreach ($node in $nodes) {
     $safe = $node -replace '[^a-zA-Z0-9_.-]', '_'
     $path = Join-Path $dir "node-$safe.json"
     Write-JsonReport $path $data
+    # Effective configz comes from the authenticated Kubernetes API. It is
+    # deliberately ephemeral: only bounded assessed facts enter node JSON.
+    $proxyPath = "/api/v1/nodes/$([Uri]::EscapeDataString($node))/proxy/configz"
+    $configzLines = @(& kubectl --context $Context get --raw $proxyPath 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $configzLines.Count -gt 0) {
+        $configzTemp = Join-Path $dir ("configz-" + [guid]::NewGuid().ToString('N') + ".json")
+        try {
+            [System.IO.File]::WriteAllText($configzTemp, ($configzLines -join "`n"), $utf8)
+            & $Binary enrich-node --input $path --configz-file $configzTemp --node-name $node --output-file $path
+            if ($LASTEXITCODE -ne 0) { throw "Authenticated live kubelet configz evidence invalid for $node" }
+        } finally {
+            Remove-Item -Path $configzTemp -Force -ErrorAction SilentlyContinue
+        }
+    } else {
+        Write-Warning "No live /configz evidence for $node (missing node/proxy permission or endpoint unavailable); unknown kubelet controls remain NOT_ASSESSED."
+    }
     $inputs.Add($path)
 }
 $providerPath = Join-Path $dir 'provider.json'
