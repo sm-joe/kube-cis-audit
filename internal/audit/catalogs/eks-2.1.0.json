@@ -1,0 +1,296 @@
+{
+  "benchmark": "cis-eks-2.1.0",
+  "status": "inventory",
+  "supportedKubernetesMinor": [
+    "34",
+    "35",
+    "36",
+    "37"
+  ],
+  "source": "user-provided official CIS 2.1.0 PDF, Appendix Summary Table",
+  "note": "Factual control ID and automated/manual classification only. No CIS benchmark content reproduced. Implemented means native code exists, not full release acceptance.",
+  "controls": [
+    {
+      "id": "2.1.1",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": true
+    },
+    {
+      "id": "3.1.1",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.1.2",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.1.3",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.1.4",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.1",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.2",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.3",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.4",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.5",
+      "assessment": "automated",
+      "pdfPage": 228,
+      "implemented": false
+    },
+    {
+      "id": "3.2.6",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "3.2.7",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "3.2.8",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.1",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.2",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.3",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.4",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.5",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.6",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.7",
+      "assessment": "automated",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.8",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.9",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.10",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.11",
+      "assessment": "manual",
+      "pdfPage": 229,
+      "implemented": false
+    },
+    {
+      "id": "4.1.12",
+      "assessment": "manual",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.2.1",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.2.2",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.2.3",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.2.4",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.2.5",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.3.1",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.3.2",
+      "assessment": "manual",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.4.1",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.4.2",
+      "assessment": "manual",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.5.1",
+      "assessment": "manual",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "4.5.2",
+      "assessment": "automated",
+      "pdfPage": 230,
+      "implemented": false
+    },
+    {
+      "id": "5.1.1",
+      "assessment": "automated",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.1.2",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.1.3",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.1.4",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.2.1",
+      "assessment": "automated",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.3.1",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.4.1",
+      "assessment": "automated",
+      "pdfPage": 231,
+      "implemented": true
+    },
+    {
+      "id": "5.4.2",
+      "assessment": "automated",
+      "pdfPage": 231,
+      "implemented": true
+    },
+    {
+      "id": "5.4.3",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.4.4",
+      "assessment": "manual",
+      "pdfPage": 231,
+      "implemented": false
+    },
+    {
+      "id": "5.5.1",
+      "assessment": "automated",
+      "pdfPage": 231,
+      "implemented": false
+    }
+  ]
+}
