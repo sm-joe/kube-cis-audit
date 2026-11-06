@@ -1,0 +1,29 @@
+name: RC3 Go formatting (temporary)
+on:
+  push:
+    branches: [feature/eks-rc3-provider-accuracy]
+permissions:
+  contents: write
+concurrency:
+  group: eks-rc3-gofmt
+  cancel-in-progress: true
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.3'
+      - name: Format and push source
+        shell: bash
+        run: |
+          gofmt -w internal/audit/*.go cmd/kubecis/main.go
+          if ! git diff --quiet; then
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git add internal/audit cmd/kubecis/main.go
+            git commit -m "style: gofmt RC3 provider and benchmark changes"
+            git push origin HEAD:feature/eks-rc3-provider-accuracy
+          fi
