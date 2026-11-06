@@ -241,7 +241,9 @@ func main() {
 				if err != nil {
 					return err
 				}
-				merged.ProviderEvidence = &evidence
+				if err := audit.AttachEKSCISProviderEvidence(&merged, evidence); err != nil {
+					return fmt.Errorf("assess CIS EKS provider evidence: %w", err)
+				}
 			}
 			var dst io.Writer = os.Stdout
 			if mergeOutput != "" {
