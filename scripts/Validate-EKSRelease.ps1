@@ -80,7 +80,7 @@ if ($p.clusterArn -notmatch '^arn:aws[a-z-]*:eks:([^:]+):([0-9]{12}):cluster/(.+
     throw 'Provider evidence ARN name/region mismatch'
 }
 if ($ReleaseLevel -eq 'Full') {
-    throw 'Full CIS EKS release NOT ACCEPTED: the profile is provisional; the official complete control inventory and version applicability are not verified.'
+    throw 'Full CIS EKS release NOT ACCEPTED: required official automated controls and manual review evidence are not yet fully implemented and validated.'
 }
 if ($r.compliance.scoredTotal -lt 1) { throw 'No scored checks were included' }
 if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scoredTotal) {
@@ -89,7 +89,7 @@ if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scored
 # A consolidated report is not an acceptable EKS node audit if every kubelet
 # configuration result is NOT_ASSESSED. Require explicit verified AL2023
 # source evidence for all three essential worker checks on every expected node.
-$requiredNodeChecks = @('KUBECIS-EKS-NODE-CONFIG-MODE', 'KUBECIS-NATIVE-NODE-1', 'KUBECIS-NATIVE-NODE-2')
+$requiredNodeChecks = @('3.1.3', '3.2.1', '3.2.2')
 foreach ($node in $nodes) {
     foreach ($checkId in $requiredNodeChecks) {
         $found = @($r.results | Where-Object { $_.id -eq $checkId -and $_.scope -eq $node })
