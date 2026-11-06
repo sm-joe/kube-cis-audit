@@ -91,7 +91,7 @@ checks:
     path: "var/lib/kubelet/config.yaml"
     field: "eventRecordQPS"
     description: "Native node-local assessment from a bounded AL2023/kubeadm kubelet metadata snapshot; unknown values fail closed."
-    remediation: "Set eventRecordQPS to 0 or document an appropriate value for event recording; review production event volume."
+    remediation: "Review the live effective kubelet eventRecordQPS (default 50); select a justified bounded event rate based on workload volume. A value of 0 disables rate limiting and is not an automatic PASS."
   - id: "3.2.7"
     title: "Kubelet client certificate rotation"
     target: node
@@ -111,37 +111,37 @@ checks:
     description: "Native node-local assessment from a bounded AL2023/kubeadm kubelet metadata snapshot; unknown values fail closed."
     remediation: "Enable serverTLSBootstrap and RotateKubeletServerCertificate together; verify certificate approval and rotation."
   - id: "4.1.1"
-    title: "EKS 4.1.1 assessment pending verified native evidence"
+    title: "Restrict cluster-admin role to approved administrators"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Restrict cluster-admin role to approved administrators. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "List cluster-admin bindings and approve only the required service accounts and principals; remove excessive cluster-admin privileges."
   - id: "4.1.2"
-    title: "EKS 4.1.2 assessment pending verified native evidence"
+    title: "Minimize permissions to read Kubernetes Secrets"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize permissions to read Kubernetes Secrets. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review Roles and ClusterRoles granting secrets get/list/watch; remove unused permissions and restrict to approved namespaces."
   - id: "4.1.3"
-    title: "EKS 4.1.3 assessment pending verified native evidence"
+    title: "Minimize wildcard permissions in Kubernetes RBAC"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize wildcard permissions in Kubernetes RBAC. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review Role and ClusterRole rules with wildcard resources, verbs or API groups and replace unnecessary wildcards with explicit permissions."
   - id: "4.1.4"
-    title: "EKS 4.1.4 assessment pending verified native evidence"
+    title: "Minimize permission to create Pods"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize permission to create Pods. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review Roles and ClusterRoles granting pods create and constrain access to approved namespaces and roles."
   - id: "4.1.5"
     title: "Dedicated service account review"
     target: policies
@@ -157,52 +157,52 @@ checks:
     description: "Native control with reviewable evidence and unknown-state handling."
     remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
   - id: "4.1.7"
-    title: "EKS 4.1.7 assessment pending verified native evidence"
+    title: "EKS access entries and scoped access policies"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: aws_eks_access_entries
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Inspect EKS authentication mode, access entries, per-principal policy scopes and legacy aws-auth mappings; migrate approved IAM principals to EKS access entries."
   - id: "4.1.8"
-    title: "EKS 4.1.8 assessment pending verified native evidence"
+    title: "Restrict RBAC bind, impersonate and escalate privileges"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Restrict RBAC bind, impersonate and escalate privileges. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Audit RBAC granting bind/impersonate/escalate and require explicit security approvals for privileged subjects."
   - id: "4.1.9"
-    title: "EKS 4.1.9 assessment pending verified native evidence"
+    title: "Minimize permissions to create PersistentVolumes"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize permissions to create PersistentVolumes. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review roles with persistentvolumes create privileges; restrict cluster-scoped storage provisioning to approved operators."
   - id: "4.1.10"
-    title: "EKS 4.1.10 assessment pending verified native evidence"
+    title: "Minimize access to nodes/proxy subresource"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize access to nodes/proxy subresource. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review RBAC on nodes/proxy and restrict access to approved operational identities."
   - id: "4.1.11"
-    title: "EKS 4.1.11 assessment pending verified native evidence"
+    title: "Minimize RBAC access to admission webhook configurations"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize RBAC access to admission webhook configurations. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review write permissions for validatingwebhookconfigurations and mutatingwebhookconfigurations; limit to approved platform administrators."
   - id: "4.1.12"
-    title: "EKS 4.1.12 assessment pending verified native evidence"
+    title: "Minimize access to serviceaccounts/token creation"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Minimize access to serviceaccounts/token creation. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review create permissions on serviceaccounts/token and restrict token minting to approved identities."
   - id: "4.2.1"
     title: "Restrict privileged Pod admission"
     target: policies
@@ -239,116 +239,116 @@ checks:
     description: "Native control with reviewable evidence and unknown-state handling."
     remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
   - id: "4.3.1"
-    title: "EKS 4.3.1 assessment pending verified native evidence"
+    title: "Amazon VPC CNI network policy enforcement"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: eks_vpc_cni_network_policy
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Enable the supported VPC CNI add-on network policy feature and ensure the aws-node network policy agent is healthy on all eligible EC2 Linux nodes; verify policy enforcement."
   - id: "4.3.2"
-    title: "EKS 4.3.2 assessment pending verified native evidence"
+    title: "Required workload coverage by Kubernetes network policies"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Required workload coverage by Kubernetes network policies. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Map active application workloads to enforced ingress/egress NetworkPolicies and approve any justified exceptions."
   - id: "4.4.1"
-    title: "EKS 4.4.1 assessment pending verified native evidence"
+    title: "Prefer mounted Kubernetes Secrets over secret environment variables"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: eks_secret_env
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Replace secretKeyRef and envFrom.secretRef environment injections with mounted secret volumes or Secrets Store CSI files; review application migration and runtime behavior."
   - id: "4.4.2"
-    title: "EKS 4.4.2 assessment pending verified native evidence"
+    title: "Consider external secret storage for sensitive workloads"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Consider external secret storage for sensitive workloads. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review adoption of AWS Secrets Manager or approved external secret storage, IAM boundaries and rotation practices."
   - id: "4.5.1"
-    title: "EKS 4.5.1 assessment pending verified native evidence"
+    title: "Administrative boundaries between resources using namespaces"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Administrative boundaries between resources using namespaces. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review namespace isolation, RBAC, NetworkPolicy and business ownership to establish administrative boundaries."
   - id: "4.5.2"
-    title: "EKS 4.5.2 assessment pending verified native evidence"
+    title: "Avoid default namespace for application workloads"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: eks_default_namespace
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Move active Pods and workload controllers from the default namespace to dedicated namespaces with appropriate RBAC, admission policies and NetworkPolicies."
   - id: "5.1.1"
-    title: "EKS 5.1.1 assessment pending verified native evidence"
+    title: "Container image vulnerability scanning coverage"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: aws_ecr_image_scanning
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Enable ECR Basic scan-on-push or Enhanced scanning for every ECR repository used by EKS workload images, verify image digest scan status, or attach approved third-party scanner evidence."
   - id: "5.1.2"
-    title: "EKS 5.1.2 assessment pending verified native evidence"
+    title: "Least-privilege access to ECR repositories"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Least-privilege access to ECR repositories. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review ECR repository/registry and IAM identity policies against approved pull, push and administration requirements."
   - id: "5.1.3"
-    title: "EKS 5.1.3 assessment pending verified native evidence"
+    title: "Restrict EKS image-pull identities to ECR pull-only access"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Restrict EKS image-pull identities to ECR pull-only access. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review worker-node and Fargate IAM role permissions and eliminate unneeded ECR push/delete/administration privileges."
   - id: "5.1.4"
-    title: "EKS 5.1.4 assessment pending verified native evidence"
+    title: "Allow only approved container image registries"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Allow only approved container image registries. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review image registry inventory and admission allowlist enforcement, and record approved exceptions."
   - id: "5.2.1"
-    title: "EKS 5.2.1 assessment pending verified native evidence"
+    title: "Dedicated EKS service accounts for workloads"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: eks_dedicated_service_account
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Assign dedicated Kubernetes service accounts to workloads and review workload IAM authorization via EKS Pod Identity or IRSA."
   - id: "5.3.1"
-    title: "EKS 5.3.1 assessment pending verified native evidence"
+    title: "Customer-managed KMS keys for EKS envelope encryption"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Customer-managed KMS keys for EKS envelope encryption. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review EKS encryption configuration, customer-managed KMS keys, access policies and key rotation."
   - id: "5.4.3"
-    title: "EKS 5.4.3 assessment pending verified native evidence"
+    title: "Deploy EKS worker nodes in private subnets"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: Deploy EKS worker nodes in private subnets. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review node subnet routes, public IP association and managed node group networking; require private-subnet placement."
   - id: "5.4.4"
-    title: "EKS 5.4.4 assessment pending verified native evidence"
+    title: "TLS certificates on EKS load balancer listeners"
     target: policies
     kind: manual
     scored: false
     manual: true
-    description: "Official EKS control requires a documented human review and supporting evidence."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    description: "Human evidence review: TLS certificates on EKS load balancer listeners. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
+    remediation: "Review LoadBalancer services, Ingress and underlying ALB/NLB listener certificate status; verify all client-facing TLS paths."
   - id: "5.5.1"
-    title: "EKS 5.5.1 assessment pending verified native evidence"
+    title: "Use EKS access entries for IAM principal authentication"
     target: policies
-    kind: cis_not_implemented
-    scored: false
-    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
-    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+    kind: aws_eks_access_entries
+    scored: true
+    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
+    remediation: "Enable API or API_AND_CONFIG_MAP authentication, migrate approved IAM principal mappings to EKS access entries, and review policy/RBAC grants and legacy aws-auth usage."
