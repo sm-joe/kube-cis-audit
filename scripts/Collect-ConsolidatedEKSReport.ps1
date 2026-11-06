@@ -98,7 +98,7 @@ foreach ($node in $nodes) {
     $inputs.Add($path)
 }
 $providerPath = Join-Path $dir 'provider.json'
-& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -ExpectedAPIServer $kubeAPIServer -OutputFile $providerPath
+& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -ExpectedAPIServer $kubeAPIServer -OutputFile $providerPath -Context $Context
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $providerPath)) { throw 'EKS provider DescribeCluster collection failed' }
 $argsList = @('consolidate','--provider-evidence',$providerPath,'--cluster',$clusterPath,'--expected-nodes',($nodes -join ','),'--max-age','30m','--output-file',(Join-Path $dir 'consolidated.json'))
 foreach ($path in $inputs) {
