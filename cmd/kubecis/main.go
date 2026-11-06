@@ -203,7 +203,7 @@ func main() {
 	compare.Flags().StringVar(&compareOutput, "output-file", "", "Write comparison JSON to this file (defaults to stdout)")
 	_ = compare.MarkFlagRequired("baseline")
 	_ = compare.MarkFlagRequired("current")
-	var mergeCluster, mergeOutput, mergeNodes, mergeMasters string
+	var mergeCluster, mergeOutput, mergeNodes, mergeMasters, mergeProviderEvidence string
 	var mergeLocals []string
 	var mergeMaxAge time.Duration
 	consolidate := &cobra.Command{
@@ -232,6 +232,17 @@ func main() {
 			if err != nil {
 				return err
 			}
+			if mergeProviderEvidence != "" {
+				providerData, err := os.ReadFile(mergeProviderEvidence)
+				if err != nil {
+					return fmt.Errorf("read EKS provider evidence: %w", err)
+				}
+				evidence, err := audit.DecodeEKSProviderEvidence(providerData, clusterReport, mergeMaxAge, time.Now().UTC())
+				if err != nil {
+					return err
+				}
+				merged.ProviderEvidence = &evidence
+			}
 			var dst io.Writer = os.Stdout
 			if mergeOutput != "" {
 				if err := os.MkdirAll(filepath.Dir(mergeOutput), 0o755); err != nil {
@@ -250,6 +261,7 @@ func main() {
 		},
 	}
 	consolidate.Flags().StringVar(&mergeCluster, "cluster", "", "Cluster-policy JSON report")
+	consolidate.Flags().StringVar(&mergeProviderEvidence, "provider-evidence", "", "Optional validated read-only AWS EKS DescribeCluster inventory JSON")
 	consolidate.Flags().StringSliceVar(&mergeLocals, "local", nil, "Node/control-plane JSON reports (repeat flag)")
 	consolidate.Flags().StringVar(&mergeNodes, "expected-nodes", "", "Comma-separated names of ALL expected Linux nodes")
 	consolidate.Flags().StringVar(&mergeMasters, "expected-control-planes", "", "Comma-separated names of expected control-plane nodes")
