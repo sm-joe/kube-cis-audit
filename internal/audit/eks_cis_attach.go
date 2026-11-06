@@ -25,6 +25,7 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
 	if err != nil {
 		return err
 	}
+	findings = append(findings, EvaluateEKSAdditionalAWSControls(evidence)...)
 	existing := make(map[string]bool, len(out.Results))
 	for _, r := range out.Results {
 		existing[StableFindingID(r)] = true
@@ -71,6 +72,8 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
 	if out.CoverageMetrics.ScoredTotal > 0 {
 		out.CoverageMetrics.ScoredPercent = math.Round(float64(out.CoverageMetrics.ScoredAssessed)*10000/float64(out.CoverageMetrics.ScoredTotal)) / 100
 	}
+	ApplyEKSCNIProviderEvidence(out, evidence)
+	recalculateEKSConsolidatedMetrics(out)
 	out.Compliance.CoveragePercent = out.CoverageMetrics.ScoredPercent
 	// In particular, these three actual CIS findings do not imply that the
 	// other official benchmark controls have been tested.
