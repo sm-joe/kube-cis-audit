@@ -369,6 +369,8 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return r
 	}
 	switch c.Kind {
+	case "eks_secret_env", "eks_default_namespace", "eks_dedicated_service_account", "eks_vpc_cni_network_policy":
+		return EvaluateEKSAdditionalPolicy(ctx, client, c)
 	case "eks_psa_admission":
 		if c.ID != "4.2.1" && c.ID != "4.2.2" && c.ID != "4.2.3" && c.ID != "4.2.4" && c.ID != "4.2.5" {
 			r.Details = "Unsupported EKS admission control ID"
