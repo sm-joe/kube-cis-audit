@@ -106,19 +106,17 @@ func evaluateExtendedKubeletSetting(nodeName string, c Check, snapshot NodeMetad
 	case "3.2.5", "3.2.7", "3.2.8":
 		expected = "true"
 	case "3.2.6":
-		expected = "0 or justified workload-specific QPS"
+		expected = "appropriate event QPS for measured workload; default 50, 0 removes rate limiting"
 	}
 	r.Evidence = []Evidence{{Resource: "host-file", Name: setting.SourcePath, Field: field, Observed: setting.Value, Expected: expected}}
 	switch c.ID {
 	case "3.2.6":
-		if setting.Value == "0" {
-			r.Status = "PASS"
+		// EKS 2.1.0 treats zero as unlimited event creation, not an
+		// automatic PASS. Appropriate QPS requires workload evidence.
+		if _, err := strconv.Atoi(setting.Value); err != nil {
+			r.Status = "NOT_ASSESSED"
 		} else {
-			if _, err := strconv.Atoi(setting.Value); err != nil {
-				r.Status = "NOT_ASSESSED"
-			} else {
-				r.Status = "MANUAL"
-			}
+			r.Status = "MANUAL"
 		}
 	case "3.2.7":
 		if setting.Value == "true" {
