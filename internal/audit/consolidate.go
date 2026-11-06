@@ -79,6 +79,9 @@ func ConsolidateReports(cluster Report, locals []Report, expectedNodes, expected
 	out.Sources = make([]SourceRecord, 0, len(all))
 	var scored ComplianceSummary
 	for _, src := range all {
+		if cluster.CloudProvider == "eks" && src.AuditMode != "native" && src.CloudProvider != "eks" {
+			return ConsolidatedReport{}, fmt.Errorf("EKS node source %s/%s must declare provider eks", src.AuditMode, src.NodeName)
+		}
 		if src.Benchmark != cluster.Benchmark || src.CompatibilityStatus != cluster.CompatibilityStatus {
 			return ConsolidatedReport{}, fmt.Errorf("source %s/%s benchmark or compatibility mismatch", src.AuditMode, src.NodeName)
 		}
