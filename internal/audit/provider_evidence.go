@@ -8,6 +8,25 @@ import (
 	"time"
 )
 
+// These optional, bounded read-only inventories allow native AWS controls to
+// distinguish verified settings from absent permissions or missing evidence.
+type EKSAccessEntryEvidence struct {
+	PrincipalARN string   `json:"principalArn"`
+	Type         string   `json:"type,omitempty"`
+	Groups       []string `json:"kubernetesGroups,omitempty"`
+	PolicyScopes []string `json:"policyScopes,omitempty"`
+	Error        string   `json:"error,omitempty"`
+}
+
+type EKSECRImageScanEvidence struct {
+	Registry    string `json:"registry"`
+	Repository  string `json:"repository"`
+	Digest      string `json:"digest,omitempty"`
+	ScanType    string `json:"scanType,omitempty"`
+	ScanStatus  string `json:"scanStatus,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
 // EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
 // snapshot. It contains configuration inventory, NOT a CIS pass/fail score.
 type EKSProviderEvidence struct {
@@ -24,6 +43,15 @@ type EKSProviderEvidence struct {
 	ControlPlaneLogging map[string]bool `json:"controlPlaneLogging"`
 	AssessmentStatus    string          `json:"assessmentStatus"`
 	AssessmentNote      string          `json:"assessmentNote"`
+	AuthenticationMode string `json:"authenticationMode,omitempty"`
+	AccessInventoryStatus string `json:"accessInventoryStatus,omitempty"`
+	AccessEntries []EKSAccessEntryEvidence `json:"accessEntries,omitempty"`
+	VpcCNIStatus string `json:"vpcCniStatus,omitempty"`
+	VpcCNIVersion string `json:"vpcCniVersion,omitempty"`
+	VpcCNINetworkPolicy *bool `json:"vpcCniNetworkPolicy,omitempty"`
+	ECRInventoryStatus string `json:"ecrInventoryStatus,omitempty"`
+	ECRImages []EKSECRImageScanEvidence `json:"ecrImages,omitempty"`
+	NonECRImageCount int `json:"nonEcrImageCount,omitempty"`
 }
 
 func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration, now time.Time) (EKSProviderEvidence, error) {
