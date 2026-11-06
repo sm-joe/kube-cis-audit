@@ -38,12 +38,16 @@ func Run(o Options) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	if err := validateBenchmarkMinor(bench, minor); err != nil {
+		return Report{}, err
+	}
 	compatibilityStatus := bench.CompatibilityStatus
 	if strings.TrimSpace(compatibilityStatus) == "" {
 		compatibilityStatus = "unknown"
 	}
 	provider := DetectCloudProvider(version.GitVersion)
-	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "CoveragePercent describes only the configured starter-profile scored controls, not the full upstream CIS benchmark.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
+	bench = applyProviderProfile(bench, provider)
+	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "CoveragePercent describes only the configured starter-profile scored controls, not the full upstream CIS benchmark.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: benchmarkCompatibilityNote(bench, version.GitVersion, provider)}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
@@ -121,6 +125,10 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	if o.Provider != "" && o.Provider != "eks" {
+		return Report{}, fmt.Errorf("unsupported explicit node provider %q (supported: eks)", o.Provider)
+	}
+	bench = applyProviderProfile(bench, o.Provider)
 	target := strings.TrimSpace(o.Target)
 	if target == "" {
 		target = "node"
@@ -131,6 +139,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	report := Report{
 		BuildVersion:         BuildVersion,
 		AuditMode:            strings.ToLower(target) + "-local",
+		CloudProvider:       o.Provider,
 		NodeName:             nodeName,
 		Tool:                 "KubeCIS Native",
 		GeneratedAt:          time.Now().UTC(),
