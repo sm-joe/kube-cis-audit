@@ -40,7 +40,8 @@ type reviewCandidate struct {
 }
 
 type reviewTemplate struct {
-	reviewInput
+	ReportSHA256   string            `json:"reportSha256"`
+	Decisions      []reviewDecision  `json:"decisions"`
 	PendingReviews []reviewCandidate `json:"pendingReviews"`
 }
 
@@ -118,10 +119,8 @@ func newReviewInitCommand() *cobra.Command {
 			}
 			digest := sha256.Sum256(raw)
 			template := reviewTemplate{
-				reviewInput: reviewInput{
-					ReportSHA256: hex.EncodeToString(digest[:]),
-					Decisions:    []reviewDecision{},
-				},
+				ReportSHA256:   hex.EncodeToString(digest[:]),
+				Decisions:      []reviewDecision{},
 				PendingReviews: []reviewCandidate{},
 			}
 			for _, r := range report.Results {
