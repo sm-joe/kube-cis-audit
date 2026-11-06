@@ -52,6 +52,7 @@ func EvaluateEKSPodAdmissionControl(ctx context.Context, client kubernetes.Inter
 		r.Evidence = append(r.Evidence, Evidence{Resource: "Namespace", Name: ns.Name, Field: "pod-security.kubernetes.io/enforce", Observed: firstNonEmpty(level, "<unset>"), Expected: required + " or stronger"})
 	}
 	violations := 0
+	platformViolations := 0
 	for _, pod := range pods.Items {
 		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 			continue
@@ -91,14 +92,21 @@ func EvaluateEKSPodAdmissionControl(ctx context.Context, client kubernetes.Inter
 			}
 		}
 		if len(findings) > 0 {
-			violations++
-			r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: label, Observed: strings.Join(findings, "; "), Expected: "no violating workload settings"})
+			if pod.Namespace == "kube-system" {
+				platformViolations++
+			} else {
+				violations++
+			}
+			r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: label, Observed: strings.Join(findings, "; "), Expected: "no violation, or documented/approved platform exception"})
 		}
 	}
 	switch {
 	case violations > 0:
 		r.Status = "FAIL"
-		r.Details = fmt.Sprintf("%d existing Pods violate %s; %d namespaces lack confirmed required PSA enforcement.", violations, label, uncovered)
+		r.Details = fmt.Sprintf("%d non-platform Pods violate %s; %d platform Pods require exception review; %d namespaces lack confirmed PSA enforcement.", violations, label, platformViolations, uncovered)
+	case platformViolations > 0:
+		r.Status = "MANUAL"
+		r.Details = fmt.Sprintf("%d kube-system Pods have configurations requiring an approved platform exception; %d namespaces lack confirmed PSA enforcement. Do not treat required AWS platform agents as automatically non-compliant.",platformViolations,uncovered)
 	case uncovered > 0:
 		r.Status = "MANUAL"
 		r.Details = fmt.Sprintf("%d namespaces lack confirmed %s PSA enforce labels; an equivalent admission engine or approved exemptions must be reviewed. No currently violating Pods found.", uncovered, required)
