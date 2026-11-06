@@ -20,8 +20,36 @@ if ($nodes.Count -eq 0) { throw 'No expected EKS managed EC2 worker nodes' }
 if (@($r.expectedControlPlaneNodes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -ne 0) { throw 'Unexpected master-local expectations on AWS-managed EKS control plane' }
 $sources = @($r.sources)
 if ($sources.Count -ne (2 + $nodes.Count)) { throw "Expected $($nodes.Count + 2) sources (API, each node, AWS provider), got $($sources.Count)" }
-if (@($sources | Where-Object { $_.auditMode -eq 'aws-provider' -and $_.findings -eq 3 }).Count -ne 1) {
-    throw 'Missing exactly one native CIS EKS AWS provider assessment with 3 findings'
+# Source integrity is defined by the exact set of provider-owned control IDs,
+# not a hardcoded count from the first three-control EKS implementation.
+# The collector now also assesses access entries (2 controls) and ECR (1).
+$awsSources = @($sources | Where-Object { $_.auditMode -eq 'aws-provider' })
+if ($awsSources.Count -ne 1) {
+    throw "Expected exactly one EKS AWS provider source; found $($awsSources.Count)"
+}
+$awsControlIds = @('2.1.1', '5.4.1', '5.4.2')
+if ($null -ne $r.providerEvidence) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$r.providerEvidence.accessInventoryStatus)) {
+        $awsControlIds += @('4.1.7', '5.5.1')
+    }
+    if (-not [string]::IsNullOrWhiteSpace([string]$r.providerEvidence.ecrInventoryStatus)) {
+        $awsControlIds += '5.1.1'
+    }
+}
+$awsFindings = @($r.results | Where-Object {
+    $_.method -in @('aws_eks_describe_cluster','aws_eks_access_entries','aws_ecr_image_scanning')
+})
+if ($awsFindings.Count -ne $awsControlIds.Count -or $awsSources[0].findings -ne $awsControlIds.Count) {
+    throw "AWS provider source integrity mismatch: expected $($awsControlIds.Count) official controls, source reports $($awsSources[0].findings), found $($awsFindings.Count)"
+}
+foreach ($controlId in $awsControlIds) {
+    $matches = @($awsFindings | Where-Object { $_.id -ceq $controlId })
+    if ($matches.Count -ne 1) {
+        throw "Missing or duplicate official EKS AWS provider control $controlId"
+    }
+    if (@('PASS','FAIL','MANUAL','NOT_ASSESSED') -cnotcontains $matches[0].status) {
+        throw "Invalid AWS provider status for control $controlId"
+    }
 }
 foreach ($controlId in @('2.1.1','5.4.1','5.4.2')) {
     $matches = @($r.results | Where-Object { $_.id -eq $controlId -and $_.method -eq 'aws_eks_describe_cluster' })
