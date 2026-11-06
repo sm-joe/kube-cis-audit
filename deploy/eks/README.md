@@ -1,96 +1,92 @@
-# EKS native audit (experimental, deliberately provisional)
+# Amazon EKS managed-node integration
 
-This EKS integration is scoped to EC2 **managed node groups**. No
-control-plane host mount or master-local DaemonSet is deployed. Fargate,
-EKS Auto Mode, and self-managed EC2 nodes are not covered by this example.
+This deployment targets Amazon EKS **managed EC2 Linux worker nodes**. The node-auditor DaemonSet collects bounded, read-only kubelet and host metadata, rather than mounting or impersonating the AWS-managed control plane. Fargate, EKS Auto Mode and self-managed workers are outside the verified managed-node source contract.
 
-## Build and publish the matching binary and image
+> **Benchmark status:** `cis-eks-2.1.0` remains a **provisional** native profile. Scan and review completion never grant an official CIS compliance score; incomplete or inapplicable checks remain MANUAL or NOT_ASSESSED.
 
-Build the CLI from this branch (`go build -o kubecis.exe ./cmd/kubecis` on Windows).
-Build and publish the image from **the same commit**, updating the placeholder
-`ghcr.io/sm-joe/kubecis:eks-provider-rc3` in
-`node-auditor-daemonset.yaml` to its immutable digest or release tag.
-Do not deploy the placeholder until an image exists. The collector deliberately
-requires the local CLI and in-cluster node auditor to have matching build
-versions, validated by `consolidate`.
+## Linux prerequisites
 
-## Deploy
+- Linux host with a shell, `kubectl`, AWS CLI v2, and a Kubernetes kubeconfig.
+- A Kubernetes identity authorized to apply the project's RBAC and DaemonSet to `kube-system`.
+- Published `ghcr.io/sm-joe/kubecis` Linux image built from the **same source commit** as the local KubeCIS CLI. Never reuse an old image with a newer CLI.
+- For source builds: Go 1.27.3.
 
-Select the EKS kubeconfig context deliberately. Verify the target using
-`kubectl config current-context` and `kubectl get nodes -L eks.amazonaws.com/nodegroup`.
-Use `kubectl apply -k deploy/eks` from the repository root. This applies
-the read-only Kubernetes API ServiceAccount/RBAC and the Linux-only node
-auditor. The node auditor's metadata helper is root with a narrowly
-scoped hostPath to `/var/lib/kubelet`; review this privileged host
-access exception and the Pod Security policy requirements before deployment.
+## Build CLI from source
 
-Wait for the DaemonSet with:
-`kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=180s`.
+From the repository root:
 
-## Collect
+```bash
+go mod download
+go vet ./...
+go test ./... -count=1
+CGO_ENABLED=0 go build -trimpath -o ./kubecis ./cmd/kubecis
+./kubecis version
+```
 
-Run `./scripts/Collect-ConsolidatedEKSReport.ps1 -Context <your-eks-context>\n-ClusterName <actual-eks-name> -Region <aws-region> -Binary ./kubecis.exe`\nin PowerShell after verifying AWS credentials
-and permissions. The script produces a fresh cluster policy report
-from the Kubernetes API, collects one node-local report for each EKS
-managed Linux node, and validates all inputs with `consolidate`.
-Missing pods, old reports, version mismatches, and inconsistent node
-inventory fail closed. There is **no** expected control-plane-node list.
+A local development build is **not automatically matched** to a published EKS node image. Use a published tag/digest and ensure the local and in-cluster `kubecis version` values match before consolidating.
 
-After a successful collection, run `./scripts/Validate-EKSRelease.ps1` to assert
-provider identity, node-source completeness, freshness, and withheld scoring.
-This acceptance gate is intentionally strict and does not replace live AWS
-configuration validation or a certified benchmark assessment.\n\nThe provisional `cis-2.1.0` profile is a starter set, not full CIS or
-EKS benchmark certification. Its `coveragePercent` measures the seven
-configured scored controls before aggregation, not upstream CIS coverage.
-The compliance percentage stays withheld.
+## Verify target cluster
 
-## Limitations
+```bash
+aws sts get-caller-identity
+aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
+kubectl config current-context
+kubectl get nodes -L eks.amazonaws.com/nodegroup
+```
 
-EKS exposes control-plane configuration through provider APIs, not by
-customer access to master host files. AWS settings such as control-plane
-logging, encryption, networking, and access entries need separately
-designed read-only AWS API collectors with explicit evidence models and
-AWS IAM permissions. This branch does not claim those evaluations.
-NetworkPolicy presence is not proof of enforcement; RBAC inventory can
-surface system controllers and needs customer-ownership triage.
+## Deploy matching Linux node auditor
 
-## AL2023 nodeadm evidence (RC3)
+Review [node-auditor-daemonset.yaml](node-auditor-daemonset.yaml) and [RBAC](rbac.yaml), especially the restricted host-metadata helper, before applying the resources.
 
-The EKS node metadata helper mounts `/etc/kubernetes/kubelet` read-only
-as `/host-nodeadm` and only evaluates `config.json`. Legacy Kind/kubeadm
-uses `/var/lib/kubelet/config.yaml`; the EKS overlay does not use this
-fallback. The audit output records the actual source path, and the EKS
-acceptance gate now fails unless all three worker-kubelet checks are explicitly
-PASS or FAIL with AL2023 source evidence. A security FAIL is an assessed outcome
-and is not the same as an unavailable check. This still does not validate full
-upstream CIS EKS compliance.
+```bash
+# Replace this placeholder with a real image published for the matching commit.
+IMAGE="ghcr.io/sm-joe/kubecis:cis210-eks135-<40-character-commit-sha>"
 
-## RC3 versioned applicability and evidence model
+kubectl apply -k deploy/eks
+kubectl -n kube-system set image daemonset/kubecis-node-auditor \
+  "node-metadata-init=$IMAGE" \
+  "node-auditor=$IMAGE" \
+  "node-metadata-helper=$IMAGE"
 
-RC3 rejects explicit benchmark selections for Kubernetes minors not declared in
-`benchmarks/cis-2.1.0/benchmark.yaml`. This intentionally **provisional**
-starter profile lists only minors 1.31 and 1.37, without asserting that its
-historical generic CIS control IDs represent a verified EKS-specific mapping.
-The cluster report records the actual server version and provider.
+kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=300s
+kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
+```
 
-On EKS worker nodes only, the generic CIS Kubernetes kubelet config.yaml mode
-control `4.1.9` is replaced by **unscored**
-`KUBECIS-EKS-NODE-CONFIG-MODE`, with AL2023 nodeadm `config.json` evidence
-and a 0644 maximum. It is an EKS security extension, not a claim of verified
-CIS EKS 3.1.3 applicability; ownership/effective kubelet flags need review.
-Existing Kind/kubeadm node assessments preserve their original generic check.
+These commands install/update KubeCIS resources but do **not** remediate security findings. Validate the image's registry, digest, and the node-auditor version. The node metadata helper reads restricted paths from `/var/lib/kubelet` and, for EKS AL2023, allowlisted kubelet settings under `/etc/kubernetes/kubelet/config.json`. Raw credentials and unrestricted kubelet configuration should not be exported.
 
-The RC3 collector additionally uses read-only `aws eks describe-cluster` to
-record the EKS API endpoint exposure settings and all five control-plane
-logging categories in `reports/eks/provider.json`, then attaches this
-**unscored inventory** to `consolidated.json`. It contains no AWS credentials,
-IAM tokens, raw API endpoints, or encryption secrets. Missing/expired/wrong
-cluster-version evidence is rejected. Requires valid AWS CLI credentials and
-`eks:DescribeCluster` permission. This is *not* proof of effective logging,
-retention, identity enforcement, or compliance.
+## Execute a Kubernetes API scan on Linux
 
-An evidence-level `ownershipHint` distinguishes names associated with typical
-EKS system components and the KubeCIS auditor from other resources. Name
-matching is only for triage, not a trusted allowlist: FAIL/WARN and CIS-scored
-status are **never suppressed** by these hints. An EKS-specific CIS ruleset
-must be independently verified before making official compliance claims.
+```bash
+mkdir -p reports/eks
+./kubecis scan \
+  --engine native \
+  --benchmark cis-eks-2.1.0 \
+  --target policies \
+  --output json \
+  --output-file reports/eks/cluster.json \
+  --exit-code-on-fail=false
+
+./kubecis render --input reports/eks/cluster.json --output-file reports/eks/results.txt
+```
+
+The API scan is useful independently but **does not include all managed-node and AWS provider findings**. Cluster identity, per-node sources, AWS provider inventory, freshness and compatibility must be validated before issuing a consolidated EKS dossier. The current repository does **not yet provide a verified POSIX-shell replacement** for the full integrated EKS collector; the Go scanner and Linux node image themselves are native. Do not label API-only output as a complete EKS assessment.
+
+For a validated consolidated JSON produced by the supported collector, the Go review/finalization CLI runs on Linux:
+
+```bash
+./kubecis review-init --input reports/eks/consolidated.json --output-file reports/eks/review-template.json
+./kubecis finalize --input reports/eks/consolidated.json --output-dir reports/eks
+```
+
+When verified human decisions are available, add `--decisions reports/eks/review-decisions.json` to `finalize`. Decisions remain distinct from automated findings; the score stays WITHHELD for provisional benchmark coverage.
+
+## Evidence and security boundaries
+
+- Never assume customer access to EKS control-plane host files.
+- Check each managed node separately, and refuse missing, stale, duplicate or mismatched evidence.
+- `nodes/proxy` for authenticated `/configz` data is a sensitive permission; grant only when justified.
+- Missing AWS inventory or kubelet fields do not imply PASS; they require MANUAL or NOT_ASSESSED disposition.
+- RBAC names associated with platform controllers are triage hints, **not** unconditional allowlists.
+- Some CI releases test platform-specific packaging; they do not establish complete CIS implementation or independent compliance certification.
+
+See the repository [README](../../README.md), [release scope](../../docs/RELEASE-SCOPE.md) and [security guidance](../../docs/SECURITY.md).
