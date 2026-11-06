@@ -70,7 +70,7 @@ func main() {
 	scan.Flags().StringVar(&upstreamBenchmark, "upstream-benchmark", "auto", "Deprecated: upstream profile selection is unsupported; only auto accepted")
 	scan.Flags().BoolVar(&exitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when one or more checks are FAIL (set false for observational scans)")
 
-	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile, nodeTarget string
+	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile, nodeTarget, nodeProvider string
 	var nodeInterval time.Duration
 	var nodeExitCodeOnFail bool
 	nodeAudit := &cobra.Command{
@@ -84,7 +84,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: nodeTarget, HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile}, nodeName)
+				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: nodeTarget, HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile, Provider: nodeProvider}, nodeName)
 				if err != nil {
 					return err
 				}
@@ -112,13 +112,14 @@ func main() {
 	nodeAudit.Flags().StringVar(&nodeConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeAudit.Flags().StringVar(&nodeHostRoot, "host-root", "/host", "Read-only mounted node filesystem root (direct mode)")
 	nodeAudit.Flags().StringVar(&nodeMetadataFile, "metadata-file", "", "Fresh metadata snapshot path produced by node-metadata")
+	nodeAudit.Flags().StringVar(&nodeProvider, "provider", "", "Explicit node provider (eks for AL2023 nodeadm EKS extension; empty for generic Kubernetes)")
 	nodeAudit.Flags().StringVar(&nodeName, "node-name", "", "Kubernetes node name (defaults to NODE_NAME)")
 	nodeAudit.Flags().StringVar(&nodeOutput, "output", "json", "Report format: json or text")
 	nodeAudit.Flags().StringVar(&nodeOutputFile, "output-file", "", "Write the report to this file instead of standard output")
 	nodeAudit.Flags().DurationVar(&nodeInterval, "interval", 0, "Repeat assessment interval (e.g. 24h); zero runs once")
 	nodeAudit.Flags().BoolVar(&nodeExitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when a one-shot node audit has FAIL results")
 
-	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataNodeName, metadataOutputFile, metadataTarget string
+	var metadataBenchmark, metadataConfigDir, metadataHostRoot, metadataKubeletConfigRoot, metadataNodeName, metadataOutputFile, metadataTarget string
 	var metadataInterval time.Duration
 	nodeMetadata := &cobra.Command{
 		Use:   "node-metadata",
@@ -131,7 +132,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				return audit.RunHostMetadataSnapshot(metadataConfigDir, metadataBenchmark, metadataTarget, metadataHostRoot, metadataNodeName, metadataOutputFile)
+				return audit.RunHostMetadataSnapshotWithKubeletRoot(metadataConfigDir, metadataBenchmark, metadataTarget, metadataHostRoot, metadataKubeletConfigRoot, metadataNodeName, metadataOutputFile)
 			}
 			if metadataInterval <= 0 {
 				return run()
@@ -150,6 +151,7 @@ func main() {
 	nodeMetadata.Flags().StringVar(&metadataTarget, "target", "node", "Host target: node or master (control-plane)")
 	nodeMetadata.Flags().StringVar(&metadataConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeMetadata.Flags().StringVar(&metadataHostRoot, "host-root", "/host-kubelet", "Read-only mount of the node kubelet directory")
+	nodeMetadata.Flags().StringVar(&metadataKubeletConfigRoot, "kubelet-config-root", "", "Optional read-only AL2023 /etc/kubernetes/kubelet mount containing config.json")
 	nodeMetadata.Flags().StringVar(&metadataNodeName, "node-name", "", "Kubernetes node name (defaults to NODE_NAME)")
 	nodeMetadata.Flags().StringVar(&metadataOutputFile, "output-file", "/metadata/snapshot.json", "Writable shared-volume path for metadata-only JSON snapshot")
 	nodeMetadata.Flags().DurationVar(&metadataInterval, "interval", 30*time.Second, "Snapshot refresh interval; zero runs once")
@@ -201,7 +203,7 @@ func main() {
 	compare.Flags().StringVar(&compareOutput, "output-file", "", "Write comparison JSON to this file (defaults to stdout)")
 	_ = compare.MarkFlagRequired("baseline")
 	_ = compare.MarkFlagRequired("current")
-	var mergeCluster, mergeOutput, mergeNodes, mergeMasters string
+	var mergeCluster, mergeOutput, mergeNodes, mergeMasters, mergeProviderEvidence, mergeFormat string
 	var mergeLocals []string
 	var mergeMaxAge time.Duration
 	consolidate := &cobra.Command{
@@ -230,6 +232,19 @@ func main() {
 			if err != nil {
 				return err
 			}
+			if mergeProviderEvidence != "" {
+				providerData, err := os.ReadFile(mergeProviderEvidence)
+				if err != nil {
+					return fmt.Errorf("read EKS provider evidence: %w", err)
+				}
+				evidence, err := audit.DecodeEKSProviderEvidence(providerData, clusterReport, mergeMaxAge, time.Now().UTC())
+				if err != nil {
+					return err
+				}
+				if err := audit.AttachEKSCISProviderEvidence(&merged, evidence); err != nil {
+					return fmt.Errorf("assess CIS EKS provider evidence: %w", err)
+				}
+			}
 			var dst io.Writer = os.Stdout
 			if mergeOutput != "" {
 				if err := os.MkdirAll(filepath.Dir(mergeOutput), 0o755); err != nil {
@@ -242,20 +257,34 @@ func main() {
 				defer f.Close()
 				dst = f
 			}
-			encoder := json.NewEncoder(dst)
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(merged)
+			switch strings.ToLower(mergeFormat) {
+			case "json":
+				encoder := json.NewEncoder(dst)
+				encoder.SetIndent("", "  ")
+				return encoder.Encode(merged)
+			case "text":
+				return renderBenchStyle(dst, merged.Report)
+			default:
+				return fmt.Errorf("unsupported consolidated output format %q (use json or text)", mergeFormat)
+			}
 		},
 	}
 	consolidate.Flags().StringVar(&mergeCluster, "cluster", "", "Cluster-policy JSON report")
+	consolidate.Flags().StringVar(&mergeProviderEvidence, "provider-evidence", "", "Optional validated read-only AWS EKS DescribeCluster inventory JSON")
 	consolidate.Flags().StringSliceVar(&mergeLocals, "local", nil, "Node/control-plane JSON reports (repeat flag)")
 	consolidate.Flags().StringVar(&mergeNodes, "expected-nodes", "", "Comma-separated names of ALL expected Linux nodes")
 	consolidate.Flags().StringVar(&mergeMasters, "expected-control-planes", "", "Comma-separated names of expected control-plane nodes")
 	consolidate.Flags().DurationVar(&mergeMaxAge, "max-age", 30*time.Minute, "Maximum age of each source report")
-	consolidate.Flags().StringVar(&mergeOutput, "output-file", "", "Consolidated JSON output file (default stdout)")
+	consolidate.Flags().StringVar(&mergeOutput, "output-file", "", "Consolidated output file (default stdout)")
+	consolidate.Flags().StringVar(&mergeFormat, "format", "json", "Consolidated output format: json or text")
 	_ = consolidate.MarkFlagRequired("cluster")
 	_ = consolidate.MarkFlagRequired("expected-nodes")
 	root.AddCommand(consolidate)
+	root.AddCommand(newRenderCommand())
+	root.AddCommand(newReviewCommand())
+	root.AddCommand(newReviewInitCommand())
+	root.AddCommand(newFinalizeCommand())
+	root.AddCommand(newEnrichNodeCommand())
 	root.AddCommand(scan, nodeAudit, nodeMetadata, compare, version)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)

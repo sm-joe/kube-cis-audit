@@ -34,15 +34,32 @@ func Run(o Options) (Report, error) {
 		return Report{}, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 	minor := strings.TrimSuffix(version.Minor, "+")
+	provider := DetectCloudProvider(version.GitVersion)
+	if o.Benchmark == "cis-eks-2.1.0" {
+		if provider != "eks" {
+			return Report{}, fmt.Errorf("CIS EKS 2.1.0 profile requires an EKS Kubernetes API server; detected %s", provider)
+		}
+		if err := validateOfficial210Scope("eks", minor); err != nil {
+			return Report{}, err
+		}
+	} else if o.Benchmark == "cis-2.1.0" {
+		if err := validateOfficial210Scope(provider, minor); err != nil {
+			return Report{}, err
+		}
+	}
 	bench, err := loadBenchmark(o.ConfigDir, o.Benchmark, minor)
 	if err != nil {
+		return Report{}, err
+	}
+	if err := validateBenchmarkMinor(bench, minor); err != nil {
 		return Report{}, err
 	}
 	compatibilityStatus := bench.CompatibilityStatus
 	if strings.TrimSpace(compatibilityStatus) == "" {
 		compatibilityStatus = "unknown"
 	}
-	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: bench.CompatibilityNote}
+	bench = applyProviderProfile(bench, provider)
+	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "coveragePercent is decisive PASS/FAIL coverage among currently scored profile checks only; it is NOT the percentage of official CIS EKS controls assessed and is NOT a CIS compliance score.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: benchmarkCompatibilityNote(bench, version.GitVersion, provider)}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
@@ -64,7 +81,15 @@ func Run(o Options) (Report, error) {
 			workloadSummaryCheck = &checkCopy
 			continue
 		}
-		r := evaluate(ctx, client, c, o)
+		// An EKS API scan must not inspect the scanning machine's filesystem
+		// when assessing AWS-managed control-plane or EC2 worker-host controls.
+		var r Result
+		if provider == "eks" && strings.HasPrefix(c.Kind, "host_") && (c.Target == "master" || c.Target == "node") {
+			r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation}
+		} else {
+			r = evaluate(ctx, client, c, o)
+		}
+		r = annotateProviderAssessment(provider, c, r)
 		r.FindingID = StableFindingID(r)
 		report.Results = append(report.Results, r)
 		incrementSummary(&report.Summary, r.Status)
@@ -112,6 +137,10 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	if o.Provider != "" && o.Provider != "eks" {
+		return Report{}, fmt.Errorf("unsupported explicit node provider %q (supported: eks)", o.Provider)
+	}
+	bench = applyProviderProfile(bench, o.Provider)
 	target := strings.TrimSpace(o.Target)
 	if target == "" {
 		target = "node"
@@ -122,6 +151,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	report := Report{
 		BuildVersion:         BuildVersion,
 		AuditMode:            strings.ToLower(target) + "-local",
+		CloudProvider:        o.Provider,
 		NodeName:             nodeName,
 		Tool:                 "KubeCIS Native",
 		GeneratedAt:          time.Now().UTC(),
@@ -144,12 +174,14 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if !strings.EqualFold(c.Target, target) {
 			continue
 		}
-		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_kubelet_config_field" {
+		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_file_owner" && c.Kind != "host_kubelet_config_field" && c.Kind != "cis_not_implemented" {
 			continue
 		}
 		localChecks = append(localChecks, c)
 		var r Result
-		if strings.TrimSpace(o.MetadataFile) != "" {
+		if c.Kind == "cis_not_implemented" {
+			r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: false, Details: "Official CIS EKS control pending native collector and validated evidence; no PASS/FAIL inferred.", Remediation: c.Remediation}
+		} else if strings.TrimSpace(o.MetadataFile) != "" {
 			if metadataErr != nil {
 				r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Details: "Node metadata snapshot unavailable: " + metadataErr.Error(), Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "metadata", Observed: "unavailable", Expected: "fresh metadata snapshot from the node metadata helper"}}}
 			} else if c.Kind == "host_kubelet_config_field" {
@@ -159,6 +191,8 @@ func RunNode(o Options, nodeName string) (Report, error) {
 			}
 		} else if c.Kind == "host_kubelet_config_field" {
 			r = evaluateKubeletConfigField(hostRoot, nodeName, c)
+		} else if c.Kind == "host_file_owner" {
+			r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation, Details: "Ownership checks require a verified Linux node-metadata snapshot; direct mode does not support this evaluator."}
 		} else {
 			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
 		}
@@ -330,11 +364,49 @@ func readBench(p string) (Benchmark, error) {
 func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Options) Result {
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Details: "No evaluator produced a result", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored}
 	if c.Manual {
+		if o.Benchmark == "cis-eks-2.1.0" && c.Target == "policies" {
+			return EvaluateEKSManualEvidence(ctx, client, c)
+		}
 		r.Status = "MANUAL"
 		r.Details = "Requires manual verification; the required configuration evidence is not exposed by the Kubernetes API."
 		return r
 	}
 	switch c.Kind {
+	case "eks_secret_env", "eks_default_namespace", "eks_dedicated_service_account", "eks_vpc_cni_network_policy":
+		return EvaluateEKSAdditionalPolicy(ctx, client, c)
+	case "eks_psa_admission":
+		if c.ID != "4.2.1" && c.ID != "4.2.2" && c.ID != "4.2.3" && c.ID != "4.2.4" && c.ID != "4.2.5" {
+			r.Details = "Unsupported EKS admission control ID"
+			return r
+		}
+		assessed, err := EvaluateEKSPodAdmissionControl(ctx, client, c.ID)
+		if err != nil {
+			r.Details = "Unable to collect namespace and Pod admission evidence: " + err.Error()
+			return r
+		}
+		return assessed
+	case "eks_default_service_account":
+		if c.ID != "4.1.5" {
+			r.Details = "Unsupported EKS workload identity control ID"
+			return r
+		}
+		assessed, err := EvaluateEKSDefaultServiceAccountUse(ctx, client)
+		if err != nil {
+			r.Details = "Unable to collect workload identity evidence: " + err.Error()
+			return r
+		}
+		return assessed
+	case "eks_token_mounts":
+		if c.ID != "4.1.6" {
+			r.Details = "Unsupported EKS token mounting control ID"
+			return r
+		}
+		assessed, err := EvaluateEKSServiceAccountTokenMounts(ctx, client)
+		if err != nil {
+			r.Details = "Unable to collect service account token evidence: " + err.Error()
+			return r
+		}
+		return assessed
 	case "api_policy_control":
 		return evaluatePolicyControl(ctx, client, c, o, r)
 	case "api_pod_non_root", "api_pod_seccomp":

@@ -1,0 +1,194 @@
+# EKS managed EC2 node groups only. Replace image with a published build from the EKS fix branch.
+# No master-local daemonset: EKS control-plane hosts are AWS-managed.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubecis-node-auditor
+  namespace: kube-system
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubecis-node-auditor
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: kubecis-node-auditor
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubecis-node-auditor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubecis-node-auditor
+    spec:
+      serviceAccountName: kubecis-node-auditor
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: eks.amazonaws.com/nodegroup
+                    operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Produce the first snapshot before the unprivileged auditor starts.
+        - name: node-metadata-init
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity
+          imagePullPolicy: IfNotPresent
+          args:
+            - node-metadata
+            - --benchmark
+            - cis-eks-2.1.0
+            - --host-root
+            - /host-kubelet
+            - --kubelet-config-root
+            - /host-nodeadm
+            - --node-name
+            - $(NODE_NAME)
+            - --output-file
+            - /metadata/snapshot.json
+            - --interval
+            - 0s
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["DAC_READ_SEARCH"]
+          volumeMounts:
+            - name: kubelet-config
+              mountPath: /host-kubelet
+              readOnly: true
+            - name: nodeadm-kubelet-config
+              mountPath: /host-nodeadm
+              readOnly: true
+            - name: metadata
+              mountPath: /metadata
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+      containers:
+        # This container has no Kubernetes API token and cannot read host files.
+        # It consumes only a short-lived, metadata-only snapshot from the helper.
+        - name: node-auditor
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity
+          imagePullPolicy: IfNotPresent
+          args:
+            - node-audit
+            - --provider
+            - eks
+            - --benchmark
+            - cis-eks-2.1.0
+            - --metadata-file
+            - /metadata/snapshot.json
+            - --node-name
+            - $(NODE_NAME)
+            - --output
+            - json
+            - --interval
+            - 24h
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: metadata
+              mountPath: /metadata
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        # Narrow exception: root plus CAP_DAC_READ_SEARCH can stat only the
+        # allowlisted kubelet config path; no file contents are read.
+        - name: node-metadata-helper
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity
+          imagePullPolicy: IfNotPresent
+          args:
+            - node-metadata
+            - --benchmark
+            - cis-eks-2.1.0
+            - --host-root
+            - /host-kubelet
+            - --kubelet-config-root
+            - /host-nodeadm
+            - --node-name
+            - $(NODE_NAME)
+            - --output-file
+            - /metadata/snapshot.json
+            - --interval
+            - 15s
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop: ["ALL"]
+              add: ["DAC_READ_SEARCH"]
+          volumeMounts:
+            - name: kubelet-config
+              mountPath: /host-kubelet
+              readOnly: true
+            - name: nodeadm-kubelet-config
+              mountPath: /host-nodeadm
+              readOnly: true
+            - name: metadata
+              mountPath: /metadata
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: kubelet-config
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: nodeadm-kubelet-config
+          hostPath:
+            path: /etc/kubernetes/kubelet
+            type: Directory
+        - name: metadata
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Mi

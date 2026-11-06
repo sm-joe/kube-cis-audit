@@ -30,11 +30,12 @@ type CoverageMetrics struct {
 // from whichever reports happened to be supplied.
 type ConsolidatedReport struct {
 	Report
-	SchemaVersion             string          `json:"schemaVersion"`
-	Sources                   []SourceRecord  `json:"sources"`
-	ExpectedNodes             []string        `json:"expectedNodes"`
-	ExpectedControlPlaneNodes []string        `json:"expectedControlPlaneNodes"`
-	CoverageMetrics           CoverageMetrics `json:"coverageMetrics"`
+	SchemaVersion             string               `json:"schemaVersion"`
+	Sources                   []SourceRecord       `json:"sources"`
+	ExpectedNodes             []string             `json:"expectedNodes"`
+	ExpectedControlPlaneNodes []string             `json:"expectedControlPlaneNodes"`
+	CoverageMetrics           CoverageMetrics      `json:"coverageMetrics"`
+	ProviderEvidence          *EKSProviderEvidence `json:"providerEvidence,omitempty"`
 }
 
 // ConsolidateReports fails closed on missing, stale, inconsistent or duplicate
@@ -64,6 +65,9 @@ func ConsolidateReports(cluster Report, locals []Report, expectedNodes, expected
 			return ConsolidatedReport{}, fmt.Errorf("control-plane node %q is not in expected nodes", n)
 		}
 	}
+	if cluster.CloudProvider == "eks" && len(masters) != 0 {
+		return ConsolidatedReport{}, fmt.Errorf("EKS control-plane nodes are AWS-managed; master-local source expectations are unsupported")
+	}
 	all := append([]Report{cluster}, locals...)
 	seenSources := map[string]bool{}
 	seenFindings := map[string]bool{}
@@ -76,6 +80,9 @@ func ConsolidateReports(cluster Report, locals []Report, expectedNodes, expected
 	out.Sources = make([]SourceRecord, 0, len(all))
 	var scored ComplianceSummary
 	for _, src := range all {
+		if cluster.CloudProvider == "eks" && src.AuditMode != "native" && src.CloudProvider != "eks" {
+			return ConsolidatedReport{}, fmt.Errorf("EKS node source %s/%s must declare provider eks", src.AuditMode, src.NodeName)
+		}
 		if src.Benchmark != cluster.Benchmark || src.CompatibilityStatus != cluster.CompatibilityStatus {
 			return ConsolidatedReport{}, fmt.Errorf("source %s/%s benchmark or compatibility mismatch", src.AuditMode, src.NodeName)
 		}

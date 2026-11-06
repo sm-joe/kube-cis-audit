@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-func TestBuildInventoryWalksNestedGroupsAndIgnoresNonCISProfiles(t *testing.T) {
+func TestBuildInventoryWalksNestedGroupsAndIncludesVersionedEKSProfiles(t *testing.T) {
 	root := t.TempDir()
 	profile := filepath.Join(root, "cis-test")
 	if err := os.MkdirAll(profile, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, "eks-test"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "eks-1.8.0"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	yaml := `controls:
@@ -46,11 +46,14 @@ func TestBuildInventoryWalksNestedGroupsAndIgnoresNonCISProfiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(profile, "master.yaml"), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, "eks-1.8.0", "node.yaml"), []byte(yaml), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	inv, err := buildInventory(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(inv.Profiles) != 1 || inv.TotalControls != 2 {
+	if len(inv.Profiles) != 2 || inv.TotalControls != 4 {
 		t.Fatalf("unexpected inventory: %#v", inv)
 	}
 	p := inv.Profiles[0]
@@ -128,5 +131,15 @@ func TestParseControlFileAcceptsWrappedControlsMapping(t *testing.T) {
 	}
 	if target != "node" || len(controls) != 1 || controls[0].ID != "4.1.1" {
 		t.Fatalf("unexpected parse result: target=%q controls=%#v", target, controls)
+	}
+}
+
+func TestBuildInventoryRejectsUnrecognizedProfiles(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "my-benchmark"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildInventory(root); err == nil {
+		t.Fatal("accepted an unknown benchmark profile as official CIS/EKS")
 	}
 }

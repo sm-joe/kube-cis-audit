@@ -1,0 +1,76 @@
+name: EKS Candidate Image
+on:
+  push:
+    branches:
+      - feature/eks-release-e2e-gates
+concurrency:
+  group: kubecis-eks-e2e-gates
+  cancel-in-progress: true
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish-eks-rc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.3'
+          cache: true
+      - name: Verify native auditor
+        run: |
+          test -z "$(gofmt -l internal/audit/*.go)"
+          go vet ./...
+          go test ./... -count=1
+      - name: Parse EKS PowerShell scripts
+        shell: pwsh
+        run: |
+          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed: $path"
+            }
+          }
+      - name: Exercise EKS provider identity rejection
+        shell: pwsh
+        run: ./scripts/Test-EKSProviderIdentity.ps1
+      - name: Package Windows EKS candidate
+        shell: bash
+        run: |
+          mkdir -p dist/eks-candidate/scripts dist/eks-candidate/deploy
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -o dist/eks-candidate/kubecis.exe ./cmd/kubecis
+          cp -R benchmarks dist/eks-candidate/benchmarks
+          cp -R deploy/eks dist/eks-candidate/deploy/eks
+          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 dist/eks-candidate/scripts/
+          (cd dist/eks-candidate && find . -type f ! -name SHA256SUMS -print0 | xargs -0 sha256sum > SHA256SUMS)
+          (cd dist && zip -qr kubecis-eks-candidate-windows-amd64.zip eks-candidate)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kubecis-eks-candidate-windows-amd64
+          path: dist/kubecis-eks-candidate-windows-amd64.zip
+          if-no-files-found: error
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=3.1.0-native-eks-rc3.1
+          tags: |
+            ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity
+            ghcr.io/sm-joe/kubecis:eks-provider-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=3.1.0-native-eks-rc3.1

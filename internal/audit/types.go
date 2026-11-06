@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-var BuildVersion = "3.1.0-native-integrated-rc3.2"
+var BuildVersion = "3.1.0-native-eks-rc3.1"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
@@ -33,26 +33,30 @@ type Benchmark struct {
 }
 
 type Evidence struct {
-	Resource  string `json:"resource,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Field     string `json:"field,omitempty"`
-	Observed  string `json:"observed,omitempty"`
-	Expected  string `json:"expected,omitempty"`
+	Resource      string `json:"resource,omitempty"`
+	Namespace     string `json:"namespace,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Field         string `json:"field,omitempty"`
+	Observed      string `json:"observed,omitempty"`
+	OwnershipHint string `json:"ownershipHint,omitempty"`
+	Expected      string `json:"expected,omitempty"`
 }
 
 type Result struct {
-	ID          string     `json:"id"`
-	FindingID   string     `json:"findingId,omitempty"`
-	Scope       string     `json:"scope,omitempty"`
-	Title       string     `json:"title"`
-	Target      string     `json:"target"`
-	Status      string     `json:"status"`
-	Details     string     `json:"details"`
-	Method      string     `json:"method,omitempty"`
-	Evidence    []Evidence `json:"evidence,omitempty"`
-	Remediation string     `json:"remediation,omitempty"`
-	Scored      bool       `json:"scored"`
+	ID              string     `json:"id"`
+	FindingID       string     `json:"findingId,omitempty"`
+	Scope           string     `json:"scope,omitempty"`
+	Title           string     `json:"title"`
+	Target          string     `json:"target"`
+	Status          string     `json:"status"`
+	Details         string     `json:"details"`
+	Method          string     `json:"method,omitempty"`
+	Applicability   string     `json:"applicability,omitempty"`
+	EvidenceSource  string     `json:"evidenceSource,omitempty"`
+	OwnershipReview string     `json:"ownershipReview,omitempty"`
+	Evidence        []Evidence `json:"evidence,omitempty"`
+	Remediation     string     `json:"remediation,omitempty"`
+	Scored          bool       `json:"scored"`
 }
 
 type Summary struct {
@@ -73,6 +77,8 @@ type Report struct {
 	GeneratedAt                   time.Time         `json:"generatedAt"`
 	ClusterVersion                string            `json:"clusterVersion"`
 	ClusterVersionSource          string            `json:"clusterVersionSource,omitempty"`
+	CloudProvider                 string            `json:"cloudProvider,omitempty"`
+	BenchmarkProfileCoverageNote  string            `json:"benchmarkProfileCoverageNote,omitempty"`
 	UpstreamBenchmark             string            `json:"upstreamBenchmark,omitempty"`
 	ExtensionsBenchmark           string            `json:"extensionsBenchmark,omitempty"`
 	ExtensionsCompatibilityStatus string            `json:"extensionsBenchmarkCompatibilityStatus,omitempty"`
@@ -87,4 +93,5 @@ type Report struct {
 type Options struct {
 	Kubeconfig, KubeContext, ConfigDir, Benchmark, Target, HostRoot, Namespace string
 	MetadataFile                                                               string
+	Provider                                                                   string
 }

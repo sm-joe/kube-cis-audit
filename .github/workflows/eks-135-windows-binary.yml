@@ -1,0 +1,118 @@
+name: Windows EKS 1.35 Native CIS Binary
+on:
+  push:
+    branches:
+      - feature/cis-210-source-validated-core
+      - feature/cis210-official-native-implementation
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: kubecis-eks-135-native-binary-v2
+  cancel-in-progress: true
+jobs:
+  package-windows-and-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.3'
+          cache: true
+      - name: Format, vet and test
+        run: |
+          test -z "$(gofmt -l internal/audit/*.go cmd/kubecis/main.go)"
+          go vet ./...
+          go test ./... -count=1
+      - name: Verify collector PowerShell and negative identity tests
+        shell: pwsh
+        run: |
+          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1','scripts/Run-KubeCIS-EKS.ps1','scripts/Test-EKSReleaseContract.ps1','scripts/Review-KubeCIS-EKS.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) { throw "Invalid PowerShell syntax in $path : $($parseErrors | Out-String)" }
+          }
+          ./scripts/Test-EKSProviderIdentity.ps1
+          ./scripts/Test-EKSReleaseContract.ps1
+      - name: Package matching Windows binary and EKS manifests
+        run: |
+          mkdir -p dist/kubecis-eks-135/scripts dist/kubecis-eks-135/deploy
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=3.1.0-native-cis210-eks135-${GITHUB_SHA}" -o dist/kubecis-eks-135/kubecis.exe ./cmd/kubecis
+          cp -R benchmarks dist/kubecis-eks-135/
+          cp -R deploy/eks dist/kubecis-eks-135/deploy/eks
+          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 scripts/Run-KubeCIS-EKS.ps1 scripts/Review-KubeCIS-EKS.ps1 dist/kubecis-eks-135/scripts/
+          printf '%s\n' "ghcr.io/sm-joe/kubecis:cis210-eks135-${GITHUB_SHA}" > dist/kubecis-eks-135/IMAGE.txt
+          (cd dist/kubecis-eks-135 && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          (cd dist && zip -qr kubecis-eks-135-windows-amd64.zip kubecis-eks-135)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kubecis-eks-135-windows-amd64
+          path: dist/kubecis-eks-135-windows-amd64.zip
+          if-no-files-found: error
+          retention-days: 30
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=3.1.0-native-cis210-eks135-${{ github.sha }}
+          tags: |
+            ghcr.io/sm-joe/kubecis:cis210-eks135-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  windows-executable-smoke:
+    needs: package-windows-and-image
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: kubecis-eks-135-windows-amd64
+          path: binary-artifact
+      - name: Expand executable ZIP and verify matched build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path 'binary-artifact' 'kubecis-eks-135-windows-amd64.zip'
+          if (-not (Test-Path $zip)) { throw 'Windows executable ZIP not uploaded' }
+          Expand-Archive -LiteralPath $zip -DestinationPath release -Force
+          $homePath = Join-Path 'release' 'kubecis-eks-135'
+          $exe = Join-Path $homePath 'kubecis.exe'
+          if (-not (Test-Path $exe)) { throw 'Missing packaged kubecis.exe' }
+          $expected = '3.1.0-native-cis210-eks135-${{ github.sha }}'
+          $got = (& $exe version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $got -cne $expected) { throw "Executable version mismatch: $got, expected $expected" }
+          $image = (Get-Content (Join-Path $homePath 'IMAGE.txt') -Raw).Trim()
+          if ($image -cne 'ghcr.io/sm-joe/kubecis:cis210-eks135-${{ github.sha }}') { throw 'Windows and Linux artifact references differ' }
+          if (-not (Test-Path (Join-Path $homePath 'scripts/Run-KubeCIS-EKS.ps1'))) { throw 'No one-command EKS runner in package' }
+          if (-not (Test-Path (Join-Path $homePath 'scripts/Review-KubeCIS-EKS.ps1'))) { throw 'No interactive evidence review in package' }
+          if (-not (Test-Path (Join-Path $homePath 'benchmarks/cis-eks-2.1.0/benchmark.yaml'))) { throw 'Benchmark profile omitted from package' }
+          $report = @{buildVersion=$got; benchmark='cis-eks-2.1.0'; benchmarkCompatibilityStatus='provisional'; clusterVersion='v1.35.9-eks-test'; cloudProvider='eks'; results=@(@{id='3.2.7';title='Client certificate rotation';target='node';scope='test-node';status='NOT_ASSESSED';scored=$true;details='Evidence unavailable';remediation='Review authentication mode'});summary=@{notAssessed=1;total=1};compliance=@{scoreStatus='withheld'}} | ConvertTo-Json -Depth 10
+          $reportFile = Join-Path $env:RUNNER_TEMP 'synthetic-report.json'
+          [System.IO.File]::WriteAllText($reportFile, $report)
+          $txtFile = Join-Path $env:RUNNER_TEMP 'synthetic-results.txt'
+          & $exe render --input $reportFile --output-file $txtFile
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged executable failed to render JSON' }
+          $rendered = Get-Content $txtFile -Raw
+          if ($rendered -notmatch '\[NOT_ASSESSED\] 3\.2\.7' -or $rendered -notmatch 'Compliance score: WITHHELD') {
+            throw 'Packaged executable lost fail-closed kube-bench-style text output'
+          }
+          $finalDir = Join-Path $env:RUNNER_TEMP 'final-dossier'
+          & $exe finalize --input $reportFile --output-dir $finalDir
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged executable failed to finalize evidence dossier' }
+          $finalJson = Get-Content (Join-Path $finalDir 'final-assessment.json') -Raw | ConvertFrom-Json
+          if ($finalJson.summary.notAssessed -ne 1 -or $finalJson.summary.automatedPass -ne 0 -or $finalJson.summary.awaitingReview -ne 0) {
+            throw 'Final dossier incorrectly changed assessment facts'
+          }
+          if (-not (Test-Path (Join-Path $finalDir 'final-assessment.txt'))) { throw 'Final readable dossier missing' }
+          Write-Host 'PASS: packaged Windows executable, matching image tag, benchmark, scripts and offline scan rendering'

@@ -74,7 +74,7 @@ func main() {
 			fatal(err)
 		}
 	}
-	fmt.Printf("Inventoried %d CIS profiles, %d YAML files and %d controls.\n", len(inv.Profiles), inv.TotalFiles, inv.TotalControls)
+	fmt.Printf("Inventoried %d CIS/Kubernetes distribution profiles, %d YAML files and %d controls.\n", len(inv.Profiles), inv.TotalFiles, inv.TotalControls)
 	fmt.Printf("Markdown: %s\n", *markdown)
 	if *jsonPath != "" {
 		fmt.Printf("JSON: %s\n", *jsonPath)
@@ -88,7 +88,7 @@ func buildInventory(root string) (Inventory, error) {
 		return inv, fmt.Errorf("read cfg directory %q: %w", root, err)
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "cis-") {
+		if !entry.IsDir() || !(strings.HasPrefix(entry.Name(), "cis-") || strings.HasPrefix(entry.Name(), "eks-")) {
 			continue
 		}
 		p := Profile{Name: entry.Name()}
@@ -135,7 +135,7 @@ func buildInventory(root string) (Inventory, error) {
 	}
 	sort.Slice(inv.Profiles, func(i, j int) bool { return inv.Profiles[i].Name < inv.Profiles[j].Name })
 	if len(inv.Profiles) == 0 {
-		return inv, fmt.Errorf("no cis-* profiles found under %s", root)
+		return inv, fmt.Errorf("no cis-* or eks-* profiles found under %s", root)
 	}
 	return inv, nil
 }
@@ -166,6 +166,11 @@ func parseControlFile(path, cfgRoot, profile string) ([]Control, string, error) 
 		}
 	}
 	if _, ok := root["groups"]; !ok {
+		// Versioned kube-bench EKS profiles may declare empty managed control-plane
+		// sections with no groups. They represent zero assessable controls.
+		if strings.HasPrefix(profile, "eks-") && root["version"] != nil && root["type"] != nil {
+			return []Control{}, stringValue(root["type"]), nil
+		}
 		return nil, "", fmt.Errorf("control document is missing top-level groups")
 	}
 	target := stringValue(root["type"])
@@ -268,7 +273,7 @@ func writeMarkdown(path string, inv Inventory) error {
 		return err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "# kube-bench CIS benchmark inventory\n\nGenerated from `%s`. This is a structural inventory of upstream YAML; it does not execute audit commands or certify benchmark correctness.\n\n", inv.Source)
+	fmt.Fprintf(&b, "# kube-bench benchmark reference inventory\n\nGenerated from `%s`. This is a structural reference inventory of upstream YAML (including versioned EKS profiles). It does not execute audit commands, assert version equivalence with CIS EKS 2.1.0, or certify benchmark correctness.\n\n", inv.Source)
 	fmt.Fprintf(&b, "- CIS profiles: **%d**\n- YAML control files: **%d**\n- Control entries: **%d**\n\n", len(inv.Profiles), inv.TotalFiles, inv.TotalControls)
 	b.WriteString("## Profile summary\n\n| Profile | Files | Controls | Scored | Not scored | Scoring unspecified | Targets |\n|---|---:|---:|---:|---:|---:|---|\n")
 	for _, p := range inv.Profiles {

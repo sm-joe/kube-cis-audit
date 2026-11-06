@@ -27,17 +27,21 @@ type NodeMetadataSnapshot struct {
 // KubeletSetting is bounded, allowlisted, evaluated configuration evidence.
 // Only explicit bool(false/true) and a known authorization mode are exported.
 type KubeletSetting struct {
-	Value string `json:"value,omitempty"`
-	Error string `json:"error,omitempty"`
+	SourcePath string `json:"sourcePath,omitempty"`
+	Value      string `json:"value,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
-const nodeSnapshotSchemaVersion = 2
+const nodeSnapshotSchemaVersion = 4
 
 type NodeFileMetadata struct {
-	Mode    uint32 `json:"mode,omitempty"`
-	Regular bool   `json:"regular"`
-	Symlink bool   `json:"symlink"`
-	Error   string `json:"error,omitempty"`
+	SourcePath string  `json:"sourcePath,omitempty"`
+	Mode       uint32  `json:"mode,omitempty"`
+	OwnerUID   *uint32 `json:"ownerUid,omitempty"`
+	OwnerGID   *uint32 `json:"ownerGid,omitempty"`
+	Regular    bool    `json:"regular"`
+	Symlink    bool    `json:"symlink"`
+	Error      string  `json:"error,omitempty"`
 }
 
 const nodeMetadataMaxAge = 2 * time.Minute
@@ -51,6 +55,13 @@ func RunNodeMetadataSnapshot(configDir, benchmark, hostRoot, nodeName, outputFil
 // RunHostMetadataSnapshot collects metadata for one explicitly selected host target.
 // The caller must mount only the target's dedicated host directory read-only.
 func RunHostMetadataSnapshot(configDir, benchmark, target, hostRoot, nodeName, outputFile string) error {
+	return RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRoot, "", nodeName, outputFile)
+}
+
+// RunHostMetadataSnapshotWithKubeletRoot supports AL2023 nodeadm kubelet config.json
+// via a separate narrowly scoped, read-only hostPath mount. The legacy kubeadm
+// path is retained for Kind and other supported configurations.
+func RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRoot, kubeletConfigRoot, nodeName, outputFile string) error {
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("node metadata helper requires Linux; current OS is %s", runtime.GOOS)
 	}
@@ -81,7 +92,7 @@ func RunHostMetadataSnapshot(configDir, benchmark, target, hostRoot, nodeName, o
 		Files:         make(map[string]NodeFileMetadata),
 	}
 	for _, check := range bench.Checks {
-		if !strings.EqualFold(check.Target, target) || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists") {
+		if !strings.EqualFold(check.Target, target) || (check.Kind != "host_file_mode" && check.Kind != "host_file_exists" && check.Kind != "host_file_owner") {
 			continue
 		}
 		metadata := NodeFileMetadata{}
@@ -92,6 +103,12 @@ func RunHostMetadataSnapshot(configDir, benchmark, target, hostRoot, nodeName, o
 			continue
 		}
 		fullPath := filepath.Join(root, relativePath)
+		if strings.EqualFold(target, "node") && (check.Path == "var/lib/kubelet/config.yaml" || check.Path == "etc/kubernetes/kubelet/config.json") && kubeletConfigRoot != "" {
+			fullPath = filepath.Join(kubeletConfigRoot, "config.json")
+			metadata.SourcePath = "etc/kubernetes/kubelet/config.json"
+		} else {
+			metadata.SourcePath = check.Path
+		}
 		info, statErr := os.Lstat(fullPath)
 		if statErr != nil {
 			metadata.Error = statErr.Error()
@@ -101,14 +118,22 @@ func RunHostMetadataSnapshot(configDir, benchmark, target, hostRoot, nodeName, o
 		metadata.Symlink = info.Mode()&os.ModeSymlink != 0
 		metadata.Regular = info.Mode().IsRegular()
 		metadata.Mode = uint32(info.Mode().Perm())
+		if uid, gid, ok := hostFileOwner(info); ok {
+			metadata.OwnerUID = &uid
+			metadata.OwnerGID = &gid
+		}
 		snapshot.Files[check.Path] = metadata
 	}
 
-	// The helper mounts exactly /var/lib/kubelet. Read only its regular,
-	// non-symlinked config.yaml and export two narrowly scoped settings.
+	// Read only a mounted kubelet config: kubeadm YAML or explicit AL2023 JSON.
+	// Do not export arbitrary configuration contents.
 	// Control-plane metadata mode never accesses kubelet configuration.
 	if strings.EqualFold(target, "node") {
-		snapshot.KubeletSettings = collectKubeletSettings(root)
+		if kubeletConfigRoot != "" {
+			snapshot.KubeletSettings = collectKubeletSettingsFrom(kubeletConfigRoot, "config.json", "etc/kubernetes/kubelet/config.json")
+		} else {
+			snapshot.KubeletSettings = collectKubeletSettings(root)
+		}
 	}
 	data, err := json.Marshal(snapshot)
 	if err != nil {
@@ -161,8 +186,14 @@ func approvedHostMetadataPath(target, benchmarkPath string) (string, bool) {
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(benchmarkPath)))
 	switch strings.ToLower(target) {
 	case "node":
+		if clean == "var/lib/kubelet/kubeconfig" {
+			return "kubeconfig", true
+		}
 		if clean == "var/lib/kubelet/config.yaml" {
 			return "config.yaml", true
+		}
+		if clean == "etc/kubernetes/kubelet/config.json" {
+			return "config.json", true
 		}
 	case "master", "controlplane", "control-plane":
 		if clean == "etc/kubernetes/manifests/kube-apiserver.yaml" {
@@ -211,6 +242,10 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, 
 		r.Details = fmt.Sprintf("Node %s: metadata helper did not report %s.", nodeName, c.Path)
 		return r
 	}
+	if metadata.SourcePath != "" && metadata.SourcePath != c.Path && metadata.SourcePath != "etc/kubernetes/kubelet/config.json" {
+		r.Details = "Metadata source path is not approved for this check"
+		return r
+	}
 	if metadata.Error != "" {
 		r.Details = fmt.Sprintf("Node %s: host metadata unavailable at %s: %s. This is an access or collection limitation, not a control failure.", nodeName, c.Path, metadata.Error)
 		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: c.Path, Field: "metadata", Observed: "unavailable", Expected: "file metadata"})
@@ -226,6 +261,19 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, 
 		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: c.Path, Field: "type", Observed: "non-regular file", Expected: "regular file"})
 		return r
 	}
+	if c.Kind == "host_file_owner" {
+		if metadata.OwnerUID == nil || metadata.OwnerGID == nil {
+			r.Details = "Node owner metadata unavailable; ownership cannot be inferred from permission bits."
+			return r
+		}
+		r.Status = "FAIL"
+		if *metadata.OwnerUID == 0 && *metadata.OwnerGID == 0 {
+			r.Status = "PASS"
+		}
+		r.Details = fmt.Sprintf("Node %s: host file %s ownership is %d:%d; expected root:root (0:0).", nodeName, metadata.SourcePath, *metadata.OwnerUID, *metadata.OwnerGID)
+		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: metadata.SourcePath, Field: "owner", Observed: fmt.Sprintf("%d:%d", *metadata.OwnerUID, *metadata.OwnerGID), Expected: "0:0"})
+		return r
+	}
 	if c.Kind == "host_file_exists" {
 		r.Status = "PASS"
 		r.Details = "Host configuration file exists: " + c.Path
@@ -236,13 +284,25 @@ func evaluateNodeHostCheckFromMetadata(nodeName string, target string, c Check, 
 		r.Details = fmt.Sprintf("Metadata helper returned invalid permission mode %04o.", metadata.Mode)
 		return r
 	}
-	return evaluateHostFileMode(os.FileMode(metadata.Mode), c, r)
+	result := evaluateHostFileMode(os.FileMode(metadata.Mode), c, r)
+	if metadata.SourcePath != "" {
+		for i := range result.Evidence {
+			if result.Evidence[i].Resource == "host-file" {
+				result.Evidence[i].Name = metadata.SourcePath
+			}
+		}
+	}
+	return result
 }
 
 // collectKubeletSettings reads only the explicitly mounted kubelet config file.
 // Never serialize arbitrary YAML content or parser errors containing source text.
 func collectKubeletSettings(root string) map[string]KubeletSetting {
-	names := []string{"authentication.anonymous.enabled", "authorization.mode"}
+	return collectKubeletSettingsFrom(root, "config.yaml", "var/lib/kubelet/config.yaml")
+}
+
+func collectKubeletSettingsFrom(root, filename, sourcePath string) map[string]KubeletSetting {
+	names := []string{"authentication.anonymous.enabled", "authorization.mode", "authentication.x509.clientCAFile", "readOnlyPort", "makeIPTablesUtilChains", "eventRecordQPS", "rotateCertificates", "serverTLSBootstrap", "featureGates.RotateKubeletServerCertificate"}
 	result := make(map[string]KubeletSetting, len(names))
 	fail := func(reason string) map[string]KubeletSetting {
 		for _, key := range names {
@@ -250,7 +310,10 @@ func collectKubeletSettings(root string) map[string]KubeletSetting {
 		}
 		return result
 	}
-	path := filepath.Join(root, "config.yaml")
+	if (filename != "config.yaml" && filename != "config.json") || (sourcePath != "var/lib/kubelet/config.yaml" && sourcePath != "etc/kubernetes/kubelet/config.json") {
+		return fail("kubelet configuration source not allowlisted")
+	}
+	path := filepath.Join(root, filename)
 	info, err := os.Lstat(path)
 	if err != nil {
 		return fail("kubelet configuration unavailable")
@@ -306,17 +369,29 @@ func collectKubeletSettings(root string) map[string]KubeletSetting {
 			}
 		}
 	}
+	collectExtendedKubeletSettings(cfg, result)
+	for key, setting := range result {
+		setting.SourcePath = sourcePath
+		result[key] = setting
+	}
 	return result
 }
 
 // evaluateKubeletSettingFromMetadata uses only checked, fresh snapshot evidence.
 func evaluateKubeletSettingFromMetadata(nodeName string, c Check, snapshot NodeMetadataSnapshot) Result {
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation}
+	if c.ID >= "3.2.3" && c.ID <= "3.2.8" {
+		return evaluateExtendedKubeletSetting(nodeName, c, snapshot)
+	}
 	if c.Path != "var/lib/kubelet/config.yaml" || (c.Field != "authentication.anonymous.enabled" && c.Field != "authorization.mode") {
 		r.Details = "Unapproved kubelet configuration path or field"
 		return r
 	}
 	setting, ok := snapshot.KubeletSettings[c.Field]
+	if ok && setting.SourcePath != "" && setting.SourcePath != c.Path && setting.SourcePath != "etc/kubernetes/kubelet/config.json" {
+		r.Details = "Kubelet setting source path is not allowlisted"
+		return r
+	}
 	if !ok || setting.Error != "" || setting.Value == "" {
 		r.Details = "Kubelet configuration evidence unavailable"
 		if setting.Error != "" {
@@ -341,6 +416,10 @@ func evaluateKubeletSettingFromMetadata(nodeName string, c Check, snapshot NodeM
 		r.Status = "PASS"
 	}
 	r.Details = fmt.Sprintf("Evaluated kubelet configuration field %s on node %s", c.Field, nodeName)
-	r.Evidence = []Evidence{{Resource: "host-file", Name: c.Path, Field: c.Field, Observed: setting.Value, Expected: expected}}
+	source := c.Path
+	if setting.SourcePath != "" {
+		source = setting.SourcePath
+	}
+	r.Evidence = []Evidence{{Resource: "host-file", Name: source, Field: c.Field, Observed: setting.Value, Expected: expected}}
 	return r
 }

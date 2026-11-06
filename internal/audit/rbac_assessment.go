@@ -65,6 +65,7 @@ func evaluateRBACRisk(ctx context.Context, client kubernetes.Interface, _ Check,
 
 	bindingCount, subjectCount, unresolved := 0, 0, 0
 	critical, high, tokenAutomountEnabled := 0, 0, 0
+	platformNamedCritical, platformNamedHigh := 0, 0
 	identityInventoryIncomplete := false
 	appendEvidence := func(e Evidence) {
 		if len(r.Evidence) < 200 {
@@ -83,15 +84,22 @@ func evaluateRBACRisk(ctx context.Context, client kubernetes.Interface, _ Check,
 			subjectCount++
 			appendEvidence(Evidence{Resource: kind, Namespace: namespace, Name: name, Field: "subject", Observed: subjectIdentity(subject), Expected: "review subject ownership and least-privilege requirement"})
 		}
+		platformHint := platformNamedRBACBinding(name, ref, subjects)
 		for i, rule := range rules {
 			risks := classifyRBACRule(rule)
 			for _, risk := range risks {
 				if risk.level == 3 {
 					critical++
+					if platformHint {
+						platformNamedCritical++
+					}
 				} else {
 					high++
+					if platformHint {
+						platformNamedHigh++
+					}
 				}
-				appendEvidence(Evidence{Resource: ref.Kind, Namespace: namespace, Name: ref.Name, Field: fmt.Sprintf("rules[%d]", i), Observed: risk.description + "; verbs=" + strings.Join(rule.Verbs, ",") + "; apiGroups=" + strings.Join(rule.APIGroups, ",") + "; resources=" + strings.Join(rule.Resources, ",") + "; resourceNames=" + strings.Join(rule.ResourceNames, ","), Expected: "remove unnecessary wildcard, privilege-escalation, impersonation, Secret-read or workload-exec permissions"})
+				appendEvidence(Evidence{Resource: ref.Kind, Namespace: namespace, Name: ref.Name, Field: fmt.Sprintf("rules[%d]", i), Observed: risk.description + "; verbs=" + strings.Join(rule.Verbs, ",") + "; apiGroups=" + strings.Join(rule.APIGroups, ",") + "; resources=" + strings.Join(rule.Resources, ",") + "; resourceNames=" + strings.Join(rule.ResourceNames, ","), Expected: "review role owner, necessity, and least privilege; AWS/Kubernetes platform-named roles are not automatically trusted"})
 			}
 		}
 	}
@@ -172,7 +180,7 @@ func evaluateRBACRisk(ctx context.Context, client kubernetes.Interface, _ Check,
 	default:
 		r.Status = "PASS"
 	}
-	r.Details = fmt.Sprintf("Inventoried %d ClusterRoles, %d Roles, %d ClusterRoleBindings and %d RoleBindings; inspected %d binding(s) and %d subject binding(s). Found %d critical privilege-escalation rule(s), %d high-risk permission rule(s), %d unresolved role reference(s), and %d workload(s) with service-account token automount enabled or defaulted on; identity inventory incomplete=%t. Permission inventory does not prove runtime use or effective authorization in every request context.", len(clusterRoles.Items), len(roles.Items), len(clusterBindings.Items), len(bindings.Items), bindingCount, subjectCount, critical, high, unresolved, tokenAutomountEnabled, identityInventoryIncomplete)
+	r.Details = fmt.Sprintf("Inventoried %d ClusterRoles, %d Roles, %d ClusterRoleBindings and %d RoleBindings; inspected %d binding(s) and %d subject binding(s). Found %d critical permission-risk exposures (%d on platform-named bindings) and %d high-risk permission exposures (%d on platform-named bindings), %d unresolved role references, and %d workload(s) with service-account token automount enabled or defaulted on; identity inventory incomplete=%t. Exposures may repeat across bindings. Name-based platform ownership hints are unverified and never suppress or downgrade findings; authorization necessity and effective usage require review.", len(clusterRoles.Items), len(roles.Items), len(clusterBindings.Items), len(bindings.Items), bindingCount, subjectCount, critical, platformNamedCritical, high, platformNamedHigh, unresolved, tokenAutomountEnabled, identityInventoryIncomplete)
 	return r
 }
 
@@ -237,4 +245,20 @@ func stableStrings(values []string) []string {
 	out := append([]string(nil), values...)
 	sort.Strings(out)
 	return out
+}
+
+// platformNamedRBACBinding identifies possible built-in/EKS provider permissions
+// without trusting a name prefix as proof of ownership or suppressing risks.
+func platformNamedRBACBinding(bindingName string, role rbacv1.RoleRef, subjects []rbacv1.Subject) bool {
+	for _, name := range []string{bindingName, role.Name} {
+		if strings.HasPrefix(name, "system:") || strings.HasPrefix(name, "eks:") {
+			return true
+		}
+	}
+	for _, subject := range subjects {
+		if strings.HasPrefix(subject.Name, "system:") || strings.HasPrefix(subject.Name, "eks:") {
+			return true
+		}
+	}
+	return false
 }
