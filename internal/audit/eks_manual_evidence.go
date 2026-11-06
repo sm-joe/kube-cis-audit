@@ -99,7 +99,7 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 		for _, pod := range pods.Items {
 			for _, volume := range pod.Spec.Volumes {
 				if volume.CSI != nil && strings.Contains(strings.ToLower(volume.CSI.Driver), "secrets-store") {
-					r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "volume/"+volume.Name, Observed: "Secrets Store CSI", Expected: "approved external secret store with rotation"})
+					r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "volume/" + volume.Name, Observed: "Secrets Store CSI", Expected: "approved external secret store with rotation"})
 				}
 			}
 		}
