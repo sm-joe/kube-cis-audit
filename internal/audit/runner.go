@@ -174,7 +174,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if !strings.EqualFold(c.Target, target) {
 			continue
 		}
-		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_kubelet_config_field" && c.Kind != "cis_not_implemented" {
+		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_file_owner" && c.Kind != "host_kubelet_config_field" && c.Kind != "cis_not_implemented" {
 			continue
 		}
 		localChecks = append(localChecks, c)
@@ -191,6 +191,8 @@ func RunNode(o Options, nodeName string) (Report, error) {
 			}
 		} else if c.Kind == "host_kubelet_config_field" {
 			r = evaluateKubeletConfigField(hostRoot, nodeName, c)
+		} else if c.Kind == "host_file_owner" {
+			r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation, Details: "Ownership checks require a verified Linux node-metadata snapshot; direct mode does not support this evaluator."}
 		} else {
 			r = evaluateNodeHostCheck(hostRoot, nodeName, c)
 		}
