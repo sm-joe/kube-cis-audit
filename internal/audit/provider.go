@@ -52,5 +52,5 @@ func annotateProviderAssessment(provider string, check Check, result Result) Res
 	default:
 		result.Applicability = "REVIEW_REQUIRED"
 	}
-	return result
+	return annotateEKSOwnershipHints(check, result)
 }
