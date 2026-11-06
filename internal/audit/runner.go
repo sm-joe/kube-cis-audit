@@ -36,7 +36,9 @@ func Run(o Options) (Report, error) {
 	minor := strings.TrimSuffix(version.Minor, "+")
 	provider := DetectCloudProvider(version.GitVersion)
 	if o.Benchmark == "cis-2.1.0" {
-		if err := validateOfficial210Scope(provider, minor); err != nil { return Report{}, err }
+		if err := validateOfficial210Scope(provider, minor); err != nil {
+			return Report{}, err
+		}
 	}
 	bench, err := loadBenchmark(o.ConfigDir, o.Benchmark, minor)
 	if err != nil {
