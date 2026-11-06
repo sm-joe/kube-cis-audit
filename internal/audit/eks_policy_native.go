@@ -106,7 +106,7 @@ func EvaluateEKSPodAdmissionControl(ctx context.Context, client kubernetes.Inter
 		r.Details = fmt.Sprintf("%d non-platform Pods violate %s; %d platform Pods require exception review; %d namespaces lack confirmed PSA enforcement.", violations, label, platformViolations, uncovered)
 	case platformViolations > 0:
 		r.Status = "MANUAL"
-		r.Details = fmt.Sprintf("%d kube-system Pods have configurations requiring an approved platform exception; %d namespaces lack confirmed PSA enforcement. Do not treat required AWS platform agents as automatically non-compliant.",platformViolations,uncovered)
+		r.Details = fmt.Sprintf("%d kube-system Pods have configurations requiring an approved platform exception; %d namespaces lack confirmed PSA enforcement. Do not treat required AWS platform agents as automatically non-compliant.", platformViolations, uncovered)
 	case uncovered > 0:
 		r.Status = "MANUAL"
 		r.Details = fmt.Sprintf("%d namespaces lack confirmed %s PSA enforce labels; an equivalent admission engine or approved exemptions must be reviewed. No currently violating Pods found.", uncovered, required)
