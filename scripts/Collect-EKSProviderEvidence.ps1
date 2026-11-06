@@ -107,7 +107,7 @@ if ($authMode -eq 'CONFIG_MAP') {
                             foreach ($policy in @($associated | Where-Object { $null -ne $_ })) {
                                 $scopeType = [string]$policy.accessScope.type
                                 $namespaces = @($policy.accessScope.namespaces | Where-Object { $_ })
-                                $item.policyScopes += "$([string]$policy.policyArn):$scopeType:$($namespaces -join ',')"
+                                $item.policyScopes += "$([string]$policy.policyArn):${scopeType}:$($namespaces -join ',')"
                             }
                         } catch {
                             $item.error = 'incomplete access entry or policy evidence'
