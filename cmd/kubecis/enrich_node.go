@@ -32,7 +32,7 @@ func newEnrichNodeCommand() *cobra.Command {
 			if output == "" {
 				return fmt.Errorf("output-file is required to avoid accidentally emitting raw evidence")
 			}
-			return audit.WriteReport(report, output)
+			return writeReport("json", output, report)
 		},
 	}
 	cmd.Flags().StringVar(&input, "input", "", "Matching node-local JSON report")
