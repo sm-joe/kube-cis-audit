@@ -10,12 +10,12 @@ import (
 // configuration or secret-bearing file contents.
 func collectExtendedKubeletSettings(cfg map[string]interface{}, result map[string]KubeletSetting) {
 	specs := map[string]string{
-		"authentication.x509.clientCAFile":             "path",
-		"readOnlyPort":                                 "integer",
-		"makeIPTablesUtilChains":                       "boolean",
-		"eventRecordQPS":                               "integer",
-		"rotateCertificates":                           "boolean",
-		"serverTLSBootstrap":                           "boolean",
+		"authentication.x509.clientCAFile":            "path",
+		"readOnlyPort":                                "integer",
+		"makeIPTablesUtilChains":                      "boolean",
+		"eventRecordQPS":                              "integer",
+		"rotateCertificates":                          "boolean",
+		"serverTLSBootstrap":                          "boolean",
 		"featureGates.RotateKubeletServerCertificate": "boolean",
 	}
 	for field, kind := range specs {
