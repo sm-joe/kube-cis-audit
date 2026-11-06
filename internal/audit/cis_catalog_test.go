@@ -42,15 +42,16 @@ func TestFullCoverageGateValidatesEvidenceAndHumanReview(t *testing.T) {
 		{ID: "4.1.1", Assessment: "manual", Implemented: true, PDFPage: 80},
 	}}
 	auto := Result{ID: "2.1.1", Status: "PASS", Scored: true, Evidence: []Evidence{{Resource: "AWS::EKS::Cluster", Observed: "enabled"}}}
-	if err := ValidateCIS210FullCoverage(inv, []Result{auto}, nil); err == nil ||
+	manual := Result{ID: "4.1.1", Status: "MANUAL", Scored: false, Details: "Manual review required"}
+	if err := ValidateCIS210FullCoverage(inv, []Result{auto, manual}, nil); err == nil ||
 		!strings.Contains(err.Error(), "manual_review_pending") {
 		t.Fatalf("manual item silently passed: %v", err)
 	}
-	if err := ValidateCIS210FullCoverage(inv, []Result{auto}, map[string]bool{"4.1.1": true}); err != nil {
+	if err := ValidateCIS210FullCoverage(inv, []Result{auto, manual}, map[string]bool{"4.1.1": true}); err != nil {
 		t.Fatalf("documented manual review rejected: %v", err)
 	}
 	auto.Evidence = nil
-	if err := ValidateCIS210FullCoverage(inv, []Result{auto}, map[string]bool{"4.1.1": true}); err == nil {
+	if err := ValidateCIS210FullCoverage(inv, []Result{auto, manual}, map[string]bool{"4.1.1": true}); err == nil {
 		t.Fatal("unsupported PASS accepted without evidence")
 	}
 }
