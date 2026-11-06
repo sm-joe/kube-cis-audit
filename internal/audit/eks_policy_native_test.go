@@ -109,3 +109,15 @@ func TestEKSTokenMountsUsePodOverrideAndNeverAssumeNeed(t *testing.T) {
 		t.Fatalf("token mount must require business-need review: %+v", r)
 	}
 }
+
+func TestEKSAWSPlatformPodExceptionNeedsReview(t *testing.T) {
+ ctx:=context.Background()
+ yes:=true
+ client:=fake.NewSimpleClientset(
+  &corev1.Namespace{ObjectMeta:metav1.ObjectMeta{Name:"kube-system"}},
+  &corev1.Pod{ObjectMeta:metav1.ObjectMeta{Name:"aws-node",Namespace:"kube-system"},Spec:corev1.PodSpec{Containers:[]corev1.Container{{Name:"aws-node",SecurityContext:&corev1.SecurityContext{Privileged:&yes}}}}},
+ )
+ r,err:=EvaluateEKSPodAdmissionControl(ctx,client,"4.2.1")
+ if err!=nil{t.Fatal(err)}
+ if r.Status!="MANUAL"||!strings.Contains(r.Details,"exception"){t.Fatalf("platform privilege exception must be reviewable: %+v",r)}
+}
