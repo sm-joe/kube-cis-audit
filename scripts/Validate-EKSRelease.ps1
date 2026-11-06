@@ -44,7 +44,7 @@ if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scored
 # A consolidated report is not an acceptable EKS node audit if every kubelet
 # configuration result is NOT_ASSESSED. Require explicit verified AL2023
 # source evidence for all three essential worker checks on every expected node.
-$requiredNodeChecks = @('4.1.9', 'KUBECIS-NATIVE-NODE-1', 'KUBECIS-NATIVE-NODE-2')
+$requiredNodeChecks = @('KUBECIS-EKS-NODE-CONFIG-MODE', 'KUBECIS-NATIVE-NODE-1', 'KUBECIS-NATIVE-NODE-2')
 foreach ($node in $nodes) {
     foreach ($checkId in $requiredNodeChecks) {
         $found = @($r.results | Where-Object { $_.id -eq $checkId -and $_.scope -eq $node })
