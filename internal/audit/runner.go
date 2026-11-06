@@ -358,6 +358,24 @@ func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Optio
 		return r
 	}
 	switch c.Kind {
+	case "eks_psa_admission":
+		if c.ID != "4.2.1" && c.ID != "4.2.2" && c.ID != "4.2.3" && c.ID != "4.2.4" && c.ID != "4.2.5" {
+			r.Details = "Unsupported EKS admission control ID"
+			return r
+		}
+		assessed, err := EvaluateEKSPodAdmissionControl(ctx, client, c.ID)
+		if err != nil { r.Details = "Unable to collect namespace and Pod admission evidence: " + err.Error(); return r }
+		return assessed
+	case "eks_default_service_account":
+		if c.ID != "4.1.5" { r.Details = "Unsupported EKS workload identity control ID"; return r }
+		assessed, err := EvaluateEKSDefaultServiceAccountUse(ctx, client)
+		if err != nil { r.Details = "Unable to collect workload identity evidence: " + err.Error(); return r }
+		return assessed
+	case "eks_token_mounts":
+		if c.ID != "4.1.6" { r.Details = "Unsupported EKS token mounting control ID"; return r }
+		assessed, err := EvaluateEKSServiceAccountTokenMounts(ctx, client)
+		if err != nil { r.Details = "Unable to collect service account token evidence: " + err.Error(); return r }
+		return assessed
 	case "api_policy_control":
 		return evaluatePolicyControl(ctx, client, c, o, r)
 	case "api_pod_non_root", "api_pod_seccomp":
