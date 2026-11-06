@@ -52,4 +52,16 @@ func TestEKS210ProfileExactOfficialIDs(t *testing.T) {
 			t.Fatalf("missing assessed EKS node control %s", id)
 		}
 	}
+	for _, check := range b.Checks {
+		if check.ID == "3.1.3" {
+			if check.Path != "etc/kubernetes/kubelet/config.json" {
+				t.Fatalf("CIS EKS nodeadm path must name the actual file, got %q", check.Path)
+			}
+			if _, ok := approvedHostMetadataPath("node", check.Path); !ok {
+				t.Fatal("official EKS nodeadm path is not in the host metadata allowlist")
+			}
+			return
+		}
+	}
+	t.Fatal("missing EKS 3.1.3 file-mode control")
 }
