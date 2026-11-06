@@ -98,8 +98,26 @@ foreach ($node in $nodes) {
     $inputs.Add($path)
 }
 $providerPath = Join-Path $dir 'provider.json'
-& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -ExpectedAPIServer $kubeAPIServer -OutputFile $providerPath -Context $Context
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path $providerPath)) { throw 'EKS provider DescribeCluster collection failed' }
+# This is a PowerShell script, not a native executable. LASTEXITCODE is
+# inherited from the last kubectl/aws process and MUST NOT be used as the
+# status of a .ps1 invocation (a rejected /configz request may leave it != 0).
+Remove-Item -LiteralPath $providerPath -Force -ErrorAction SilentlyContinue
+try {
+    & (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -ExpectedAPIServer $kubeAPIServer -OutputFile $providerPath -Context $Context
+} catch {
+    throw "EKS provider evidence collection failed: $($_.Exception.Message)"
+}
+if (-not (Test-Path -LiteralPath $providerPath -PathType Leaf)) {
+    throw 'EKS provider evidence collection returned no provider.json; inspect AWS DescribeCluster and collector diagnostics'
+}
+try {
+    $providerReport = Get-Content -LiteralPath $providerPath -Raw | ConvertFrom-Json -ErrorAction Stop
+    if ($providerReport.schemaVersion -ne 1 -or $providerReport.clusterName -cne $ClusterName -or $providerReport.assessmentStatus -cne 'INVENTORY_ONLY') {
+        throw 'provider.json missing required schema or expected cluster identity'
+    }
+} catch {
+    throw "EKS provider evidence is invalid: $($_.Exception.Message)"
+}
 $argsList = @('consolidate','--provider-evidence',$providerPath,'--cluster',$clusterPath,'--expected-nodes',($nodes -join ','),'--max-age','30m','--output-file',(Join-Path $dir 'consolidated.json'))
 foreach ($path in $inputs) {
     if ($path -ne $clusterPath) { $argsList += @('--local',$path) }
