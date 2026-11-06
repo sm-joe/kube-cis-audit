@@ -66,11 +66,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            VERSION=3.1.0-native-eks-rc3
+            VERSION=3.1.0-native-eks-rc3.1
           tags: |
-            ghcr.io/sm-joe/kubecis:eks-provider-rc3
+            ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity
             ghcr.io/sm-joe/kubecis:eks-provider-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=3.1.0-native-eks-rc3
+            org.opencontainers.image.version=3.1.0-native-eks-rc3.1
