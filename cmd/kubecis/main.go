@@ -263,7 +263,7 @@ func main() {
 				encoder.SetIndent("", "  ")
 				return encoder.Encode(merged)
 			case "text":
-				return renderBenchStyle(dst, merged)
+				return renderBenchStyle(dst, merged.Report)
 			default:
 				return fmt.Errorf("unsupported consolidated output format %q (use json or text)", mergeFormat)
 			}
