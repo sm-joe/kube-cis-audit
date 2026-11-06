@@ -40,7 +40,7 @@ spec:
       initContainers:
         # Produce the first snapshot before the unprivileged auditor starts.
         - name: node-metadata-init
-          image: ghcr.io/sm-joe/kubecis:eks-provider-rc2
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3
           imagePullPolicy: IfNotPresent
           args:
             - node-metadata
@@ -90,10 +90,12 @@ spec:
         # This container has no Kubernetes API token and cannot read host files.
         # It consumes only a short-lived, metadata-only snapshot from the helper.
         - name: node-auditor
-          image: ghcr.io/sm-joe/kubecis:eks-provider-rc2
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3
           imagePullPolicy: IfNotPresent
           args:
             - node-audit
+            - --provider
+            - eks
             - --benchmark
             - cis-2.1.0
             - --metadata-file
@@ -131,7 +133,7 @@ spec:
         # Narrow exception: root plus CAP_DAC_READ_SEARCH can stat only the
         # allowlisted kubelet config path; no file contents are read.
         - name: node-metadata-helper
-          image: ghcr.io/sm-joe/kubecis:eks-provider-rc2
+          image: ghcr.io/sm-joe/kubecis:eks-provider-rc3
           imagePullPolicy: IfNotPresent
           args:
             - node-metadata
