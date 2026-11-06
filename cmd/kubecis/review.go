@@ -33,9 +33,9 @@ type reviewInput struct {
 }
 
 type reviewCandidate struct {
-	ID string `json:"id"`
-	Scope string `json:"scope,omitempty"`
-	Title string `json:"title"`
+	ID      string `json:"id"`
+	Scope   string `json:"scope,omitempty"`
+	Title   string `json:"title"`
 	Details string `json:"details"`
 }
 
