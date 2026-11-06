@@ -118,7 +118,7 @@ kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -
 
 These commands **create or update KubeCIS deployment resources**, including RBAC and a host-metadata helper. Review [EKS deployment manifests](deploy/eks/) and their access requirements before deployment. Assessments do not intentionally change the cluster's security configuration.
 
-**Current limitation:** The full EKS collection/orchestration and release-acceptance scripts in the repository are implemented in PowerShell. A POSIX shell equivalent of the full provider-plus-node consolidation pipeline has **not been verified**. The Go CLI and Linux node-auditor image are Linux-native, but the commands above should **not** be presented as a complete EKS provider assessment or as an equivalent to the proven integrated collection workflow. Linux/Unix support is the product's target; the remaining orchestration portability work is separate from the scanning engine.
+**Current limitation:** The repository's complete EKS collection/orchestration and release-acceptance workflow is not yet available as a verified POSIX-shell runner. Full provider-plus-node consolidation on Linux has **not been validated end to end**. The Go CLI and Linux node-auditor image are Linux-native, but the commands above should **not** be presented as a complete EKS provider assessment or as an equivalent to the proven integrated collection workflow. Linux/Unix support is the product's target; the remaining orchestration portability work is separate from the scanning engine.
 
 ## Reporting and review
 
