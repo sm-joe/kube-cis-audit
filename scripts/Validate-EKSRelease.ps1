@@ -2,7 +2,10 @@
 [CmdletBinding()]
 param(
     [string]$ReportPath = '.\reports\eks\consolidated.json',
-    [int]$MaxAgeMinutes = 30
+    [int]$MaxAgeMinutes = 30,
+    [ValidateSet('Preview', 'Full')][string]$ReleaseLevel = 'Preview',
+    [string]$ExpectedClusterName = '',
+    [string]$ExpectedRegion = ''
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path $ReportPath -PathType Leaf)) { throw "Consolidated EKS report missing: $ReportPath" }
@@ -56,6 +59,48 @@ foreach ($type in @('api','audit','authenticator','controllerManager','scheduler
     if ($p.controlPlaneLogging.PSObject.Properties.Name -notcontains $type) {
         throw "Missing AWS EKS logging inventory field $type"
     }
+}
+if ($ExpectedClusterName -and $p.clusterName -cne $ExpectedClusterName) {
+    throw "Provider cluster name mismatch: expected '$ExpectedClusterName', got '$($p.clusterName)'"
+}
+if ($ExpectedRegion -and $p.region -cne $ExpectedRegion) {
+    throw "Provider cluster region mismatch: expected '$ExpectedRegion', got '$($p.region)'"
+}
+if ($p.clusterArn -notmatch '^arn:aws[a-z-]*:eks:([^:]+):([0-9]{12}):cluster/(.+)
+if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scoredTotal) {
+    throw 'Decisive statuses exceed total scored controls'
+}
+# A consolidated report is not an acceptable EKS node audit if every kubelet
+# configuration result is NOT_ASSESSED. Require explicit verified AL2023
+# source evidence for all three essential worker checks on every expected node.
+$requiredNodeChecks = @('KUBECIS-EKS-NODE-CONFIG-MODE', 'KUBECIS-NATIVE-NODE-1', 'KUBECIS-NATIVE-NODE-2')
+foreach ($node in $nodes) {
+    foreach ($checkId in $requiredNodeChecks) {
+        $found = @($r.results | Where-Object { $_.id -eq $checkId -and $_.scope -eq $node })
+        if ($found.Count -ne 1) {
+            throw "Missing or duplicate EKS kubelet control $checkId for worker $node"
+        }
+        $finding = $found[0]
+        if (@('PASS','FAIL') -notcontains $finding.status) {
+            throw "EKS node evidence incomplete: $checkId on $node is $($finding.status). $($finding.details)"
+        }
+        $sourceEvidence = @($finding.evidence | Where-Object {
+            $_.name -eq 'etc/kubernetes/kubelet/config.json'
+        })
+        if ($sourceEvidence.Count -eq 0) {
+            throw "EKS node control $checkId on $node lacks AL2023 nodeadm config.json evidence"
+        }
+    }
+}
+Write-Host "PASS (PREVIEW ONLY): EKS API + $($nodes.Count) managed EC2 node source(s) verified"
+Write-Host "Benchmark: $($r.benchmark) ($($r.benchmarkCompatibilityStatus)); score withheld as required"
+Write-Host "Scored evidence coverage: $($r.compliance.coveragePercent)% within configured starter profile"
+ -or
+    $Matches[1] -cne $p.region -or $Matches[3] -cne $p.clusterName) {
+    throw 'Provider evidence ARN name/region mismatch'
+}
+if ($ReleaseLevel -eq 'Full') {
+    throw 'Full CIS EKS release NOT ACCEPTED: the profile is provisional; official complete control inventory, version applicability and evidence verification are not established. Preview mode is available.'
 }
 if ($r.compliance.scoredTotal -lt 1) { throw 'No scored checks were included' }
 if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scoredTotal) {
