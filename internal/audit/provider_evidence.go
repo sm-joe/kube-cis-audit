@@ -10,18 +10,18 @@ import (
 // EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
 // snapshot. It contains configuration inventory, NOT a CIS pass/fail score.
 type EKSProviderEvidence struct {
-	SchemaVersion       int               `json:"schemaVersion"`
-	CloudProvider       string            `json:"cloudProvider"`
-	ClusterName         string            `json:"clusterName"`
-	Region              string            `json:"region"`
-	KubernetesVersion   string            `json:"kubernetesVersion"`
-	GeneratedAt         time.Time         `json:"generatedAt"`
-	EndpointPrivate     bool              `json:"endpointPrivateAccess"`
-	EndpointPublic      bool              `json:"endpointPublicAccess"`
-	PublicAccessCIDRs   []string          `json:"publicAccessCidrs,omitempty"`
-	ControlPlaneLogging map[string]bool   `json:"controlPlaneLogging"`
-	AssessmentStatus    string            `json:"assessmentStatus"`
-	AssessmentNote      string            `json:"assessmentNote"`
+	SchemaVersion       int             `json:"schemaVersion"`
+	CloudProvider       string          `json:"cloudProvider"`
+	ClusterName         string          `json:"clusterName"`
+	Region              string          `json:"region"`
+	KubernetesVersion   string          `json:"kubernetesVersion"`
+	GeneratedAt         time.Time       `json:"generatedAt"`
+	EndpointPrivate     bool            `json:"endpointPrivateAccess"`
+	EndpointPublic      bool            `json:"endpointPublicAccess"`
+	PublicAccessCIDRs   []string        `json:"publicAccessCidrs,omitempty"`
+	ControlPlaneLogging map[string]bool `json:"controlPlaneLogging"`
+	AssessmentStatus    string          `json:"assessmentStatus"`
+	AssessmentNote      string          `json:"assessmentNote"`
 }
 
 func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration, now time.Time) (EKSProviderEvidence, error) {

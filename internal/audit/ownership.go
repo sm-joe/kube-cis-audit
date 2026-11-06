@@ -4,8 +4,8 @@ import "strings"
 
 const (
 	ownershipPlatformNamed = "PLATFORM_NAMED_REVIEW"
-	ownershipAuditorSelf    = "KUBECIS_SELF_REVIEW"
-	ownershipUnverified     = "UNVERIFIED"
+	ownershipAuditorSelf   = "KUBECIS_SELF_REVIEW"
+	ownershipUnverified    = "UNVERIFIED"
 )
 
 // annotateEKSOwnershipHints adds triage context to evidence without changing

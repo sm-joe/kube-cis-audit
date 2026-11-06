@@ -139,7 +139,7 @@ func RunNode(o Options, nodeName string) (Report, error) {
 	report := Report{
 		BuildVersion:         BuildVersion,
 		AuditMode:            strings.ToLower(target) + "-local",
-		CloudProvider:       o.Provider,
+		CloudProvider:        o.Provider,
 		NodeName:             nodeName,
 		Tool:                 "KubeCIS Native",
 		GeneratedAt:          time.Now().UTC(),

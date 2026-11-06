@@ -30,12 +30,12 @@ type CoverageMetrics struct {
 // from whichever reports happened to be supplied.
 type ConsolidatedReport struct {
 	Report
-	SchemaVersion             string          `json:"schemaVersion"`
-	Sources                   []SourceRecord  `json:"sources"`
-	ExpectedNodes             []string        `json:"expectedNodes"`
-	ExpectedControlPlaneNodes []string        `json:"expectedControlPlaneNodes"`
-	CoverageMetrics           CoverageMetrics `json:"coverageMetrics"`
-	ProviderEvidence           *EKSProviderEvidence `json:"providerEvidence,omitempty"`
+	SchemaVersion             string               `json:"schemaVersion"`
+	Sources                   []SourceRecord       `json:"sources"`
+	ExpectedNodes             []string             `json:"expectedNodes"`
+	ExpectedControlPlaneNodes []string             `json:"expectedControlPlaneNodes"`
+	CoverageMetrics           CoverageMetrics      `json:"coverageMetrics"`
+	ProviderEvidence          *EKSProviderEvidence `json:"providerEvidence,omitempty"`
 }
 
 // ConsolidateReports fails closed on missing, stale, inconsistent or duplicate

@@ -33,30 +33,30 @@ type Benchmark struct {
 }
 
 type Evidence struct {
-	Resource  string `json:"resource,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Field     string `json:"field,omitempty"`
-	Observed  string `json:"observed,omitempty"`
+	Resource      string `json:"resource,omitempty"`
+	Namespace     string `json:"namespace,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Field         string `json:"field,omitempty"`
+	Observed      string `json:"observed,omitempty"`
 	OwnershipHint string `json:"ownershipHint,omitempty"`
-	Expected  string `json:"expected,omitempty"`
+	Expected      string `json:"expected,omitempty"`
 }
 
 type Result struct {
-	ID             string     `json:"id"`
-	FindingID      string     `json:"findingId,omitempty"`
-	Scope          string     `json:"scope,omitempty"`
-	Title          string     `json:"title"`
-	Target         string     `json:"target"`
-	Status         string     `json:"status"`
-	Details        string     `json:"details"`
-	Method         string     `json:"method,omitempty"`
-	Applicability  string     `json:"applicability,omitempty"`
-	EvidenceSource string     `json:"evidenceSource,omitempty"`
+	ID              string     `json:"id"`
+	FindingID       string     `json:"findingId,omitempty"`
+	Scope           string     `json:"scope,omitempty"`
+	Title           string     `json:"title"`
+	Target          string     `json:"target"`
+	Status          string     `json:"status"`
+	Details         string     `json:"details"`
+	Method          string     `json:"method,omitempty"`
+	Applicability   string     `json:"applicability,omitempty"`
+	EvidenceSource  string     `json:"evidenceSource,omitempty"`
 	OwnershipReview string     `json:"ownershipReview,omitempty"`
-	Evidence       []Evidence `json:"evidence,omitempty"`
-	Remediation    string     `json:"remediation,omitempty"`
-	Scored         bool       `json:"scored"`
+	Evidence        []Evidence `json:"evidence,omitempty"`
+	Remediation     string     `json:"remediation,omitempty"`
+	Scored          bool       `json:"scored"`
 }
 
 type Summary struct {
