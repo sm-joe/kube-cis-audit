@@ -156,13 +156,6 @@ checks:
     scored: true
     description: "Native control with reviewable evidence and unknown-state handling."
     remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
-  - id: "4.1.7"
-    title: "EKS access entries and scoped access policies"
-    target: policies
-    kind: aws_eks_access_entries
-    scored: true
-    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
-    remediation: "Inspect EKS authentication mode, access entries, per-principal policy scopes and legacy aws-auth mappings; migrate approved IAM principals to EKS access entries."
   - id: "4.1.8"
     title: "Restrict RBAC bind, impersonate and escalate privileges"
     target: policies
@@ -283,13 +276,6 @@ checks:
     scored: true
     description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
     remediation: "Move active Pods and workload controllers from the default namespace to dedicated namespaces with appropriate RBAC, admission policies and NetworkPolicies."
-  - id: "5.1.1"
-    title: "Container image vulnerability scanning coverage"
-    target: policies
-    kind: aws_ecr_image_scanning
-    scored: true
-    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
-    remediation: "Enable ECR Basic scan-on-push or Enhanced scanning for every ECR repository used by EKS workload images, verify image digest scan status, or attach approved third-party scanner evidence."
   - id: "5.1.2"
     title: "Least-privilege access to ECR repositories"
     target: policies
@@ -345,10 +331,3 @@ checks:
     manual: true
     description: "Human evidence review: TLS certificates on EKS load balancer listeners. Decisions must be tied to a hashed scan and include reviewer, justification and evidence reference."
     remediation: "Review LoadBalancer services, Ingress and underlying ALB/NLB listener certificate status; verify all client-facing TLS paths."
-  - id: "5.5.1"
-    title: "Use EKS access entries for IAM principal authentication"
-    target: policies
-    kind: aws_eks_access_entries
-    scored: true
-    description: "Native EKS 2.1.0 assessment requiring verified API or AWS evidence; unverifiable requirements remain MANUAL or NOT_ASSESSED."
-    remediation: "Enable API or API_AND_CONFIG_MAP authentication, migrate approved IAM principal mappings to EKS access entries, and review policy/RBAC grants and legacy aws-auth usage."
