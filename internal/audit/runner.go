@@ -35,10 +35,13 @@ func Run(o Options) (Report, error) {
 	}
 	minor := strings.TrimSuffix(version.Minor, "+")
 	provider := DetectCloudProvider(version.GitVersion)
-	if o.Benchmark == "cis-2.1.0" {
-		if err := validateOfficial210Scope(provider, minor); err != nil {
-			return Report{}, err
+	if o.Benchmark == "cis-eks-2.1.0" {
+		if provider != "eks" {
+			return Report{}, fmt.Errorf("CIS EKS 2.1.0 profile requires an EKS Kubernetes API server; detected %s", provider)
 		}
+		if err := validateOfficial210Scope("eks", minor); err != nil { return Report{}, err }
+	} else if o.Benchmark == "cis-2.1.0" {
+		if err := validateOfficial210Scope(provider, minor); err != nil { return Report{}, err }
 	}
 	bench, err := loadBenchmark(o.ConfigDir, o.Benchmark, minor)
 	if err != nil {
@@ -167,12 +170,14 @@ func RunNode(o Options, nodeName string) (Report, error) {
 		if !strings.EqualFold(c.Target, target) {
 			continue
 		}
-		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_kubelet_config_field" {
+		if c.Kind != "host_file_mode" && c.Kind != "host_file_exists" && c.Kind != "host_kubelet_config_field" && c.Kind != "cis_not_implemented" {
 			continue
 		}
 		localChecks = append(localChecks, c)
 		var r Result
-		if strings.TrimSpace(o.MetadataFile) != "" {
+		if c.Kind == "cis_not_implemented" {
+			r = Result{ID:c.ID, Title:c.Title, Target:c.Target, Status:"NOT_ASSESSED", Method:c.Kind, Scored:false, Details:"Official CIS EKS control pending native collector and validated evidence; no PASS/FAIL inferred.", Remediation:c.Remediation}
+		} else if strings.TrimSpace(o.MetadataFile) != "" {
 			if metadataErr != nil {
 				r = Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored, Details: "Node metadata snapshot unavailable: " + metadataErr.Error(), Evidence: []Evidence{{Resource: "node", Name: nodeName, Field: "metadata", Observed: "unavailable", Expected: "fresh metadata snapshot from the node metadata helper"}}}
 			} else if c.Kind == "host_kubelet_config_field" {
