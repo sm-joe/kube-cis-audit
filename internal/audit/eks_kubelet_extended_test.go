@@ -37,8 +37,12 @@ func TestExtendedKubeletMetadataAndDecisions(t *testing.T) {
 	for _, tc := range cases {
 		check := Check{ID: tc.id, Field: tc.field, Path: "var/lib/kubelet/config.yaml", Kind: "host_kubelet_config_field", Target: "node", Scored: true}
 		got := evaluateExtendedKubeletSetting("worker-a", check, snapshot)
-		if got.Status != "PASS" {
-			t.Errorf("%s got %s: %s", tc.id, got.Status, got.Details)
+		expected := "PASS"
+		if tc.id == "3.2.6" {
+			expected = "MANUAL" // 0 means unlimited event traffic, not automatic compliance.
+		}
+		if got.Status != expected {
+			t.Errorf("%s got %s, want %s: %s", tc.id, got.Status, expected, got.Details)
 		}
 	}
 	values["readOnlyPort"] = KubeletSetting{SourcePath: "etc/kubernetes/kubelet/config.json", Value: "10255"}
