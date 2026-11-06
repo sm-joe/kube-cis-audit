@@ -35,6 +35,7 @@ type ConsolidatedReport struct {
 	ExpectedNodes             []string        `json:"expectedNodes"`
 	ExpectedControlPlaneNodes []string        `json:"expectedControlPlaneNodes"`
 	CoverageMetrics           CoverageMetrics `json:"coverageMetrics"`
+	ProviderEvidence           *EKSProviderEvidence `json:"providerEvidence,omitempty"`
 }
 
 // ConsolidateReports fails closed on missing, stale, inconsistent or duplicate
