@@ -37,6 +37,26 @@ foreach ($src in $sources) {
     }
 }
 if ($r.summary.total -ne @($r.results).Count) { throw 'Report summary and findings count mismatch' }
+if ($null -eq $r.providerEvidence) { throw 'Missing read-only AWS EKS provider configuration inventory' }
+$p = $r.providerEvidence
+if ($p.cloudProvider -ne 'eks' -or $p.assessmentStatus -ne 'INVENTORY_ONLY' -or
+    $p.schemaVersion -ne 1 -or -not $p.clusterName -or -not $p.region) {
+    throw 'Invalid EKS provider evidence metadata'
+}
+if ($r.clusterVersion -notmatch '^v(\d+)\.(\d+)\.') { throw 'Invalid cluster Kubernetes version' }
+$expectedMinor = "$($Matches[1]).$($Matches[2])"
+if ($p.kubernetesVersion -ne $expectedMinor) {
+    throw "AWS provider Kubernetes version does not match API server: $($p.kubernetesVersion) vs $expectedMinor"
+}
+$providerAge = ([DateTimeOffset]::UtcNow - [DateTimeOffset]::Parse($p.generatedAt)).TotalMinutes
+if ($providerAge -gt $MaxAgeMinutes -or $providerAge -lt -2) {
+    throw 'AWS EKS provider evidence is stale or future dated'
+}
+foreach ($type in @('api','audit','authenticator','controllerManager','scheduler')) {
+    if ($p.controlPlaneLogging.PSObject.Properties.Name -notcontains $type) {
+        throw "Missing AWS EKS logging inventory field $type"
+    }
+}
 if ($r.compliance.scoredTotal -lt 1) { throw 'No scored checks were included' }
 if ($r.compliance.scoredPass + $r.compliance.scoredFail -gt $r.compliance.scoredTotal) {
     throw 'Decisive statuses exceed total scored controls'
