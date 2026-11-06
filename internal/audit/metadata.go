@@ -280,7 +280,7 @@ func collectKubeletSettings(root string) map[string]KubeletSetting {
 }
 
 func collectKubeletSettingsFrom(root, filename, sourcePath string) map[string]KubeletSetting {
-	names := []string{"authentication.anonymous.enabled", "authorization.mode"}
+	names := []string{"authentication.anonymous.enabled", "authorization.mode", "authentication.x509.clientCAFile", "readOnlyPort", "makeIPTablesUtilChains", "eventRecordQPS", "rotateCertificates", "serverTLSBootstrap", "featureGates.RotateKubeletServerCertificate"}
 	result := make(map[string]KubeletSetting, len(names))
 	fail := func(reason string) map[string]KubeletSetting {
 		for _, key := range names {
@@ -347,6 +347,7 @@ func collectKubeletSettingsFrom(root, filename, sourcePath string) map[string]Ku
 			}
 		}
 	}
+	collectExtendedKubeletSettings(cfg, result)
 	for key, setting := range result {
 		setting.SourcePath = sourcePath
 		result[key] = setting
@@ -357,6 +358,9 @@ func collectKubeletSettingsFrom(root, filename, sourcePath string) map[string]Ku
 // evaluateKubeletSettingFromMetadata uses only checked, fresh snapshot evidence.
 func evaluateKubeletSettingFromMetadata(nodeName string, c Check, snapshot NodeMetadataSnapshot) Result {
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Method: c.Kind, Scored: c.Scored, Remediation: c.Remediation}
+	if c.ID >= "3.2.3" && c.ID <= "3.2.8" {
+		return evaluateExtendedKubeletSetting(nodeName, c, snapshot)
+	}
 	if c.Path != "var/lib/kubelet/config.yaml" || (c.Field != "authentication.anonymous.enabled" && c.Field != "authorization.mode") {
 		r.Details = "Unapproved kubelet configuration path or field"
 		return r
