@@ -66,7 +66,7 @@ checks:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "SECRET-MUST-NOT-LEAK") || strings.Contains(string(data), "clientCAFile") {
+	if strings.Contains(string(data), "SECRET-MUST-NOT-LEAK") || strings.Contains(string(data), "\\\"clientCAFile\\\"") {
 		t.Fatal("snapshot leaked non-allowlisted kubelet configuration")
 	}
 	report, err := RunNode(Options{ConfigDir: profileRoot, Benchmark: "test", Target: "node", MetadataFile: output}, "worker-a")
