@@ -23,7 +23,7 @@ checks:
     target: node
     kind: host_file_mode
     scored: true
-    path: "var/lib/kubelet/config.yaml"
+    path: "etc/kubernetes/kubelet/config.json"
     maxMode: "0644"
     description: "Native control with reviewable evidence and unknown-state handling."
     remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
