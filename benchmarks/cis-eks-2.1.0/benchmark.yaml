@@ -1,0 +1,338 @@
+id: cis-eks-2.1.0
+name: "KubeCIS Native — Amazon EKS benchmark v2.1.0 (assessment coverage under development)"
+kubernetesMinor: ["34", "35", "36", "37"]
+compatibilityStatus: provisional
+compatibilityNote: "Official EKS 2.1.0 control identities; unmapped checks are NOT_ASSESSED and require implementation. This profile does not confer complete compliance."
+checks:
+  - id: "3.1.1"
+    title: "EKS 3.1.1 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.1.2"
+    title: "EKS 3.1.2 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.1.3"
+    title: "EKS kubelet configuration permissions"
+    target: node
+    kind: host_file_mode
+    scored: true
+    path: "var/lib/kubelet/config.yaml"
+    maxMode: "0644"
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.1.4"
+    title: "EKS 3.1.4 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.1"
+    title: "EKS kubelet anonymous authentication"
+    target: node
+    kind: host_kubelet_config_field
+    scored: true
+    path: "var/lib/kubelet/config.yaml"
+    field: "authentication.anonymous.enabled"
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.2"
+    title: "EKS kubelet authorization mode"
+    target: node
+    kind: host_kubelet_config_field
+    scored: true
+    path: "var/lib/kubelet/config.yaml"
+    field: "authorization.mode"
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.3"
+    title: "EKS 3.2.3 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.4"
+    title: "EKS 3.2.4 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.5"
+    title: "EKS 3.2.5 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.6"
+    title: "EKS 3.2.6 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.7"
+    title: "EKS 3.2.7 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "3.2.8"
+    title: "EKS 3.2.8 assessment pending verified native evidence"
+    target: node
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.1"
+    title: "EKS 4.1.1 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.2"
+    title: "EKS 4.1.2 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.3"
+    title: "EKS 4.1.3 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.4"
+    title: "EKS 4.1.4 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.5"
+    title: "Dedicated service account review"
+    target: policies
+    kind: eks_default_service_account
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.6"
+    title: "Service account token mounting review"
+    target: policies
+    kind: eks_token_mounts
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.7"
+    title: "EKS 4.1.7 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.8"
+    title: "EKS 4.1.8 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.9"
+    title: "EKS 4.1.9 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.10"
+    title: "EKS 4.1.10 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.11"
+    title: "EKS 4.1.11 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.1.12"
+    title: "EKS 4.1.12 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.2.1"
+    title: "Restrict privileged Pod admission"
+    target: policies
+    kind: eks_psa_admission
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.2.2"
+    title: "Restrict host PID Pod admission"
+    target: policies
+    kind: eks_psa_admission
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.2.3"
+    title: "Restrict host IPC Pod admission"
+    target: policies
+    kind: eks_psa_admission
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.2.4"
+    title: "Restrict host network Pod admission"
+    target: policies
+    kind: eks_psa_admission
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.2.5"
+    title: "Restrict container privilege escalation"
+    target: policies
+    kind: eks_psa_admission
+    scored: true
+    description: "Native control with reviewable evidence and unknown-state handling."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.3.1"
+    title: "EKS 4.3.1 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.3.2"
+    title: "EKS 4.3.2 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.4.1"
+    title: "EKS 4.4.1 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.4.2"
+    title: "EKS 4.4.2 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.5.1"
+    title: "EKS 4.5.1 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "4.5.2"
+    title: "EKS 4.5.2 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.1.1"
+    title: "EKS 5.1.1 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.1.2"
+    title: "EKS 5.1.2 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.1.3"
+    title: "EKS 5.1.3 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.1.4"
+    title: "EKS 5.1.4 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.2.1"
+    title: "EKS 5.2.1 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.3.1"
+    title: "EKS 5.3.1 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.4.3"
+    title: "EKS 5.4.3 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.4.4"
+    title: "EKS 5.4.4 assessment pending verified native evidence"
+    target: policies
+    kind: manual
+    scored: false
+    manual: true
+    description: "Official EKS control requires a documented human review and supporting evidence."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
+  - id: "5.5.1"
+    title: "EKS 5.5.1 assessment pending verified native evidence"
+    target: policies
+    kind: cis_not_implemented
+    scored: false
+    description: "Official EKS control reserved for native collector implementation; fail closed as NOT_ASSESSED."
+    remediation: "Review the official CIS EKS 2.1.0 recommendation and apply only verified, applicable remediation."
