@@ -106,4 +106,12 @@ jobs:
           if ($rendered -notmatch '\[NOT_ASSESSED\] 3\.2\.7' -or $rendered -notmatch 'Compliance score: WITHHELD') {
             throw 'Packaged executable lost fail-closed kube-bench-style text output'
           }
+          $finalDir = Join-Path $env:RUNNER_TEMP 'final-dossier'
+          & $exe finalize --input $reportFile --output-dir $finalDir
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged executable failed to finalize evidence dossier' }
+          $finalJson = Get-Content (Join-Path $finalDir 'final-assessment.json') -Raw | ConvertFrom-Json
+          if ($finalJson.summary.notAssessed -ne 1 -or $finalJson.summary.automatedPass -ne 0 -or $finalJson.summary.awaitingReview -ne 0) {
+            throw 'Final dossier incorrectly changed assessment facts'
+          }
+          if (-not (Test-Path (Join-Path $finalDir 'final-assessment.txt'))) { throw 'Final readable dossier missing' }
           Write-Host 'PASS: packaged Windows executable, matching image tag, benchmark, scripts and offline scan rendering'
