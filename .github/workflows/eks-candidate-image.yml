@@ -2,9 +2,9 @@ name: EKS Candidate Image
 on:
   push:
     branches:
-      - feature/eks-rc3-provider-accuracy
+      - feature/eks-release-e2e-gates
 concurrency:
-  group: kubecis-eks-rc3-candidate
+  group: kubecis-eks-e2e-gates
   cancel-in-progress: true
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - name: Parse EKS PowerShell scripts
         shell: pwsh
         run: |
-          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1')) {
+          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1')) {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
@@ -35,6 +35,9 @@ jobs:
               throw "PowerShell syntax validation failed: $path"
             }
           }
+      - name: Exercise EKS provider identity rejection
+        shell: pwsh
+        run: ./scripts/Test-EKSProviderIdentity.ps1
       - name: Package Windows EKS candidate
         shell: bash
         run: |
