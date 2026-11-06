@@ -70,3 +70,40 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+  windows-executable-smoke:
+    needs: package-windows-and-image
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: kubecis-eks-135-windows-amd64
+          path: binary-artifact
+      - name: Expand executable ZIP and verify matched build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path 'binary-artifact' 'kubecis-eks-135-windows-amd64.zip'
+          if (-not (Test-Path $zip)) { throw 'Windows executable ZIP not uploaded' }
+          Expand-Archive -LiteralPath $zip -DestinationPath release -Force
+          $homePath = Join-Path 'release' 'kubecis-eks-135'
+          $exe = Join-Path $homePath 'kubecis.exe'
+          if (-not (Test-Path $exe)) { throw 'Missing packaged kubecis.exe' }
+          $expected = '3.1.0-native-cis210-eks135-${{ github.sha }}'
+          $got = (& $exe version).Trim()
+          if ($LASTEXITCODE -ne 0 -or $got -cne $expected) { throw "Executable version mismatch: $got, expected $expected" }
+          $image = (Get-Content (Join-Path $homePath 'IMAGE.txt') -Raw).Trim()
+          if ($image -cne 'ghcr.io/sm-joe/kubecis:cis210-eks135-${{ github.sha }}') { throw 'Windows and Linux artifact references differ' }
+          if (-not (Test-Path (Join-Path $homePath 'scripts/Run-KubeCIS-EKS.ps1'))) { throw 'No one-command EKS runner in package' }
+          if (-not (Test-Path (Join-Path $homePath 'benchmarks/cis-eks-2.1.0/benchmark.yaml'))) { throw 'Benchmark profile omitted from package' }
+          $report = @{buildVersion=$got; benchmark='cis-eks-2.1.0'; benchmarkCompatibilityStatus='provisional'; clusterVersion='v1.35.9-eks-test'; cloudProvider='eks'; results=@(@{id='3.2.7';title='Client certificate rotation';target='node';scope='test-node';status='NOT_ASSESSED';scored=$true;details='Evidence unavailable';remediation='Review authentication mode'});summary=@{notAssessed=1;total=1};compliance=@{scoreStatus='withheld'}} | ConvertTo-Json -Depth 10
+          $reportFile = Join-Path $env:RUNNER_TEMP 'synthetic-report.json'
+          [System.IO.File]::WriteAllText($reportFile, $report)
+          $txtFile = Join-Path $env:RUNNER_TEMP 'synthetic-results.txt'
+          & $exe render --input $reportFile --output-file $txtFile
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged executable failed to render JSON' }
+          $rendered = Get-Content $txtFile -Raw
+          if ($rendered -notmatch '\[NOT_ASSESSED\] 3\.2\.7' -or $rendered -notmatch 'Compliance score: WITHHELD') {
+            throw 'Packaged executable lost fail-closed kube-bench-style text output'
+          }
+          Write-Host 'PASS: packaged Windows executable, matching image tag, benchmark, scripts and offline scan rendering'
