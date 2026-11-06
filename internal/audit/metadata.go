@@ -35,13 +35,13 @@ type KubeletSetting struct {
 const nodeSnapshotSchemaVersion = 4
 
 type NodeFileMetadata struct {
-	SourcePath string `json:"sourcePath,omitempty"`
-	Mode       uint32 `json:"mode,omitempty"`
+	SourcePath string  `json:"sourcePath,omitempty"`
+	Mode       uint32  `json:"mode,omitempty"`
 	OwnerUID   *uint32 `json:"ownerUid,omitempty"`
 	OwnerGID   *uint32 `json:"ownerGid,omitempty"`
-	Regular    bool   `json:"regular"`
-	Symlink    bool   `json:"symlink"`
-	Error      string `json:"error,omitempty"`
+	Regular    bool    `json:"regular"`
+	Symlink    bool    `json:"symlink"`
+	Error      string  `json:"error,omitempty"`
 }
 
 const nodeMetadataMaxAge = 2 * time.Minute
