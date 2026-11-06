@@ -8,7 +8,7 @@ param(
     [string]$Namespace = 'kube-system',
     [string]$OutputDir = '.\reports\eks',
     [string]$Binary = '.\kubecis.exe',
-    [string]$Benchmark = 'cis-2.1.0',
+    [string]$Benchmark = 'cis-eks-2.1.0',
     [string]$ConfigDir = '.\benchmarks'
 )
 $ErrorActionPreference = 'Stop'
