@@ -1,265 +1,226 @@
 # KubeCIS Native
 
-**Native Kubernetes security assessment, AWS EKS evidence collection, and reviewable security reports.**
+**Linux-native Kubernetes security assessment with Amazon EKS evidence and auditable review workflows.**
 
 [![CI](https://github.com/sm-joe/kube-cis-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/sm-joe/kube-cis-audit/actions/workflows/ci.yml)
-[![Windows EKS build](https://github.com/sm-joe/kube-cis-audit/actions/workflows/eks-135-windows-binary.yml/badge.svg)](https://github.com/sm-joe/kube-cis-audit/actions/workflows/eks-135-windows-binary.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-KubeCIS Native is a **Go-based, self-hosted security assessment tool** for Kubernetes clusters and Linux nodes. It collects Kubernetes API evidence, examines allowlisted node security settings, enriches Amazon EKS findings with AWS read-only API inventory, and produces consolidated JSON, kube-bench-style text, and a human-reviewable assessment dossier.
+KubeCIS Native is an open-source, Go-based Kubernetes and Linux-node security auditor. It performs read-only Kubernetes API checks, evaluates explicitly collected Linux kubelet and host metadata, supports provider-aware Amazon EKS findings, and produces structured reports with human review attestations.
 
-**No kube-bench runtime dependency.** Assessments run through the project's native Go implementation. KubeCIS is not a vulnerability scanner, admission controller, automatic hardening engine, or independently certified CIS benchmark implementation.
+**Designed for Linux/Unix environments and Kubernetes containers.** Its native scanning engine does not depend on the kube-bench executable, kube-bench configuration corpus or runtime image. The project is not a vulnerability scanner, admission controller or automatic remediation service.
 
-> **Release scope:** The Amazon EKS `cis-eks-2.1.0` profile is **provisional**. The program reports automated PASS/FAIL separately from MANUAL and NOT_ASSESSED findings. A successful scan, 100% review completion, or high decisive-coverage percentage **does not establish official CIS compliance**. The official compliance percentage stays **WITHHELD** until mapping, applicability, evidence, and release scope are fully verified. Do not report preview percentages as a CIS score.
+> **Benchmark accuracy:** The `cis-eks-2.1.0` assessment profile is **provisional**, not a certified or fully verified reproduction of the official benchmark. PASS and FAIL apply to specific implemented checks; MANUAL and NOT_ASSESSED are not silently counted as PASS. The official compliance score remains **WITHHELD**, including after manual reviews.
 
-## Features
+## Capabilities
 
-| Capability | What it provides |
+| Component | Function |
 | --- | --- |
-| Kubernetes API checks | Read-only evaluation of configured workload, service account, RBAC, namespace, Pod Security Admission and network-security observations |
-| Linux node assessment | Native host-file permission and kubelet security-setting checks using allowlisted metadata |
-| Amazon EKS integration | Read-only inventory of control-plane logging, endpoint configuration, authentication/access entries, VPC CNI and ECR scanning evidence |
-| EKS managed worker nodes | Per-node results for supported **EKS managed EC2 Linux** nodes; Kubernetes control-plane host access is not assumed |
-| Evidence provenance | Source and build identity, timestamps, per-node scope, method, evidence and expected values; consolidation rejects stale or mismatched inputs |
-| Reporting | Machine-readable JSON, kube-bench-style `results.txt`, stable control/finding identities and cross-report comparison |
-| Human review | Evidence-backed review candidates and interactive APPROVED / REJECTED / EXCEPTION decisions bound to the immutable scan SHA-256 |
-| Final assessment | `final-assessment.json` and `final-assessment.txt` retain automated statuses while showing reviewer attestations and pending controls separately |
-| Release gates | Go tests, vet, PowerShell collection tests, Windows executable smoke test, version-matched Linux image and strict provider/source completeness checks |
+| Kubernetes API auditor | Read-only workloads, namespace, RBAC, service account, Pod Security Admission and network-policy assessment |
+| Linux node auditor | Host-file permission checks and allowlisted kubelet configuration evidence, including EKS AL2023 nodeadm sources |
+| EKS provider evidence | Separate read-only AWS inventory for control-plane logging, API endpoint exposure, IAM access entries, ECR image scanning and VPC CNI configuration |
+| Consolidation | Combine compatible Kubernetes, worker-node and provider reports; reject stale, incomplete or mismatched collection inputs |
+| Reporting | JSON, kube-bench-style text, stable finding identities and baseline comparisons |
+| Human reviews | SHA-256-bound review candidates and APPROVED / REJECTED / EXCEPTION decisions |
+| Final dossier | One JSON and text assessment preserving original automated results and separating reviewer judgments |
 
-## Quick start — Amazon EKS on Windows
+### Supported deployment scope
 
-### Requirements
+KubeCIS runs against Kubernetes clusters through their APIs. Linux node checks require authorized access to the node's relevant host metadata; API-only scans cannot determine host-file permissions.
 
-- **Windows PowerShell 5.1+** (PowerShell 7 is also suitable); commands below use PowerShell.
-- **AWS CLI v2** with valid credentials, `aws eks update-kubeconfig` access, and read-only access to the relevant EKS/ECR inventory.
-- **kubectl** configured for the target Amazon EKS cluster.
-- A supported Amazon EKS cluster with **managed EC2 Linux worker nodes** and sufficient permissions to install KubeCIS's Kubernetes ServiceAccount/RBAC and node-auditor DaemonSet in `kube-system`.
-- Network access to the specific published `ghcr.io/sm-joe/kubecis` image.
-- If building from source instead of using the packaged executable: **Go 1.27.3** (see [go.mod](go.mod)).
+The EKS node-auditor manifests target **EKS managed EC2 Linux nodes**. EKS control-plane nodes are AWS-managed and not mounted or scanned as customer hosts. Fargate, EKS Auto Mode and self-managed worker nodes are not included in the strict managed-node collection contract.
 
-**Supported EKS collection is not equivalent to all EKS compute types.** Fargate, EKS Auto Mode and self-managed worker fleets are outside the strict managed-EC2 consolidation path. Managed EKS control-plane host paths cannot be audited by customer node agents.
+## Prerequisites
 
-### 1. Obtain a version-matched package
+- Linux distribution with a POSIX-compatible shell and standard tooling.
+- Go **1.27.3** for source builds (see [go.mod](go.mod)).
+- `kubectl` and a Kubernetes kubeconfig with permitted read access.
+- Docker or Podman to build/run the Linux image, or access to a published GHCR image.
+- For Amazon EKS: AWS CLI v2 with relevant IAM permissions, an EKS kubeconfig, and appropriate Kubernetes authorization to install the auditor's resources.
 
-Download the `kubecis-eks-135-windows-amd64` artifact from a successful [Windows EKS build workflow](https://github.com/sm-joe/kube-cis-audit/actions/workflows/eks-135-windows-binary.yml). Expand the downloaded workflow artifact and its packaged ZIP if GitHub presents nested archives. The **package directory** should contain:
+## Quick start: Linux CLI
 
-```text
-kubecis-eks-135/
-  kubecis.exe
-  IMAGE.txt
-  SHA256SUMS
-  benchmarks/
-  deploy/eks/
-  scripts/
-    Run-KubeCIS-EKS.ps1
-    Collect-ConsolidatedEKSReport.ps1
-    Collect-EKSProviderEvidence.ps1
-    Validate-EKSRelease.ps1
-    Review-KubeCIS-EKS.ps1
+Clone and build:
+
+```bash
+git clone https://github.com/sm-joe/kube-cis-audit.git
+cd kube-cis-audit
+
+go version
+go mod download
+go vet ./...
+go test ./... -count=1
+CGO_ENABLED=0 go build -trimpath -o ./kubecis ./cmd/kubecis
+./kubecis version
 ```
 
-Use the executable and `IMAGE.txt` from **the same build**. Do **not** reuse an old `kubecis.exe` or change the container tag independently; consolidation rejects mixed-version evidence.
+Use the native Kubernetes API scanner:
 
-### 2. Authenticate and verify cluster identity
+```bash
+kubectl config current-context
+kubectl get nodes
 
-```powershell
+mkdir -p reports
+./kubecis scan \
+  --engine native \
+  --benchmark auto \
+  --target policies \
+  --output json \
+  --output-file reports/cluster.json \
+  --exit-code-on-fail=false
+
+./kubecis render \
+  --input reports/cluster.json \
+  --output-file reports/results.txt
+
+cat reports/results.txt
+```
+
+The `--exit-code-on-fail=false` option permits security findings to be reported without treating a detected FAIL as a CLI execution error. It does not hide failed checks.
+
+Inspect available CLI flags with `./kubecis <command> --help`. `--engine upstream` and `--engine hybrid` are not supported.
+
+## Containerized operation
+
+Build a Linux image locally:
+
+```bash
+docker build --build-arg VERSION=local-dev -t kubecis-native:local .
+docker run --rm kubecis-native:local version
+```
+
+For an API scan, supply kubeconfig or an in-cluster service account with carefully scoped access. An external kubeconfig may reference credential helpers or certificates not present in the container; make those available securely, rather than copying secrets into an image. In-cluster deployment examples are under [deploy/](deploy/).
+
+### Amazon EKS deployment
+
+Use a deliberately selected cluster context and confirm AWS/Kubernetes identity:
+
+```bash
 aws sts get-caller-identity
-aws eks describe-cluster --region us-east-1 --name my-eks-cluster --query "cluster.status"
+aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
 kubectl config current-context
 kubectl get nodes -L eks.amazonaws.com/nodegroup
 ```
 
-Confirm the AWS account, cluster name, region and managed EC2 worker nodes before running any deployment command. KubeCIS independently verifies EKS provider and Kubernetes API endpoint identity.
+The EKS DaemonSet is version-coupled to the local scanner. **Do not deploy its placeholder image as-is.** Build and publish a Linux container from the same Git commit as the CLI, or use an existing published matching build, and set the images for all three DaemonSet containers:
 
-### 3. Run a fresh assessment
+```bash
+# Replace with a published image built from the matching source commit.
+IMAGE="ghcr.io/sm-joe/kubecis:cis210-eks135-<40-character-commit-sha>"
 
-From the extracted **`kubecis-eks-135`** directory:
-
-```powershell
-.\scripts\Run-KubeCIS-EKS.ps1 `
-  -ClusterName "my-eks-cluster" `
-  -Region "us-east-1"
+kubectl apply -k deploy/eks
+kubectl -n kube-system set image daemonset/kubecis-node-auditor \
+  "node-metadata-init=$IMAGE" \
+  "node-auditor=$IMAGE" \
+  "node-metadata-helper=$IMAGE"
+kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=300s
+kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
 ```
 
-The runner verifies the local binary and `IMAGE.txt` build identity, updates the target kubeconfig, **applies KubeCIS resources** under `deploy/eks`, updates all node-auditor images to the matching version, waits for rollout, checks the binary version inside the auditor Pods, collects fresh Kubernetes/node/AWS evidence, enforces the preview release gate, and renders the assessment.
+These commands **create or update KubeCIS deployment resources**, including RBAC and a host-metadata helper. Review [EKS deployment manifests](deploy/eks/) and their access requirements before deployment. Assessments do not intentionally change the cluster's security configuration.
 
-**Deployment changes Kubernetes resources**; the subsequent audit collects configuration without intentionally remediating the cluster. Review Kubernetes RBAC, host mounts, image provenance and change-control policies before installation. The KubeCIS node metadata helper has read-only host access but may require elevated Linux permissions to inspect restricted kubelet metadata.
+**Current limitation:** The full EKS collection/orchestration and release-acceptance scripts in the repository are implemented in PowerShell. A POSIX shell equivalent of the full provider-plus-node consolidation pipeline has **not been verified**. The Go CLI and Linux node-auditor image are Linux-native, but the commands above should **not** be presented as a complete EKS provider assessment or as an equivalent to the proven integrated collection workflow. Linux/Unix support is the product's target; the remaining orchestration portability work is separate from the scanning engine.
 
-To choose another output directory:
+## Reporting and review
 
-```powershell
-.\scripts\Run-KubeCIS-EKS.ps1 `
-  -ClusterName "my-eks-cluster" -Region "us-east-1" `
-  -OutputDir "D:\security-reports\eks"
+KubeCIS can generate a reviewable dossier from a consolidated report produced by its native collection/consolidation process:
+
+```bash
+./kubecis review-init \
+  --input reports/eks/consolidated.json \
+  --output-file reports/eks/review-template.json
+
+# An authorized reviewer supplies evidence-bound decisions in JSON.
+./kubecis review \
+  --input reports/eks/consolidated.json \
+  --decisions reports/eks/review-decisions.json \
+  --output-file reports/eks/review-validated.json
+
+./kubecis finalize \
+  --input reports/eks/consolidated.json \
+  --decisions reports/eks/review-decisions.json \
+  --output-dir reports/eks
 ```
 
-### 4. Review the generated reports
+To produce a dossier with unresolved manual items, omit `--decisions` from `finalize`:
 
-```powershell
-Get-Content .\reports\eks\results.txt
-Get-Content .\reports\eks\final-assessment.txt
+```bash
+./kubecis finalize \
+  --input reports/eks/consolidated.json \
+  --output-dir reports/eks
 ```
 
-Default files:
+Typical report files:
 
-| File | Purpose |
+| File | Description |
 | --- | --- |
-| `cluster.json` | Fresh Kubernetes API findings |
-| `node-<node>.json` | Individual managed Linux worker findings |
-| `provider.json` | Bounded AWS EKS/ECR provider evidence inventory |
-| `consolidated.json` | Immutable source report for the review workflow |
-| `results.txt` | Grouped kube-bench-style text with remediations |
-| `review-template.json` | Manual review candidates, attached evidence, control titles and guidance |
-| `final-assessment.json` | Original source plus review state, decisions and separate automated/reviewer summary |
-| `final-assessment.txt` | Readable finalized dossier, even if some reviews are pending |
-| `review-decisions.json` | Saved reviewer decisions (created by the interactive review step) |
-| `review-validated.json` | Validated review attestation output (created by the interactive review step) |
+| `cluster.json` | Kubernetes API findings |
+| `node-<node>.json` | Linux node-local findings |
+| `provider.json` | Read-only AWS provider inventory |
+| `consolidated.json` | Original, source-of-truth assessment |
+| `results.txt` | Grouped kube-bench-style summary and remediations |
+| `review-template.json` | Manual controls with supporting evidence, observations and guidance |
+| `review-decisions.json` | Decisions made by an authorized reviewer |
+| `review-validated.json` | Validated review results tied to the source SHA-256 |
+| `final-assessment.json` | Complete assessment, automated statuses and reviewer decisions |
+| `final-assessment.txt` | Human-readable final dossier |
 
-`final-assessment` is a **report artifact**, not a declaration that all controls passed. Its status may be `INCOMPLETE` or `REVIEWED`; automated FAIL and NOT_ASSESSED remain visible in either case.
+**Review integrity:** Every decision requires a matching manual control, reviewer identity, evidence reference, justification and valid timestamp. A decision for a non-manual control or from another scan is rejected. Human approval never changes the underlying PASS/FAIL/NOT_ASSESSED result.
 
-## Human review and evidence-backed attestations
+**Audit-grade limitation:** The current review validator verifies that external evidence references are present, but does not independently retrieve or authenticate those external records. Text such as `approved` is not independently verifiable proof. An assessment labeled `REVIEWED` is not an assertion of CIS compliance.
 
-After a scan, an authorized reviewer can work through pending controls **without scanning the cluster again**:
+## Findings and coverage interpretation
 
-```powershell
-.\scripts\Review-KubeCIS-EKS.ps1 `
-  -Reviewer "SecurityReviewer" `
-  -ShowEvidence
-```
-
-Choose **A** (APPROVED), **R** (REJECTED), **E** (EXCEPTION), **S** (SKIP), or **Q** (QUIT). Approved/rejected/exception decisions require the reviewer, a **real independently resolvable** evidence reference (for example a ticket, document or controlled review URL), a specific justification and UTC time. Decisions are saved incrementally. Re-running the review command resumes unreviewed items from the same scan. Skipped items remain pending.
-
-For another report directory or explicit decisions file:
-
-```powershell
-.\scripts\Review-KubeCIS-EKS.ps1 `
-  -Reviewer "SecurityReviewer" `
-  -ReportDir "D:\security-reports\eks" `
-  -DecisionsFile "D:\security-reports\eks\review-decisions.json" `
-  -ShowEvidence
-```
-
-To validate and generate the dossier without interactive prompts:
-
-```powershell
-.\kubecis.exe review `
-  --input .\reports\eks\consolidated.json `
-  --decisions .\reports\eks\review-decisions.json `
-  --output-file .\reports\eks\review-validated.json
-
-.\kubecis.exe finalize `
-  --input .\reports\eks\consolidated.json `
-  --decisions .\reports\eks\review-decisions.json `
-  --output-dir .\reports\eks
-```
-
-`finalize` can run **without** `--decisions`; all MANUAL controls then remain PENDING. Reviewer decisions never convert automated FAIL/NOT_ASSESSED to PASS, and never release a provisional compliance percentage. Decisions are bound to the original report's **SHA-256**; decisions from a different scan are rejected. If you rescan, collect new evidence and perform a fresh review; an old decision file is not automatically valid for a new source.
-
-**Current attestation limitation:** The review validator checks that `evidenceRef` and `justification` are nonempty and that the reviewer/timestamp/control mapping is valid. It **does not independently fetch, authenticate or prove the contents of an external ticket or document**. Generic references such as `approved` are not audit-quality evidence even if accepted syntactically. A completed `REVIEWED` workflow is not an independent compliance certification.
-
-## Understanding assessment status
-
-| Result | Meaning |
+| Status | Meaning |
 | --- | --- |
-| `PASS` | Specific configured native check passed with the available asserted evidence |
-| `FAIL` | Check identified a configuration or policy condition that does not satisfy its configured criterion |
-| `WARN` | Caution requiring investigation; do not interpret as PASS |
-| `MANUAL` | Human verification or an approved exception is needed; recorded decisions are separate from the source result |
-| `NOT_ASSESSED` | Necessary evidence, reliable evaluator or applicability information was unavailable |
-| `REVIEWED` | Every MANUAL finding received a syntactically validated reviewer decision; it does not mean compliant |
-| `WITHHELD` | An official CIS compliance score is not published |
+| `PASS` | The implemented check observed a compliant configuration for its defined condition |
+| `FAIL` | The implemented check observed a condition that does not meet its defined criterion |
+| `WARN` | A security concern that needs investigation |
+| `MANUAL` | Additional human assessment or a documented exception is required |
+| `NOT_ASSESSED` | Evidence, evaluator coverage or reliable applicability is insufficient |
+| `REVIEWED` | All manual items received recorded reviewer decisions, regardless of their conclusions |
+| `WITHHELD` | Official compliance scoring is not available for this provisional benchmark |
 
-The EKS `coveragePercent` is a **decisive PASS/FAIL fraction of currently scored starter-profile checks**, not the share of official CIS controls implemented and not a compliance percentage. The `cis-eks-2.1.0` control mapping and benchmark compatibility remain provisional. Do not use preview output as certification, or equate every marked `APPROVED` attestation with a PASS.
+`coveragePercent` is a decisive-outcome fraction among configured scored checks, **not** the percentage of official CIS controls implemented, not a compliance percentage, and not a benchmark certification.
 
-## Supported command-line interfaces
+## Native command reference
 
-| Command | Description |
+| Command | Role |
 | --- | --- |
-| `kubecis version` | Print the embedded build version |
-| `kubecis scan` | Run native Kubernetes API checks; use `--engine native` |
-| `kubecis node-audit` | Run Linux host/node checks, normally inside the matching node-auditor image |
-| `kubecis node-metadata` | Produce bounded, allowlisted host metadata for node-audit |
-| `kubecis enrich-node` | Enrich a matching node-local report with effective kubelet `/configz` facts |
-| `kubecis consolidate` | Combine fresh reports and validate source identity and expected node inventory |
-| `kubecis render` | Render JSON assessment in kube-bench-style text |
-| `kubecis review-init` | Generate SHA-256-bound manual review candidates |
-| `kubecis review` | Validate reviewer decisions against the original report |
-| `kubecis finalize` | Produce final JSON and readable text dossier with separate automated and reviewer results |
-| `kubecis compare` | Compare two native reports by stable finding identity |
+| `kubecis version` | Print executable build identity |
+| `kubecis scan` | Kubernetes API scanner |
+| `kubecis node-audit` | Linux host and kubelet checks |
+| `kubecis node-metadata` | Bounded host metadata collection |
+| `kubecis enrich-node` | Add validated effective kubelet `/configz` evidence |
+| `kubecis consolidate` | Validate and merge fresh API, node and provider evidence |
+| `kubecis render` | Generate grouped readable report |
+| `kubecis compare` | Compare two reports using stable finding identities |
+| `kubecis review-init` | Prepare manual assessment candidates |
+| `kubecis review` | Validate reviewer attestations |
+| `kubecis finalize` | Produce final JSON and text dossier |
 
-For actual flags, run `.\kubecis.exe <command> --help`. The upstream `kube-bench` and legacy `--engine upstream/hybrid` modes are not supported.
+## Security and permissions
 
-## Build from source and run tests
+Use least-privilege access for Kubernetes API reads. AWS EKS evidence collection may require `eks:DescribeCluster`, `eks:ListAccessEntries`, `eks:DescribeAccessEntry`, `eks:ListAssociatedAccessPolicies`, `eks:DescribeAddon`, `ecr:GetRegistryScanningConfiguration` and `ecr:DescribeImageScanFindings`. Some metadata enrichment uses `nodes/proxy`, a sensitive Kubernetes permission; grant it only where reviewed and necessary. The Kubernetes deployment requires additional privileges to create its own ServiceAccounts, RBAC and DaemonSet.
 
-```powershell
-git clone https://github.com/sm-joe/kube-cis-audit.git
-cd kube-cis-audit
-go version   # 1.27.3 per go.mod
-go mod download
-go fmt ./...
-go vet ./...
-go test ./... -count=1
-go build -trimpath -o .\kubecis.exe ./cmd/kubecis
-.\kubecis.exe version
-```
+Store kubeconfigs, identity metadata, scan reports and reviewer records in access-restricted locations. Do not commit credentials, private cluster inventories or attestations into public source control. Verify published image tags, digests and provenance before deployment. Missing evidence must not be interpreted as a secure default.
 
-A locally built binary by itself is **not** an EKS deployment release. To scan node data through EKS, publish the Linux image from **the same commit** with matching embedded `audit.BuildVersion`; use the CI-produced ZIP/image pair where possible. See [EKS deployment details](deploy/eks/README.md), [native validation](docs/NATIVE-VALIDATION.md), and [release scope](docs/RELEASE-SCOPE.md).
+## CI, project structure and support
 
-## Required permissions and operational security
-
-The collector uses `aws eks describe-cluster`, access-entry APIs, `aws eks describe-addon`, ECR scanning status APIs, and Kubernetes read-only list/get requests. A least-privilege AWS policy for complete inventory typically needs permission to call:
+Go CI, security scans and benchmark contract tests run under [GitHub Actions](.github/workflows/). Release packaging and smoke tests exist, but **the currently published automated artifact workflow is not a general Linux/Unix release installer**. Users building on Linux should use the native Go build or the Linux container image, with matching source/image versions.
 
 ```text
-eks:DescribeCluster
-eks:ListAccessEntries
-eks:DescribeAccessEntry
-eks:ListAssociatedAccessPolicies
-eks:DescribeAddon
-ecr:GetRegistryScanningConfiguration
-ecr:DescribeImageScanFindings
-sts:GetCallerIdentity                 # identity preflight
+cmd/kubecis/          Go CLI, rendering and review engine
+internal/audit/       Native checks, consolidation, node evidence and AWS attachment
+benchmarks/           Native profile definitions
+deploy/eks/           EKS Kubernetes deployment
+deploy/kind-native/   Local Kubernetes/Kind examples
+scripts/              Collection and validation helpers
+docs/                 Security, validation and release-scope notes
+.github/workflows/    CI, security and publishing automation
 ```
 
-AWS permissions must be scoped to the target account, cluster and repositories where the actions support resource-level authorization. The **installation** identity additionally needs Kubernetes authorization to apply the explicitly reviewed `deploy/eks` manifests. Optional kubelet `/configz` enrichment uses authenticated Kubernetes node proxy access (`nodes/proxy`), which is sensitive; grant only where approved. Do not grant cluster-admin merely to suppress an authorization error. Missing permissions or unavailable evidence should remain `MANUAL`/`NOT_ASSESSED`.
+See [native validation](docs/NATIVE-VALIDATION.md), [release scope](docs/RELEASE-SCOPE.md), and [security guidance](docs/SECURITY.md). Report problems through [GitHub Issues](https://github.com/sm-joe/kube-cis-audit/issues), with sanitized logs and build metadata.
 
-The agent does not intentionally modify cluster security settings or remediate detected findings. It does create/update its own Kubernetes deployment resources. Avoid committing kubeconfig files, temporary credentials, provider inventory, scan JSON or reviewer records to public source control. These may contain infrastructure metadata, principal names and operationally sensitive facts. Store reports and attestations in restricted storage with an appropriate retention policy. Treat `SHA256SUMS` as package integrity checking, **not** a digital publisher signature.
+## License
 
-## Troubleshooting
-
-| Symptom | What to check |
-| --- | --- |
-| Missing `kubecis.exe`, `IMAGE.txt` or benchmark | Run inside the extracted `kubecis-eks-135` directory, not an older repo checkout |
-| Local and DaemonSet build mismatch | Download a single workflow build; never combine binaries and images from different commits |
-| `ImagePullBackOff` | Verify published GHCR tag, registry/network access, and node image pull permissions |
-| No running node auditor | Verify DaemonSet rollout, supported managed Linux nodes, namespace, Pod Security exceptions, host mount access |
-| AWS provider evidence failure | Check `aws sts get-caller-identity`, `eks:DescribeCluster`, cluster name, region, API endpoint identity, provider collector diagnostics |
-| Missing `/configz` evidence | Check authenticated node proxy permission, kubelet endpoint, and explicit config availability; never assume defaults |
-| `NOT_ASSESSED` for a kubelet control | Required effective setting/applicability could not be established; this is not a product crash |
-| Review SHA-256 mismatch | The source report changed or decisions belong to another scan; do not copy approvals across runs |
-| `REVIEWED` but score WITHHELD | Expected for a provisional benchmark, even with all manual attestations completed |
-| Security finding remains FAIL | Investigate the actual EKS/Kubernetes setting. The tool will not silently remediate or mask it |
-
-## Continuous integration and release criteria
-
-The [CI workflow](.github/workflows/ci.yml) checks Go formatting, vet, tests and build. The [EKS Windows build workflow](.github/workflows/eks-135-windows-binary.yml) runs Go and PowerShell tests, packages the Windows CLI/manifests/scripts, publishes a **matching multi-architecture Linux image**, and smoke-tests the **packaged executable on Windows** with JSON-to-text and final-assessment generation. [Security workflows](.github/workflows/security.yml) provide additional gates.
-
-A successful workflow validates those build and packaging contracts. It is **not** a live end-to-end test of every customer EKS configuration, complete proof of CIS mapping, external evidence verification, or a certificate of compliance.
-
-## Project structure
-
-```text
-cmd/kubecis/           CLI, rendering, review and final assessment
-internal/audit/        Native evaluators, evidence, node collectors, consolidation
-benchmarks/            Native benchmark profiles and compatibility declarations
-deploy/eks/            EKS Kubernetes manifests and deployment notes
-deploy/kind-native/    Optional local Kind-based integration examples
-scripts/               Windows collection, validation, scan and review runners
-docs/                  Security, design, validation and release-scope documentation
-.github/workflows/     Tests, security gates, binary/image packaging
-```
-
-## License and support
-
-Distributed under the [Apache License, Version 2.0](LICENSE). See [security documentation](docs/SECURITY.md) for handling sensitive findings and [GitHub Issues](https://github.com/sm-joe/kube-cis-audit/issues) to report defects or request controls. Please include the CLI build version, Kubernetes version, provider, reproduction steps and **sanitized** logs; never attach credentials, kubeconfig tokens or unrestricted security inventories.
-
-KubeCIS Native is provided **as is**. Review findings and change-control implications before applying remediations to production workloads.
+[Apache License 2.0](LICENSE). Provided **as is**, without warranty. KubeCIS findings and review attestations must be assessed by authorized operators before making production security changes.
