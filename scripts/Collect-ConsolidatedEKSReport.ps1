@@ -60,7 +60,7 @@ foreach ($node in $nodes) {
     })
     if ($matching.Count -ne 1) { throw "Expected one Running node-auditor Pod on $node; found $($matching.Count)" }
     $pod = $matching[0].metadata.name
-    $data = @(& kubectl --context $Context -n $Namespace exec $pod -c node-auditor -- /usr/local/bin/kubecis node-audit --benchmark $Benchmark --target node --metadata-file /metadata/snapshot.json --node-name $node --output json --exit-code-on-fail=false)
+    $data = @(& kubectl --context $Context -n $Namespace exec $pod -c node-auditor -- /usr/local/bin/kubecis node-audit --provider eks --benchmark $Benchmark --target node --metadata-file /metadata/snapshot.json --node-name $node --output json --exit-code-on-fail=false)
     if ($LASTEXITCODE -ne 0) { throw "Node-local audit failed: $node" }
     $safe = $node -replace '[^a-zA-Z0-9_.-]', '_'
     $path = Join-Path $dir "node-$safe.json"
