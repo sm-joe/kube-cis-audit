@@ -23,7 +23,7 @@ func TestEKS210ProfileExactOfficialIDs(t *testing.T) {
 	if b.CompatibilityStatus == "verified" {
 		t.Fatal("incomplete EKS controls incorrectly certified")
 	}
-	seen := map[string]bool{"2.1.1": true, "5.4.1": true, "5.4.2": true}
+	seen := map[string]bool{"2.1.1": true, "5.4.1": true, "5.4.2": true, "4.1.7": true, "5.1.1": true, "5.5.1": true}
 	for _, c := range b.Checks {
 		if seen[c.ID] {
 			t.Fatalf("duplicate official EKS control %s", c.ID)
@@ -33,7 +33,7 @@ func TestEKS210ProfileExactOfficialIDs(t *testing.T) {
 			t.Fatalf("missing evidence control incorrectly scored/marked reviewed: %+v", c)
 		}
 	}
-	if len(seen) != 47 || len(b.Checks) != 44 {
+	if len(seen) != 47 || len(b.Checks) != 41 {
 		t.Fatalf("EKS v2.1.0 profile incomplete: %d IDs, %d config checks", len(seen), len(b.Checks))
 	}
 	for _, c := range inv.Controls {
