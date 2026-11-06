@@ -4,7 +4,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$ClusterName,
     [Parameter(Mandatory=$true)][string]$Region,
-    [string]$OutputDir = 'reports\eks'
+    [string]$OutputDir = 'reports\eks',
+    [string]$DecisionsPath = ''
 )
 $ErrorActionPreference = 'Stop'
 $homePath = Split-Path -Parent $PSScriptRoot
@@ -62,6 +63,19 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Failed to render kube-bench-style text report' }
     & .\kubecis.exe review-init --input $reportPath --output-file (Join-Path $reportDir 'review-template.json')
     if ($LASTEXITCODE -ne 0) { throw 'Failed to initialize the human-review template' }
+    # A finalized assessment is always produced, even when no human has
+    # reviewed a control. Missing decisions remain pending; automated findings
+    # are immutable and the provisional compliance score remains withheld.
+    $finalizeArgs = @('finalize','--input',$reportPath,'--output-dir',$reportDir)
+    if ($DecisionsPath) {
+        if (-not [System.IO.Path]::IsPathRooted($DecisionsPath)) { $DecisionsPath = Join-Path $original $DecisionsPath }
+        if (-not (Test-Path -LiteralPath $DecisionsPath -PathType Leaf)) { throw "Decisions file not found: $DecisionsPath" }
+        $finalizeArgs += @('--decisions',$DecisionsPath)
+    }
+    & .\kubecis.exe @finalizeArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Could not generate final assessment dossier; original scan remains unchanged' }
+    Write-Host "Final assessment: $(Join-Path $reportDir 'final-assessment.json')"
+    Write-Host "Final readable assessment: $(Join-Path $reportDir 'final-assessment.txt')"
     Write-Host "PASS: completed native EKS preview assessment using matching $expectedVersion"
     Write-Host "Text report: $txt"
     Write-Host "JSON report: $reportPath"
