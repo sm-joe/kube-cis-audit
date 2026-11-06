@@ -282,6 +282,7 @@ func main() {
 	root.AddCommand(consolidate)
 	root.AddCommand(newRenderCommand())
 	root.AddCommand(newReviewCommand())
+	root.AddCommand(newReviewInitCommand())
 	root.AddCommand(scan, nodeAudit, nodeMetadata, compare, version)
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "ERROR:", err)
