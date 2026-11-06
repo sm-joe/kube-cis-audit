@@ -203,7 +203,7 @@ func main() {
 	compare.Flags().StringVar(&compareOutput, "output-file", "", "Write comparison JSON to this file (defaults to stdout)")
 	_ = compare.MarkFlagRequired("baseline")
 	_ = compare.MarkFlagRequired("current")
-	var mergeCluster, mergeOutput, mergeNodes, mergeMasters, mergeProviderEvidence string
+	var mergeCluster, mergeOutput, mergeNodes, mergeMasters, mergeProviderEvidence, mergeFormat string
 	var mergeLocals []string
 	var mergeMaxAge time.Duration
 	consolidate := &cobra.Command{
@@ -257,9 +257,16 @@ func main() {
 				defer f.Close()
 				dst = f
 			}
-			encoder := json.NewEncoder(dst)
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(merged)
+			switch strings.ToLower(mergeFormat) {
+			case "json":
+				encoder := json.NewEncoder(dst)
+				encoder.SetIndent("", "  ")
+				return encoder.Encode(merged)
+			case "text":
+				return renderBenchStyle(dst, merged)
+			default:
+				return fmt.Errorf("unsupported consolidated output format %q (use json or text)", mergeFormat)
+			}
 		},
 	}
 	consolidate.Flags().StringVar(&mergeCluster, "cluster", "", "Cluster-policy JSON report")
@@ -268,7 +275,8 @@ func main() {
 	consolidate.Flags().StringVar(&mergeNodes, "expected-nodes", "", "Comma-separated names of ALL expected Linux nodes")
 	consolidate.Flags().StringVar(&mergeMasters, "expected-control-planes", "", "Comma-separated names of expected control-plane nodes")
 	consolidate.Flags().DurationVar(&mergeMaxAge, "max-age", 30*time.Minute, "Maximum age of each source report")
-	consolidate.Flags().StringVar(&mergeOutput, "output-file", "", "Consolidated JSON output file (default stdout)")
+	consolidate.Flags().StringVar(&mergeOutput, "output-file", "", "Consolidated output file (default stdout)")
+	consolidate.Flags().StringVar(&mergeFormat, "format", "json", "Consolidated output format: json or text")
 	_ = consolidate.MarkFlagRequired("cluster")
 	_ = consolidate.MarkFlagRequired("expected-nodes")
 	root.AddCommand(consolidate)
