@@ -27,7 +27,7 @@ jobs:
       - name: Verify collector PowerShell and negative identity tests
         shell: pwsh
         run: |
-          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1','scripts/Run-KubeCIS-EKS.ps1','scripts/Test-EKSReleaseContract.ps1')) {
+          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1','scripts/Run-KubeCIS-EKS.ps1','scripts/Test-EKSReleaseContract.ps1','scripts/Review-KubeCIS-EKS.ps1')) {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
@@ -41,7 +41,7 @@ jobs:
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=3.1.0-native-cis210-eks135-${GITHUB_SHA}" -o dist/kubecis-eks-135/kubecis.exe ./cmd/kubecis
           cp -R benchmarks dist/kubecis-eks-135/
           cp -R deploy/eks dist/kubecis-eks-135/deploy/eks
-          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 scripts/Run-KubeCIS-EKS.ps1 dist/kubecis-eks-135/scripts/
+          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 scripts/Run-KubeCIS-EKS.ps1 scripts/Review-KubeCIS-EKS.ps1 dist/kubecis-eks-135/scripts/
           printf '%s\n' "ghcr.io/sm-joe/kubecis:cis210-eks135-${GITHUB_SHA}" > dist/kubecis-eks-135/IMAGE.txt
           (cd dist/kubecis-eks-135 && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           (cd dist && zip -qr kubecis-eks-135-windows-amd64.zip kubecis-eks-135)
@@ -95,6 +95,7 @@ jobs:
           $image = (Get-Content (Join-Path $homePath 'IMAGE.txt') -Raw).Trim()
           if ($image -cne 'ghcr.io/sm-joe/kubecis:cis210-eks135-${{ github.sha }}') { throw 'Windows and Linux artifact references differ' }
           if (-not (Test-Path (Join-Path $homePath 'scripts/Run-KubeCIS-EKS.ps1'))) { throw 'No one-command EKS runner in package' }
+          if (-not (Test-Path (Join-Path $homePath 'scripts/Review-KubeCIS-EKS.ps1'))) { throw 'No interactive evidence review in package' }
           if (-not (Test-Path (Join-Path $homePath 'benchmarks/cis-eks-2.1.0/benchmark.yaml'))) { throw 'Benchmark profile omitted from package' }
           $report = @{buildVersion=$got; benchmark='cis-eks-2.1.0'; benchmarkCompatibilityStatus='provisional'; clusterVersion='v1.35.9-eks-test'; cloudProvider='eks'; results=@(@{id='3.2.7';title='Client certificate rotation';target='node';scope='test-node';status='NOT_ASSESSED';scored=$true;details='Evidence unavailable';remediation='Review authentication mode'});summary=@{notAssessed=1;total=1};compliance=@{scoreStatus='withheld'}} | ConvertTo-Json -Depth 10
           $reportFile = Join-Path $env:RUNNER_TEMP 'synthetic-report.json'
