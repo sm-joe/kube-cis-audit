@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +30,18 @@ type reviewDecision struct {
 type reviewInput struct {
 	ReportSHA256 string           `json:"reportSha256"`
 	Decisions    []reviewDecision `json:"decisions"`
+}
+
+type reviewCandidate struct {
+	ID string `json:"id"`
+	Scope string `json:"scope,omitempty"`
+	Title string `json:"title"`
+	Details string `json:"details"`
+}
+
+type reviewTemplate struct {
+	reviewInput
+	PendingReviews []reviewCandidate `json:"pendingReviews"`
 }
 
 type reviewOutput struct {
@@ -89,6 +102,61 @@ func newReviewCommand() *cobra.Command {
 	return cmd
 }
 
+func newReviewInitCommand() *cobra.Command {
+	var input, output string
+	cmd := &cobra.Command{
+		Use:   "review-init",
+		Short: "Generate an evidence-bound human review template for a native scan",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, err := os.ReadFile(input)
+			if err != nil {
+				return fmt.Errorf("read scan report: %w", err)
+			}
+			report, err := audit.DecodeReport(raw)
+			if err != nil {
+				return fmt.Errorf("decode scan report: %w", err)
+			}
+			digest := sha256.Sum256(raw)
+			template := reviewTemplate{
+				reviewInput: reviewInput{
+					ReportSHA256: hex.EncodeToString(digest[:]),
+					Decisions:    []reviewDecision{},
+				},
+				PendingReviews: []reviewCandidate{},
+			}
+			for _, r := range report.Results {
+				if r.Status == "MANUAL" {
+					template.PendingReviews = append(template.PendingReviews, reviewCandidate{
+						ID: r.ID, Scope: r.Scope, Title: r.Title, Details: r.Details,
+					})
+				}
+			}
+			sort.Slice(template.PendingReviews, func(i, j int) bool {
+				if template.PendingReviews[i].ID == template.PendingReviews[j].ID {
+					return template.PendingReviews[i].Scope < template.PendingReviews[j].Scope
+				}
+				return template.PendingReviews[i].ID < template.PendingReviews[j].ID
+			})
+			encoded, err := json.MarshalIndent(template, "", "  ")
+			if err != nil {
+				return err
+			}
+			if output == "" {
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), string(encoded))
+				return err
+			}
+			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+				return err
+			}
+			return os.WriteFile(output, append(encoded, '\n'), 0600)
+		},
+	}
+	cmd.Flags().StringVar(&input, "input", "", "Original KubeCIS consolidated JSON report")
+	cmd.Flags().StringVar(&output, "output-file", "", "Review template JSON path (default stdout)")
+	_ = cmd.MarkFlagRequired("input")
+	return cmd
+}
+
 func validateReviews(raw []byte, report audit.Report, input reviewInput, now time.Time) (reviewOutput, error) {
 	sum := sha256.Sum256(raw)
 	digest := hex.EncodeToString(sum[:])
@@ -133,6 +201,7 @@ func validateReviews(raw []byte, report audit.Report, input reviewInput, now tim
 	for key := range pending {
 		output.Pending = append(output.Pending, key)
 	}
+	sort.Strings(output.Pending)
 	if len(pending) == 0 {
 		output.ReviewStatus = "REVIEWED"
 	}
