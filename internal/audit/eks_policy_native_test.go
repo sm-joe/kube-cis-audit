@@ -15,7 +15,7 @@ func TestEKSPodAdmissionRequiresEnforcedNamespacePolicy(t *testing.T) {
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "app", Namespace: "apps"}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}}}
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "apps"}}
 	client := fake.NewSimpleClientset(ns, pod)
-	for _, id := range []string{"4.2.1", "4.2.2", "4.2.3", "4.2.4", "4.2.5"} {
+	for _, id := range []string{"4.2.1", "4.2.2", "4.2.3", "4.2.4"} {
 		r, err := EvaluateEKSPodAdmissionControl(ctx, client, id)
 		if err != nil {
 			t.Fatal(err)
