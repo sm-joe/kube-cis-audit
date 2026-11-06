@@ -59,7 +59,7 @@ func Run(o Options) (Report, error) {
 		compatibilityStatus = "unknown"
 	}
 	bench = applyProviderProfile(bench, provider)
-	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "CoveragePercent describes only the configured starter-profile scored controls, not the full upstream CIS benchmark.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: benchmarkCompatibilityNote(bench, version.GitVersion, provider)}
+	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "coveragePercent is decisive PASS/FAIL coverage among currently scored profile checks only; it is NOT the percentage of official CIS EKS controls assessed and is NOT a CIS compliance score.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: benchmarkCompatibilityNote(bench, version.GitVersion, provider)}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var workloadSummaryCheck *Check
