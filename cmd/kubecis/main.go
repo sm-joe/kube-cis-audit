@@ -70,7 +70,7 @@ func main() {
 	scan.Flags().StringVar(&upstreamBenchmark, "upstream-benchmark", "auto", "Deprecated: upstream profile selection is unsupported; only auto accepted")
 	scan.Flags().BoolVar(&exitCodeOnFail, "exit-code-on-fail", true, "Exit non-zero when one or more checks are FAIL (set false for observational scans)")
 
-	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile, nodeTarget string
+	var nodeBenchmark, nodeConfigDir, nodeHostRoot, nodeName, nodeOutput, nodeOutputFile, nodeMetadataFile, nodeTarget, nodeProvider string
 	var nodeInterval time.Duration
 	var nodeExitCodeOnFail bool
 	nodeAudit := &cobra.Command{
@@ -84,7 +84,7 @@ func main() {
 				return fmt.Errorf("node name is required; pass --node-name or set NODE_NAME")
 			}
 			run := func() error {
-				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: nodeTarget, HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile}, nodeName)
+				report, err := audit.RunNode(audit.Options{ConfigDir: nodeConfigDir, Benchmark: nodeBenchmark, Target: nodeTarget, HostRoot: nodeHostRoot, MetadataFile: nodeMetadataFile, Provider: nodeProvider}, nodeName)
 				if err != nil {
 					return err
 				}
@@ -112,6 +112,7 @@ func main() {
 	nodeAudit.Flags().StringVar(&nodeConfigDir, "config-dir", defaultConfigDir(), "Directory containing benchmark YAML files")
 	nodeAudit.Flags().StringVar(&nodeHostRoot, "host-root", "/host", "Read-only mounted node filesystem root (direct mode)")
 	nodeAudit.Flags().StringVar(&nodeMetadataFile, "metadata-file", "", "Fresh metadata snapshot path produced by node-metadata")
+	nodeAudit.Flags().StringVar(&nodeProvider, "provider", "", "Explicit node provider (eks for AL2023 nodeadm EKS extension; empty for generic Kubernetes)")
 	nodeAudit.Flags().StringVar(&nodeName, "node-name", "", "Kubernetes node name (defaults to NODE_NAME)")
 	nodeAudit.Flags().StringVar(&nodeOutput, "output", "json", "Report format: json or text")
 	nodeAudit.Flags().StringVar(&nodeOutputFile, "output-file", "", "Write the report to this file instead of standard output")
