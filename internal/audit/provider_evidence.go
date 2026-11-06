@@ -19,39 +19,39 @@ type EKSAccessEntryEvidence struct {
 }
 
 type EKSECRImageScanEvidence struct {
-	Registry    string `json:"registry"`
-	Repository  string `json:"repository"`
-	Digest      string `json:"digest,omitempty"`
-	ScanType    string `json:"scanType,omitempty"`
-	ScanStatus  string `json:"scanStatus,omitempty"`
-	Error       string `json:"error,omitempty"`
+	Registry   string `json:"registry"`
+	Repository string `json:"repository"`
+	Digest     string `json:"digest,omitempty"`
+	ScanType   string `json:"scanType,omitempty"`
+	ScanStatus string `json:"scanStatus,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 // EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
 // snapshot. It contains configuration inventory, NOT a CIS pass/fail score.
 type EKSProviderEvidence struct {
-	SchemaVersion       int             `json:"schemaVersion"`
-	CloudProvider       string          `json:"cloudProvider"`
-	ClusterName         string          `json:"clusterName"`
-	ClusterARN          string          `json:"clusterArn"`
-	Region              string          `json:"region"`
-	KubernetesVersion   string          `json:"kubernetesVersion"`
-	GeneratedAt         time.Time       `json:"generatedAt"`
-	EndpointPrivate     bool            `json:"endpointPrivateAccess"`
-	EndpointPublic      bool            `json:"endpointPublicAccess"`
-	PublicAccessCIDRs   []string        `json:"publicAccessCidrs,omitempty"`
-	ControlPlaneLogging map[string]bool `json:"controlPlaneLogging"`
-	AssessmentStatus    string          `json:"assessmentStatus"`
-	AssessmentNote      string          `json:"assessmentNote"`
-	AuthenticationMode string `json:"authenticationMode,omitempty"`
-	AccessInventoryStatus string `json:"accessInventoryStatus,omitempty"`
-	AccessEntries []EKSAccessEntryEvidence `json:"accessEntries,omitempty"`
-	VpcCNIStatus string `json:"vpcCniStatus,omitempty"`
-	VpcCNIVersion string `json:"vpcCniVersion,omitempty"`
-	VpcCNINetworkPolicy *bool `json:"vpcCniNetworkPolicy,omitempty"`
-	ECRInventoryStatus string `json:"ecrInventoryStatus,omitempty"`
-	ECRImages []EKSECRImageScanEvidence `json:"ecrImages,omitempty"`
-	NonECRImageCount int `json:"nonEcrImageCount,omitempty"`
+	SchemaVersion         int                       `json:"schemaVersion"`
+	CloudProvider         string                    `json:"cloudProvider"`
+	ClusterName           string                    `json:"clusterName"`
+	ClusterARN            string                    `json:"clusterArn"`
+	Region                string                    `json:"region"`
+	KubernetesVersion     string                    `json:"kubernetesVersion"`
+	GeneratedAt           time.Time                 `json:"generatedAt"`
+	EndpointPrivate       bool                      `json:"endpointPrivateAccess"`
+	EndpointPublic        bool                      `json:"endpointPublicAccess"`
+	PublicAccessCIDRs     []string                  `json:"publicAccessCidrs,omitempty"`
+	ControlPlaneLogging   map[string]bool           `json:"controlPlaneLogging"`
+	AssessmentStatus      string                    `json:"assessmentStatus"`
+	AssessmentNote        string                    `json:"assessmentNote"`
+	AuthenticationMode    string                    `json:"authenticationMode,omitempty"`
+	AccessInventoryStatus string                    `json:"accessInventoryStatus,omitempty"`
+	AccessEntries         []EKSAccessEntryEvidence  `json:"accessEntries,omitempty"`
+	VpcCNIStatus          string                    `json:"vpcCniStatus,omitempty"`
+	VpcCNIVersion         string                    `json:"vpcCniVersion,omitempty"`
+	VpcCNINetworkPolicy   *bool                     `json:"vpcCniNetworkPolicy,omitempty"`
+	ECRInventoryStatus    string                    `json:"ecrInventoryStatus,omitempty"`
+	ECRImages             []EKSECRImageScanEvidence `json:"ecrImages,omitempty"`
+	NonECRImageCount      int                       `json:"nonEcrImageCount,omitempty"`
 }
 
 func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration, now time.Time) (EKSProviderEvidence, error) {
