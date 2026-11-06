@@ -46,7 +46,9 @@ func TestBuildInventoryWalksNestedGroupsAndIncludesVersionedEKSProfiles(t *testi
 	if err := os.WriteFile(filepath.Join(profile, "master.yaml"), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "eks-1.8.0", "node.yaml"), []byte(yaml), 0o600); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(root, "eks-1.8.0", "node.yaml"), []byte(yaml), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	inv, err := buildInventory(root)
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +135,11 @@ func TestParseControlFileAcceptsWrappedControlsMapping(t *testing.T) {
 }
 
 func TestBuildInventoryRejectsUnrecognizedProfiles(t *testing.T) {
-    root := t.TempDir()
-    if err := os.MkdirAll(filepath.Join(root, "my-benchmark"), 0o755); err != nil { t.Fatal(err) }
-    if _, err := buildInventory(root); err == nil { t.Fatal("accepted an unknown benchmark profile as official CIS/EKS") }
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "my-benchmark"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildInventory(root); err == nil {
+		t.Fatal("accepted an unknown benchmark profile as official CIS/EKS")
+	}
 }
