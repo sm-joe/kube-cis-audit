@@ -364,6 +364,9 @@ func readBench(p string) (Benchmark, error) {
 func evaluate(ctx context.Context, client kubernetes.Interface, c Check, o Options) Result {
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "NOT_ASSESSED", Details: "No evaluator produced a result", Method: c.Kind, Remediation: c.Remediation, Scored: c.Scored}
 	if c.Manual {
+		if o.Benchmark == "cis-eks-2.1.0" && c.Target == "policies" {
+			return EvaluateEKSManualEvidence(ctx, client, c)
+		}
 		r.Status = "MANUAL"
 		r.Details = "Requires manual verification; the required configuration evidence is not exposed by the Kubernetes API."
 		return r
