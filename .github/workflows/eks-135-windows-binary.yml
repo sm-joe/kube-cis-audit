@@ -8,7 +8,7 @@ permissions:
   contents: read
   packages: write
 concurrency:
-  group: kubecis-eks-135-native-binary
+  group: kubecis-eks-135-native-binary-v2
   cancel-in-progress: true
 jobs:
   package-windows-and-image:
@@ -27,7 +27,7 @@ jobs:
       - name: Verify collector PowerShell and negative identity tests
         shell: pwsh
         run: |
-          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1')) {
+          foreach ($path in @('scripts/Collect-ConsolidatedEKSReport.ps1','scripts/Validate-EKSRelease.ps1','scripts/Collect-EKSProviderEvidence.ps1','scripts/Test-EKSProviderIdentity.ps1','scripts/Run-KubeCIS-EKS.ps1')) {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path).Path,[ref]$tokens,[ref]$parseErrors) | Out-Null
@@ -40,7 +40,7 @@ jobs:
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=3.1.0-native-cis210-eks135-${GITHUB_SHA}" -o dist/kubecis-eks-135/kubecis.exe ./cmd/kubecis
           cp -R benchmarks dist/kubecis-eks-135/
           cp -R deploy/eks dist/kubecis-eks-135/deploy/eks
-          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 dist/kubecis-eks-135/scripts/
+          cp scripts/Collect-ConsolidatedEKSReport.ps1 scripts/Validate-EKSRelease.ps1 scripts/Collect-EKSProviderEvidence.ps1 scripts/Run-KubeCIS-EKS.ps1 dist/kubecis-eks-135/scripts/
           printf '%s\n' "ghcr.io/sm-joe/kubecis:cis210-eks135-${GITHUB_SHA}" > dist/kubecis-eks-135/IMAGE.txt
           (cd dist/kubecis-eks-135 && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
           (cd dist && zip -qr kubecis-eks-135-windows-amd64.zip kubecis-eks-135)
