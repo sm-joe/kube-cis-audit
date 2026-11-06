@@ -33,10 +33,16 @@ type reviewInput struct {
 }
 
 type reviewCandidate struct {
-	ID      string `json:"id"`
-	Scope   string `json:"scope,omitempty"`
-	Title   string `json:"title"`
-	Details string `json:"details"`
+	ID             string           `json:"id"`
+	Scope          string           `json:"scope,omitempty"`
+	Title          string           `json:"title"`
+	Details        string           `json:"details"`
+	Scored         bool             `json:"scored"`
+	Method         string           `json:"method,omitempty"`
+	EvidenceSource string           `json:"evidenceSource,omitempty"`
+	Evidence       []audit.Evidence `json:"evidence,omitempty"`
+	Remediation    string           `json:"remediation,omitempty"`
+	ReviewGuidance string           `json:"reviewGuidance"`
 }
 
 type reviewTemplate struct {
@@ -127,6 +133,9 @@ func newReviewInitCommand() *cobra.Command {
 				if r.Status == "MANUAL" {
 					template.PendingReviews = append(template.PendingReviews, reviewCandidate{
 						ID: r.ID, Scope: r.Scope, Title: r.Title, Details: r.Details,
+						Scored: r.Scored, Method: r.Method, EvidenceSource: r.EvidenceSource,
+						Evidence: r.Evidence, Remediation: r.Remediation,
+						ReviewGuidance: "Inspect evidence; record APPROVED, REJECTED or EXCEPTION only after human verification. Include reviewer, dated justification and independently resolvable evidenceRef. No auto-approval.",
 					})
 				}
 			}
