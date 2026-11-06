@@ -19,7 +19,16 @@ $nodes = @($r.expectedNodes | Where-Object { -not [string]::IsNullOrWhiteSpace($
 if ($nodes.Count -eq 0) { throw 'No expected EKS managed EC2 worker nodes' }
 if (@($r.expectedControlPlaneNodes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -ne 0) { throw 'Unexpected master-local expectations on AWS-managed EKS control plane' }
 $sources = @($r.sources)
-if ($sources.Count -ne (1 + $nodes.Count)) { throw "Expected $($nodes.Count + 1) sources, got $($sources.Count)" }
+if ($sources.Count -ne (2 + $nodes.Count)) { throw "Expected $($nodes.Count + 2) sources (API, each node, AWS provider), got $($sources.Count)" }
+if (@($sources | Where-Object { $_.auditMode -eq 'aws-provider' -and $_.findings -eq 3 }).Count -ne 1) {
+    throw 'Missing exactly one native CIS EKS AWS provider assessment with 3 findings'
+}
+foreach ($controlId in @('2.1.1','5.4.1','5.4.2')) {
+    $matches = @($r.results | Where-Object { $_.id -eq $controlId -and $_.method -eq 'aws_eks_describe_cluster' })
+    if ($matches.Count -ne 1 -or @('PASS','FAIL','MANUAL') -notcontains $matches[0].status -or @($matches[0].evidence).Count -eq 0) {
+        throw "Missing or invalid native EKS CIS v2.1.0 control $controlId"
+    }
+}
 if (@($sources | Where-Object { $_.auditMode -eq 'native' -and -not $_.nodeName }).Count -ne 1) {
     throw 'Expected one fresh native Kubernetes API report'
 }
