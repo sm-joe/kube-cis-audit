@@ -34,6 +34,10 @@ func Run(o Options) (Report, error) {
 		return Report{}, fmt.Errorf("detect Kubernetes version: %w", err)
 	}
 	minor := strings.TrimSuffix(version.Minor, "+")
+	provider := DetectCloudProvider(version.GitVersion)
+	if o.Benchmark == "cis-2.1.0" {
+		if err := validateOfficial210Scope(provider, minor); err != nil { return Report{}, err }
+	}
 	bench, err := loadBenchmark(o.ConfigDir, o.Benchmark, minor)
 	if err != nil {
 		return Report{}, err
@@ -45,7 +49,6 @@ func Run(o Options) (Report, error) {
 	if strings.TrimSpace(compatibilityStatus) == "" {
 		compatibilityStatus = "unknown"
 	}
-	provider := DetectCloudProvider(version.GitVersion)
 	bench = applyProviderProfile(bench, provider)
 	report := Report{BuildVersion: BuildVersion, AuditMode: "native", Tool: "KubeCIS Native", GeneratedAt: time.Now().UTC(), ClusterVersion: version.GitVersion, ClusterVersionSource: "kubernetes-api", CloudProvider: provider, BenchmarkProfileCoverageNote: "CoveragePercent describes only the configured starter-profile scored controls, not the full upstream CIS benchmark.", Benchmark: bench.ID, CompatibilityStatus: compatibilityStatus, CompatibilityNote: benchmarkCompatibilityNote(bench, version.GitVersion, provider)}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
