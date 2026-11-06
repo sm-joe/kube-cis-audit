@@ -6,13 +6,13 @@ import (
 )
 
 func TestValidateBenchmarkMinorFailsClosed(t *testing.T) {
-	b := Benchmark{ID: "cis-2.1.0", KubernetesMinor: []string{"31", "37"}}
-	for _, minor := range []string{"31", "37"} {
+	b := Benchmark{ID: "cis-2.1.0", KubernetesMinor: []string{"34", "35", "36", "37"}}
+	for _, minor := range []string{"34", "35", "36", "37"} {
 		if err := validateBenchmarkMinor(b, minor); err != nil {
 			t.Fatalf("listed version %s rejected: %v", minor, err)
 		}
 	}
-	for _, minor := range []string{"30", "32", "", "137"} {
+	for _, minor := range []string{"30", "31", "32", "", "137"} {
 		err := validateBenchmarkMinor(b, minor)
 		if err == nil {
 			t.Fatalf("unlisted minor %q was accepted", minor)
@@ -53,4 +53,18 @@ func TestEKSProvisionalNoteNamesActualServer(t *testing.T) {
 	if !strings.Contains(note, "v1.31.14-eks-577a51e") || !strings.Contains(note, "official CIS EKS") {
 		t.Fatalf("missing version or scope warning: %s", note)
 	}
+}
+
+func TestOfficialCIS210VersionRangesFailClosed(t *testing.T) {
+    for _, minor := range []string{"34","35","36","37"} {
+        if err := validateOfficial210Scope("eks", minor); err != nil { t.Fatalf("EKS minor %s rejected: %v",minor,err) }
+    }
+    for _, minor := range []string{"34","35"} {
+        if err := validateOfficial210Scope("unknown", minor); err != nil { t.Fatalf("generic minor %s rejected: %v",minor,err) }
+    }
+    for _, tc := range []struct{ provider, minor string }{
+        {"eks","31"},{"eks","38"},{"unknown","36"},{"unknown","37"},{"unknown","31"},{"eks",""},
+    }{
+        if err := validateOfficial210Scope(tc.provider,tc.minor); err == nil { t.Fatalf("accepted incompatible %s Kubernetes 1.%s",tc.provider,tc.minor) }
+    }
 }
