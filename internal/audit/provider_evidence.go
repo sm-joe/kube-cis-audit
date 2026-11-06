@@ -3,8 +3,8 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 	"time"
 )
 

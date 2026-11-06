@@ -58,10 +58,14 @@ func TestDecodeEKSProviderEvidenceRejectsMismatchedAndStaleData(t *testing.T) {
 	}
 	bad = candidate
 	bad.ClusterARN = "arn:aws:eks:us-east-1:123456789012:cluster/kubecis-eks-test"
-	if err := decode(bad); err == nil { t.Fatal("ARN region mismatch accepted") }
+	if err := decode(bad); err == nil {
+		t.Fatal("ARN region mismatch accepted")
+	}
 	bad = candidate
 	bad.ClusterARN = "arn:aws:eks:ap-south-1:123456789012:cluster/other-cluster"
-	if err := decode(bad); err == nil { t.Fatal("wrong EKS ARN cluster accepted") }
+	if err := decode(bad); err == nil {
+		t.Fatal("wrong EKS ARN cluster accepted")
+	}
 	bad = candidate
 	bad.CloudProvider = "unknown"
 	if err := decode(bad); err == nil {
