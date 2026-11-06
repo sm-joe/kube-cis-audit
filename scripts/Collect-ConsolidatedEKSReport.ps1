@@ -3,6 +3,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$Context,
+    [string]$ClusterName = $Context,
+    [string]$Region = '',
     [string]$Namespace = 'kube-system',
     [string]$OutputDir = '.\reports\eks',
     [string]$Binary = '.\kubecis.exe',
@@ -67,7 +69,10 @@ foreach ($node in $nodes) {
     Write-JsonReport $path $data
     $inputs.Add($path)
 }
-$argsList = @('consolidate','--cluster',$clusterPath,'--expected-nodes',($nodes -join ','),'--max-age','30m','--output-file',(Join-Path $dir 'consolidated.json'))
+$providerPath = Join-Path $dir 'provider.json'
+& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -OutputFile $providerPath
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $providerPath)) { throw 'EKS provider DescribeCluster collection failed' }
+$argsList = @('consolidate','--provider-evidence',$providerPath,'--cluster',$clusterPath,'--expected-nodes',($nodes -join ','),'--max-age','30m','--output-file',(Join-Path $dir 'consolidated.json'))
 foreach ($path in $inputs) {
     if ($path -ne $clusterPath) { $argsList += @('--local',$path) }
 }
