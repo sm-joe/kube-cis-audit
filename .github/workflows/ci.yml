@@ -27,6 +27,7 @@ jobs:
         shell: bash
         run: |
           files=$(find . -type f -name '*.go' -not -path './vendor/*')
+          gofmt -l $files
           test -z "$(gofmt -l $files)"
 
       - name: Run Go Vet
