@@ -90,4 +90,7 @@ foreach ($path in $inputs) {
 }
 & $Binary @argsList
 if ($LASTEXITCODE -ne 0) { throw 'EKS consolidation rejected: stale, incomplete, or inconsistent evidence' }
-Write-Host "PASS: Validated EKS consolidated report at $(Join-Path $dir 'consolidated.json')"
+$consolidatedPath = Join-Path $dir 'consolidated.json'
+# Collection succeeds only when the complete preview release gate passes.
+& (Join-Path $PSScriptRoot 'Validate-EKSRelease.ps1') -ReportPath $consolidatedPath -ReleaseLevel Preview -ExpectedClusterName $ClusterName -ExpectedRegion $Region
+Write-Host "PASS: EKS native preview report at $consolidatedPath"
