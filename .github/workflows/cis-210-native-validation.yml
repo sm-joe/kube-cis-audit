@@ -1,7 +1,7 @@
 name: CIS v2.1.0 native assessment validation
 on:
   push:
-    branches: [feature/cis-210-source-validated-core]
+    branches: [feature/cis-210-source-validated-core, feature/cis210-official-native-implementation]
 permissions:
   contents: read
 jobs:
