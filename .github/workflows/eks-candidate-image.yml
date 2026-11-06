@@ -2,9 +2,9 @@ name: EKS Candidate Image
 on:
   push:
     branches:
-      - fix/eks-native-provider-audit
+      - feature/eks-rc3-provider-accuracy
 concurrency:
-  group: kubecis-eks-candidate
+  group: kubecis-eks-rc3-candidate
   cancel-in-progress: true
 permissions:
   contents: read
@@ -63,11 +63,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            VERSION=3.1.0-native-eks-rc2
+            VERSION=3.1.0-native-eks-rc3
           tags: |
-            ghcr.io/sm-joe/kubecis:eks-provider-rc2
+            ghcr.io/sm-joe/kubecis:eks-provider-rc3
             ghcr.io/sm-joe/kubecis:eks-provider-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=3.1.0-native-eks-rc2
+            org.opencontainers.image.version=3.1.0-native-eks-rc3
