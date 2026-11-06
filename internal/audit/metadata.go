@@ -101,7 +101,7 @@ func RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRo
 			continue
 		}
 		fullPath := filepath.Join(root, relativePath)
-		if strings.EqualFold(target, "node") && check.Path == "var/lib/kubelet/config.yaml" && kubeletConfigRoot != "" {
+		if strings.EqualFold(target, "node") && (check.Path == "var/lib/kubelet/config.yaml" || check.Path == "etc/kubernetes/kubelet/config.json") && kubeletConfigRoot != "" {
 			fullPath = filepath.Join(kubeletConfigRoot, "config.json")
 			metadata.SourcePath = "etc/kubernetes/kubelet/config.json"
 		} else {
@@ -182,6 +182,9 @@ func approvedHostMetadataPath(target, benchmarkPath string) (string, bool) {
 	case "node":
 		if clean == "var/lib/kubelet/config.yaml" {
 			return "config.yaml", true
+		}
+		if clean == "etc/kubernetes/kubelet/config.json" {
+			return "config.json", true
 		}
 	case "master", "controlplane", "control-plane":
 		if clean == "etc/kubernetes/manifests/kube-apiserver.yaml" {
