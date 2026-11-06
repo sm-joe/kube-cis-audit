@@ -18,6 +18,9 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
     if out.ProviderEvidence != nil {
         return fmt.Errorf("AWS EKS evidence already attached")
     }
+    if evidence.GeneratedAt.IsZero() || evidence.GeneratedAt.After(time.Now().Add(2*time.Minute)) {
+        return fmt.Errorf("missing or future AWS evidence timestamp")
+    }
     findings, err := EvaluateEKSCISProviderControls(evidence)
     if err != nil { return err }
     existing := make(map[string]bool, len(out.Results))
@@ -65,10 +68,5 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
     out.Compliance.ScoreStatus = "withheld: incomplete official CIS EKS 2.1.0 control coverage"
     out.Sources = append(out.Sources, SourceRecord{AuditMode: "aws-provider", GeneratedAt: evidence.GeneratedAt, Findings: len(findings)})
     sort.Slice(out.Results, func(i, j int) bool { return StableFindingID(out.Results[i]) < StableFindingID(out.Results[j]) })
-    // The caller has already validated freshness and identity through
-    // DecodeEKSProviderEvidence. A zero timestamp must never reach output.
-    if evidence.GeneratedAt.IsZero() || evidence.GeneratedAt.After(time.Now().Add(2*time.Minute)) {
-        return fmt.Errorf("missing or future AWS evidence timestamp")
-    }
     return nil
 }
