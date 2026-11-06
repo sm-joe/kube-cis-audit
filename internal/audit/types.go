@@ -38,6 +38,7 @@ type Evidence struct {
 	Name      string `json:"name,omitempty"`
 	Field     string `json:"field,omitempty"`
 	Observed  string `json:"observed,omitempty"`
+	OwnershipHint string `json:"ownershipHint,omitempty"`
 	Expected  string `json:"expected,omitempty"`
 }
 
@@ -52,6 +53,7 @@ type Result struct {
 	Method         string     `json:"method,omitempty"`
 	Applicability  string     `json:"applicability,omitempty"`
 	EvidenceSource string     `json:"evidenceSource,omitempty"`
+	OwnershipReview string     `json:"ownershipReview,omitempty"`
 	Evidence       []Evidence `json:"evidence,omitempty"`
 	Remediation    string     `json:"remediation,omitempty"`
 	Scored         bool       `json:"scored"`
