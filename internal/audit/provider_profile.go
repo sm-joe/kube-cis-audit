@@ -20,7 +20,7 @@ func applyProviderProfile(input Benchmark, provider string) Benchmark {
 	out := input
 	out.Checks = append([]Check(nil), input.Checks...)
 	for i, c := range out.Checks {
-		if c.Target != "node" || c.Kind != "host_file_mode" ||
+		if c.ID != "4.1.9" || c.Target != "node" || c.Kind != "host_file_mode" ||
 			c.Path != "var/lib/kubelet/config.yaml" {
 			continue
 		}
