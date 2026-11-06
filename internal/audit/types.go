@@ -4,7 +4,7 @@ import "time"
 
 // BuildVersion is embedded in every report so operators can verify which
 // auditor implementation actually produced the results.
-var BuildVersion = "3.1.0-native-eks-rc2"
+var BuildVersion = "3.1.0-native-eks-rc3"
 
 type Check struct {
 	ID          string `yaml:"id" json:"id"`
@@ -91,4 +91,5 @@ type Report struct {
 type Options struct {
 	Kubeconfig, KubeContext, ConfigDir, Benchmark, Target, HostRoot, Namespace string
 	MetadataFile                                                               string
+	Provider                                                                   string
 }
