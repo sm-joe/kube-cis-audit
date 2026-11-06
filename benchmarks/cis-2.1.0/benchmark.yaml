@@ -1,10 +1,11 @@
 id: cis-2.1.0
 name: CIS Kubernetes Benchmark v2.1.0 - KubeCIS provisional starter profile
-# Provisional Kubernetes 1.37 mapping: verify distribution applicability against the
-# official CIS benchmark before treating these results as compliance evidence.
-kubernetesMinor: ["37"]
+# Experimental starter-profile *inventory* for Kubernetes minors 1.31 and 1.37.
+# This is not a version-validated CIS EKS benchmark control mapping.
+# Each minor is explicitly listed to prohibit silent cross-version application.
+kubernetesMinor: ["31", "37"]
 compatibilityStatus: provisional
-compatibilityNote: "Provisional Kubernetes 1.37 mapping. This is a limited starter profile, not the complete CIS benchmark."
+compatibilityNote: "Experimental starter profile for Kubernetes 1.31 and 1.37 only. Control IDs and applicability have NOT been verified against the official versioned CIS Kubernetes or CIS EKS benchmark."
 checks:
   - id: 1.1.1
     title: API server pod specification file permissions are 0600 or more restrictive
