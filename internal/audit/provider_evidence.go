@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"regexp"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type EKSProviderEvidence struct {
 	SchemaVersion       int             `json:"schemaVersion"`
 	CloudProvider       string          `json:"cloudProvider"`
 	ClusterName         string          `json:"clusterName"`
+	ClusterARN          string          `json:"clusterArn"`
 	Region              string          `json:"region"`
 	KubernetesVersion   string          `json:"kubernetesVersion"`
 	GeneratedAt         time.Time       `json:"generatedAt"`
@@ -34,6 +36,50 @@ func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration
 	}
 	if strings.TrimSpace(e.ClusterName) == "" || strings.TrimSpace(e.Region) == "" {
 		return e, fmt.Errorf("provider evidence missing EKS cluster or region")
+	}
+	// Verify the snapshot's immutable AWS resource identifier agrees with
+	// the displayed name and region; not a substitute for API endpoint matching
+	// performed by the PowerShell collector.
+	arnPattern := regexp.MustCompile(`^arn:aws[a-z-]*:eks:([a-z0-9-]+):([0-9]{12}):cluster/([A-Za-z0-9_-]+)package audit
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"regexp"
+	"time"
+)
+
+// EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
+// snapshot. It contains configuration inventory, NOT a CIS pass/fail score.
+type EKSProviderEvidence struct {
+	SchemaVersion       int             `json:"schemaVersion"`
+	CloudProvider       string          `json:"cloudProvider"`
+	ClusterName         string          `json:"clusterName"`
+	ClusterARN          string          `json:"clusterArn"`
+	Region              string          `json:"region"`
+	KubernetesVersion   string          `json:"kubernetesVersion"`
+	GeneratedAt         time.Time       `json:"generatedAt"`
+	EndpointPrivate     bool            `json:"endpointPrivateAccess"`
+	EndpointPublic      bool            `json:"endpointPublicAccess"`
+	PublicAccessCIDRs   []string        `json:"publicAccessCidrs,omitempty"`
+	ControlPlaneLogging map[string]bool `json:"controlPlaneLogging"`
+	AssessmentStatus    string          `json:"assessmentStatus"`
+	AssessmentNote      string          `json:"assessmentNote"`
+}
+
+func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration, now time.Time) (EKSProviderEvidence, error) {
+	var e EKSProviderEvidence
+	if err := json.Unmarshal(data, &e); err != nil {
+		return e, fmt.Errorf("decode EKS provider evidence: %w", err)
+	}
+	if cluster.CloudProvider != "eks" || e.CloudProvider != "eks" || e.SchemaVersion != 1 {
+		return e, fmt.Errorf("provider evidence must match EKS cluster and schema v1")
+	}
+	)
+	partsARN := arnPattern.FindStringSubmatch(e.ClusterARN)
+	if len(partsARN) != 4 || partsARN[1] != e.Region || partsARN[3] != e.ClusterName {
+		return e, fmt.Errorf("EKS provider ARN does not match cluster name and region")
 	}
 	if e.GeneratedAt.IsZero() || e.GeneratedAt.After(now.Add(2*time.Minute)) ||
 		now.Sub(e.GeneratedAt) > maxAge {
