@@ -9,12 +9,12 @@ func TestExtendedKubeletMetadataAndDecisions(t *testing.T) {
 		"authentication": map[string]interface{}{
 			"x509": map[string]interface{}{"clientCAFile": "/etc/kubernetes/pki/ca.crt"},
 		},
-		"readOnlyPort": 0,
+		"readOnlyPort":           0,
 		"makeIPTablesUtilChains": true,
-		"eventRecordQPS": 0,
-		"rotateCertificates": true,
-		"serverTLSBootstrap": true,
-		"featureGates": map[string]interface{}{"RotateKubeletServerCertificate": true},
+		"eventRecordQPS":         0,
+		"rotateCertificates":     true,
+		"serverTLSBootstrap":     true,
+		"featureGates":           map[string]interface{}{"RotateKubeletServerCertificate": true},
 	}
 	values := map[string]KubeletSetting{}
 	collectExtendedKubeletSettings(cfg, values)
