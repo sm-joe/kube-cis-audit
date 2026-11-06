@@ -23,6 +23,18 @@ $server = (& kubectl --context $Context version -o json | ConvertFrom-Json).serv
 if ($LASTEXITCODE -ne 0 -or $server -notmatch '-eks-') {
     throw "Expected an Amazon EKS Kubernetes server version; observed '$server'"
 }
+# Resolve the actual kubeconfig context -> cluster -> API endpoint, without
+# using context aliases as AWS cluster identity. Credentials stay redacted.
+$config = (& kubectl config view -o json | ConvertFrom-Json)
+if ($LASTEXITCODE -ne 0) { throw 'Unable to read kubeconfig context and server identity' }
+$selectedContext = @($config.contexts | Where-Object { $_.name -ceq $Context })
+if ($selectedContext.Count -ne 1) { throw "Kubeconfig context '$Context' is missing or ambiguous" }
+$kubeClusterRef = [string]$selectedContext[0].context.cluster
+$selectedCluster = @($config.clusters | Where-Object { $_.name -ceq $kubeClusterRef })
+if ($selectedCluster.Count -ne 1 -or -not $selectedCluster[0].cluster.server) {
+    throw "Missing API endpoint for kubeconfig cluster '$kubeClusterRef'"
+}
+$kubeAPIServer = [string]$selectedCluster[0].cluster.server
 $nodesObj = (& kubectl --context $Context get nodes -l kubernetes.io/os=linux -o json | ConvertFrom-Json)
 if ($LASTEXITCODE -ne 0) { throw 'Cannot list Linux worker nodes' }
 $nodes = @($nodesObj.items | Where-Object {
@@ -70,7 +82,7 @@ foreach ($node in $nodes) {
     $inputs.Add($path)
 }
 $providerPath = Join-Path $dir 'provider.json'
-& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -OutputFile $providerPath
+& (Join-Path $PSScriptRoot 'Collect-EKSProviderEvidence.ps1') -ClusterName $ClusterName -Region $Region -ExpectedAPIServer $kubeAPIServer -OutputFile $providerPath
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $providerPath)) { throw 'EKS provider DescribeCluster collection failed' }
 $argsList = @('consolidate','--provider-evidence',$providerPath,'--cluster',$clusterPath,'--expected-nodes',($nodes -join ','),'--max-age','30m','--output-file',(Join-Path $dir 'consolidated.json'))
 foreach ($path in $inputs) {
