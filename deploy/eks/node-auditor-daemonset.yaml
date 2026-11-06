@@ -45,7 +45,7 @@ spec:
           args:
             - node-metadata
             - --benchmark
-            - cis-2.1.0
+            - cis-eks-2.1.0
             - --host-root
             - /host-kubelet
             - --kubelet-config-root
@@ -97,7 +97,7 @@ spec:
             - --provider
             - eks
             - --benchmark
-            - cis-2.1.0
+            - cis-eks-2.1.0
             - --metadata-file
             - /metadata/snapshot.json
             - --node-name
@@ -138,7 +138,7 @@ spec:
           args:
             - node-metadata
             - --benchmark
-            - cis-2.1.0
+            - cis-eks-2.1.0
             - --host-root
             - /host-kubelet
             - --kubelet-config-root
