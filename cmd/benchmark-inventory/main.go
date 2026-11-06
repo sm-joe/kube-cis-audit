@@ -166,6 +166,11 @@ func parseControlFile(path, cfgRoot, profile string) ([]Control, string, error) 
 		}
 	}
 	if _, ok := root["groups"]; !ok {
+		// Versioned kube-bench EKS profiles may declare empty managed control-plane
+		// sections with no groups. They represent zero assessable controls.
+		if strings.HasPrefix(profile, "eks-") && root["version"] != nil && root["type"] != nil {
+			return []Control{}, stringValue(root["type"]), nil
+		}
 		return nil, "", fmt.Errorf("control document is missing top-level groups")
 	}
 	target := stringValue(root["type"])
