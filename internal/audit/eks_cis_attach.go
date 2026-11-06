@@ -31,7 +31,9 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
 		existing[StableFindingID(r)] = true
 	}
 	for i := range findings {
-		findings[i].EvidenceSource = "aws-eks-describe-cluster"
+		if findings[i].EvidenceSource == "" {
+			findings[i].EvidenceSource = "aws-eks-describe-cluster"
+		}
 		findings[i].FindingID = StableFindingID(findings[i])
 		if existing[findings[i].FindingID] {
 			return fmt.Errorf("duplicate CIS EKS finding %s", findings[i].ID)
