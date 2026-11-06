@@ -85,7 +85,11 @@ func ApplyEKSCNIProviderEvidence(out *ConsolidatedReport, e EKSProviderEvidence)
 		if r.ID != "4.3.1" || r.Target != "policies" {
 			continue
 		}
-		r.Evidence = append(r.Evidence, Evidence{Resource: "AWS::EKS::Addon", Name: "vpc-cni", Field: "enableNetworkPolicy", Observed: fmt.Sprintf("addonStatus=%s version=%s configured=%v", e.VpcCNIStatus, e.VpcCNIVersion, e.VpcCNINetworkPolicy), Expected: "ACTIVE supported add-on with enableNetworkPolicy=true and node policy agents ready"})
+		configured := "unknown"
+		if e.VpcCNINetworkPolicy != nil {
+			configured = fmt.Sprintf("%t", *e.VpcCNINetworkPolicy)
+		}
+		r.Evidence = append(r.Evidence, Evidence{Resource: "AWS::EKS::Addon", Name: "vpc-cni", Field: "enableNetworkPolicy", Observed: fmt.Sprintf("addonStatus=%s version=%s configured=%s", e.VpcCNIStatus, e.VpcCNIVersion, configured), Expected: "ACTIVE supported add-on with enableNetworkPolicy=true and node policy agents ready"})
 		switch {
 		case e.VpcCNIStatus != "ACTIVE" || e.VpcCNINetworkPolicy == nil:
 			r.Status = "MANUAL"
