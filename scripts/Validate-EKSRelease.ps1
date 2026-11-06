@@ -110,4 +110,4 @@ foreach ($node in $nodes) {
 }
 Write-Host "PASS (PREVIEW ONLY): EKS API + $($nodes.Count) managed EC2 node source(s) verified"
 Write-Host "Benchmark: $($r.benchmark) ($($r.benchmarkCompatibilityStatus)); score withheld as required"
-Write-Host "Scored evidence coverage: $($r.compliance.coveragePercent)% within configured starter profile"
+Write-Host "Decisive coverage within currently scored controls: $($r.compliance.coveragePercent)% (NOT official CIS benchmark coverage or compliance)"
