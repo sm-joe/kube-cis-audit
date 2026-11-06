@@ -11,7 +11,7 @@ import (
 func newEnrichNodeCommand() *cobra.Command {
 	var input, configzPath, nodeName, output string
 	cmd := &cobra.Command{
-		Use: "enrich-node",
+		Use:   "enrich-node",
 		Short: "Merge authenticated live kubelet configz facts into a matching native node report",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			reportData, err := os.ReadFile(input)
