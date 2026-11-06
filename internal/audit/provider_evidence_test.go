@@ -12,7 +12,7 @@ func TestDecodeEKSProviderEvidenceRejectsMismatchedAndStaleData(t *testing.T) {
 	cluster := Report{CloudProvider: "eks", ClusterVersion: "v1.31.14-eks-577a51e"}
 	candidate := EKSProviderEvidence{
 		SchemaVersion: 1, CloudProvider: "eks",
-		ClusterName: "kubecis-eks-test", Region: "ap-south-1",
+		ClusterName: "kubecis-eks-test", Region: "ap-south-1", ClusterARN: "arn:aws:eks:ap-south-1:123456789012:cluster/kubecis-eks-test",
 		KubernetesVersion: "1.31", GeneratedAt: now.Add(-time.Minute),
 		EndpointPrivate: true, EndpointPublic: false,
 		AssessmentStatus: "INVENTORY_ONLY",
@@ -56,6 +56,12 @@ func TestDecodeEKSProviderEvidenceRejectsMismatchedAndStaleData(t *testing.T) {
 	if err := decode(bad); err == nil {
 		t.Fatal("incomplete provider logging evidence accepted")
 	}
+	bad = candidate
+	bad.ClusterARN = "arn:aws:eks:us-east-1:123456789012:cluster/kubecis-eks-test"
+	if err := decode(bad); err == nil { t.Fatal("ARN region mismatch accepted") }
+	bad = candidate
+	bad.ClusterARN = "arn:aws:eks:ap-south-1:123456789012:cluster/other-cluster"
+	if err := decode(bad); err == nil { t.Fatal("wrong EKS ARN cluster accepted") }
 	bad = candidate
 	bad.CloudProvider = "unknown"
 	if err := decode(bad); err == nil {
