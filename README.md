@@ -90,46 +90,45 @@ docker run --rm kubecis-native:local version
 
 For an API scan, supply kubeconfig or an in-cluster service account with carefully scoped access. An external kubeconfig may reference credential helpers or certificates not present in the container; make those available securely, rather than copying secrets into an image. In-cluster deployment examples are under [deploy/](deploy/).
 
-### Amazon EKS deployment
+### Amazon EKS: native Linux preview
 
-For Linux/Unix operators, [the digest-pinned EKS deployment helper](docs/LINUX-EKS-DEPLOY.md) provides a fail-closed installation entry point. It does **not** replace the currently unverified Linux provider evidence collection workflow.
+The **Linux/Unix** operator workflow now includes a Bash-based collector for
+API findings, all supported EKS managed EC2 Linux workers and AWS DescribeCluster
+inventory. It deliberately reports optional IAM/CNI/ECR provider inventories as
+unavailable until verified Linux collectors are implemented. This is a
+**provisional CIS EKS preview**, not an official CIS compliance assessment.
+
+Prerequisites: AWS CLI v2, `kubectl`, Bash, `jq`, GNU coreutils and a Linux
+`kubecis` binary built from the same commit/version as the published auditor
+image. The selected Kubernetes context and AWS identity must identify the same
+EKS cluster and Kubernetes minor version. `nodes/proxy` access is optional
+and security-sensitive; missing evidence remains unknown.
 
 ```bash
-bash scripts/test-deploy-eks.sh
-bash scripts/deploy-eks.sh --context YOUR_EKS_CONTEXT \\
+# Review the DaemonSet host mounts and RBAC before installing.
+bash scripts/deploy-eks.sh --context YOUR_EKS_CONTEXT \
   --image ghcr.io/sm-joe/kubecis@sha256:YOUR_VERIFIED_64_CHARACTER_DIGEST
+
+# The placeholder digest above must be replaced with a real verified digest.
+bash scripts/collect-eks.sh \
+  --context YOUR_EKS_CONTEXT --cluster-name YOUR_CLUSTER \
+  --region YOUR_REGION --binary ./kubecis --output-dir reports/eks
+
+# The full CIS acceptance mode is intentionally blocked:
+bash scripts/validate-eks-preview.sh --report reports/eks/consolidated.json \
+  --cluster-name YOUR_CLUSTER --region YOUR_REGION
 ```
 
-The digest is an example placeholder, not a deployable image. Obtain a real published digest before running the helper.
+The collector fails on stale, missing, duplicate, mismatched or unsupported node
+sources. Its preview gate requires AL2023 nodeadm kubelet evidence for every
+worker. It produces `consolidated.json`, `results.txt`,
+`review-template.json`, and a final assessment dossier. For security and
+explicit limitations, see [the Linux EKS collection guide](docs/LINUX-EKS-COLLECTION.md)
+and [the deployment guide](docs/LINUX-EKS-DEPLOY.md).
 
-
-Use a deliberately selected cluster context and confirm AWS/Kubernetes identity:
-
-```bash
-aws sts get-caller-identity
-aws eks update-kubeconfig --name my-eks-cluster --region us-east-1
-kubectl config current-context
-kubectl get nodes -L eks.amazonaws.com/nodegroup
-```
-
-The EKS DaemonSet is version-coupled to the local scanner. **Do not deploy its placeholder image as-is.** Build and publish a Linux container from the same Git commit as the CLI, or use an existing published matching build, and set the images for all three DaemonSet containers:
-
-```bash
-# Replace with a published image built from the matching source commit.
-IMAGE="ghcr.io/sm-joe/kubecis:cis210-eks135-<40-character-commit-sha>"
-
-kubectl apply -k deploy/eks
-kubectl -n kube-system set image daemonset/kubecis-node-auditor \
-  "node-metadata-init=$IMAGE" \
-  "node-auditor=$IMAGE" \
-  "node-metadata-helper=$IMAGE"
-kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=300s
-kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
-```
-
-These commands **create or update KubeCIS deployment resources**, including RBAC and a host-metadata helper. Review [EKS deployment manifests](deploy/eks/) and their access requirements before deployment. Assessments do not intentionally change the cluster's security configuration.
-
-**Current limitation:** The repository's complete EKS collection/orchestration and release-acceptance workflow is not yet available as a verified POSIX-shell runner. Full provider-plus-node consolidation on Linux has **not been validated end to end**. The Go CLI and Linux node-auditor image are Linux-native, but the commands above should **not** be presented as a complete EKS provider assessment or as an equivalent to the proven integrated collection workflow. Linux/Unix support is the product's target; the remaining orchestration portability work is separate from the scanning engine.
+**Runtime acceptance is not yet established:** This workflow requires a clean
+Linux-to-EKS integration run before support can be marked production verified.
+The official CIS compliance score remains **WITHHELD**.
 
 ## Reporting and review
 
