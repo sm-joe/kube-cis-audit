@@ -35,6 +35,10 @@ jobs:
           files=$(find . -type f -name '*.go' -not -path './vendor/*')
           test -z "$(gofmt -l $files)"
 
+      - name: Validate Linux acceptance helpers
+        shell: bash
+        run: bash scripts/test-linux-eks.sh
+
       - name: Run Go Vet
         run: go vet ./...
 
@@ -171,6 +175,8 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: mode=max
+          sbom: true
           build-args: |
             VERSION=${{ github.ref_name }}
           tags: ${{ steps.image-tags.outputs.tags }}
