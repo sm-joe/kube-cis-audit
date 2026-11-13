@@ -36,6 +36,12 @@ jobs:
         shell: bash
         run: bash scripts/test-deploy-eks.sh
 
+      - name: Validate Linux EKS collection and provisional release gates
+        shell: bash
+        run: |
+          bash scripts/test-linux-eks.sh
+          bash scripts/test-deploy-eks.sh
+
       - name: Run Go Vet
         run: go vet ./...
 
