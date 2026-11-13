@@ -46,7 +46,9 @@ jobs:
 
       - name: Validate Linux acceptance helpers
         shell: bash
-        run: bash scripts/test-linux-eks.sh
+        run: |
+          bash scripts/test-linux-eks.sh
+          bash scripts/test-linux-install.sh
 
       - name: Run Go Vet
         run: go vet ./...
