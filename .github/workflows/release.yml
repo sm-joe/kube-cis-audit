@@ -151,6 +151,21 @@ jobs:
         with:
           subject-path: 'dist/*'
 
+      - name: Install Cosign for keyless binary signing
+        uses: sigstore/cosign-installer@v4.1.0
+
+      - name: Sign and verify release assets
+        shell: bash
+        run: |
+          IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
+          for file in dist/kubecis_* dist/SHA256SUMS; do
+            test -s "$file"
+            cosign sign-blob "$file" --bundle "$file.sigstore.json" --yes
+            cosign verify-blob "$file" --bundle "$file.sigstore.json" \
+              --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+          done
+
       - name: Publish Release Assets
         uses: softprops/action-gh-release@v3
         with:
