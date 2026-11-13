@@ -29,3 +29,12 @@ Node-local and cluster/API reports are separate outputs; this release does not s
 ## Release classification
 
 This is a **technical-preview / release-candidate source package**, not a stable full-CIS compliance release. Stable compliance claims require a complete authorized benchmark inventory, native evidence mappings for every applicable recommendation, distribution-specific applicability, multi-node aggregation, and passing clean-room build, unit, integration, and E2E validation.
+
+## Linux EKS preview workflow (November 2026)
+
+The CLI + Bash collection pipeline produces validated, per-worker and AWS
+DescribeCluster source reports, but has not yet completed clean-room Linux
+EKS runtime acceptance. IAM access entries, VPC CNI and ECR enrichment are
+currently uncollected in the Linux provider adapter and must not be treated as
+secure or conformant. The full official benchmark remains unverified, so the
+stable full-CIS release gate is intentionally blocked.

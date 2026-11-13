@@ -23,6 +23,15 @@ jobs:
             exit 1
           fi
 
+      - name: Prevent stable release while official CIS EKS mapping is provisional
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] &&
+             grep -q '^compatibilityStatus: provisional$' benchmarks/cis-eks-2.1.0/benchmark.yaml; then
+            echo "::error::Stable release blocked: EKS benchmark mapping remains provisional"
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
@@ -34,6 +43,13 @@ jobs:
         run: |
           files=$(find . -type f -name '*.go' -not -path './vendor/*')
           test -z "$(gofmt -l $files)"
+
+      - name: Validate Linux acceptance helpers
+        shell: bash
+        run: |
+          bash scripts/test-linux-eks.sh
+          bash scripts/test-eks-provider.sh
+          bash scripts/test-linux-install.sh
 
       - name: Run Go Vet
         run: go vet ./...
@@ -88,13 +104,21 @@ jobs:
           STAGE="$RUNNER_TEMP/kubecis"
           mkdir -p "$STAGE/benchmarks" dist
           cp -R benchmarks/. "$STAGE/benchmarks/"
-          cp README.md "$STAGE/README.md"
+          cp README.md LICENSE ATTRIBUTION.md "$STAGE/"
           cp -R docs "$STAGE/docs"
+          mkdir -p "$STAGE/scripts" "$STAGE/deploy"
+          cp scripts/*.sh "$STAGE/scripts/"
+          cp -R deploy/eks "$STAGE/deploy/eks"
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           CGO_ENABLED=0 go build -trimpath -buildvcs=false \
             -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=$VERSION" \
             -o "$STAGE/kubecis$EXT" ./cmd/kubecis
+          if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "amd64" ]; then
+            "$STAGE/kubecis" version | grep -Fx "$VERSION"
+            bash "$STAGE/scripts/test-linux-eks.sh"
+            bash "$STAGE/scripts/test-deploy-eks.sh"
+          fi
           NAME="kubecis_${GOOS}_${GOARCH}"
           if [ "$ARCHIVE" = "zip" ]; then
             (cd "$STAGE" && zip -qr "$GITHUB_WORKSPACE/dist/${NAME}.zip" .)
@@ -113,6 +137,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -121,6 +148,26 @@ jobs:
 
       - name: Generate Checksums
         run: cd dist && sha256sum kubecis_* > SHA256SUMS
+
+      - name: Attest release archives and checksum manifest
+        uses: actions/attest@v4
+        with:
+          subject-path: 'dist/*'
+
+      - name: Install Cosign for keyless binary signing
+        uses: sigstore/cosign-installer@v4.1.0
+
+      - name: Sign and verify release assets
+        shell: bash
+        run: |
+          IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
+          for file in dist/kubecis_* dist/SHA256SUMS; do
+            test -s "$file"
+            cosign sign-blob "$file" --bundle "$file.sigstore.json" --yes
+            cosign verify-blob "$file" --bundle "$file.sigstore.json" \
+              --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+          done
 
       - name: Publish Release Assets
         uses: softprops/action-gh-release@v3
@@ -136,6 +183,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -153,6 +201,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Cosign for keyless OCI signing
+        uses: sigstore/cosign-installer@v4.1.0
+
       - name: Set image tags
         id: image-tags
         shell: bash
@@ -166,14 +217,28 @@ jobs:
           { echo 'tags<<EOF'; printf '%s\n' "$tags"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Multi-architecture Image
+        id: image
         uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: mode=max
+          sbom: true
           build-args: |
             VERSION=${{ github.ref_name }}
           tags: ${{ steps.image-tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ github.ref_name }}
+
+      - name: Sign published image by immutable digest
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          test -n "$DIGEST"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$DIGEST"
+          cosign sign --yes "$IMAGE"
+          cosign verify "$IMAGE" --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
