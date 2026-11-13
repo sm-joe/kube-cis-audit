@@ -26,8 +26,14 @@ jobs:
       - name: Prevent stable release while official CIS EKS mapping is provisional
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
-             grep -Eq '^compatibilityStatus: provisional
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+[.][0-9]+[.][0-9]+$ ]] &&
+             grep -q '^compatibilityStatus: provisional$' benchmarks/cis-eks-2.1.0/benchmark.yaml; then
+            echo "::error::Stable release blocked: EKS benchmark mapping remains provisional"
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
           go-version: '1.27.4'
           cache: true
