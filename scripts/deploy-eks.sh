@@ -48,12 +48,17 @@ if ! printf '%s' "$server" | grep -Eq -- '-eks-'; then
 fi
 echo "Selected kubeconfig context: $(kubectl "${kubectl_args[@]}" config current-context)"
 echo "Image (immutable): $image"
-# kubectl set image --local emits the modified DaemonSet without touching the
-# cluster, so images are pinned before any resource is submitted.
+# Replace only the known candidate image reference in the rendered output.
+# Refuse unexpected manifest changes rather than accidentally shipping a
+# mutable image or deploying a partially updated DaemonSet.
 manifest="$(kubectl kustomize "$repo_dir/deploy/eks")"
-patched="$(printf '%s\n' "$manifest" | kubectl set image --local -f - \
-    node-metadata-init="$image" node-auditor="$image" node-metadata-helper="$image" -o yaml)"
-# All three image fields must have been replaced in the rendered manifest.
+placeholder='ghcr.io/sm-joe/kubecis:eks-provider-rc3-identity'
+old_count="$(printf '%s\n' "$manifest" | grep -Fc "image: $placeholder" || true)"
+if [[ "$old_count" -ne 3 ]]; then
+  echo "Expected exactly three known candidate image references; found $old_count" >&2
+  exit 1
+fi
+patched="${manifest//image: $placeholder/image: $image}"
 count="$(printf '%s\n' "$patched" | grep -Fc "image: $image" || true)"
 if [[ "$count" -ne 3 ]]; then
   echo "Expected three digest-pinned image references; found $count; refusing apply" >&2
