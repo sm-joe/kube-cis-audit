@@ -32,7 +32,7 @@ The EKS node-auditor manifests target **EKS managed EC2 Linux nodes**. EKS contr
 ## Prerequisites
 
 - Linux distribution with a POSIX-compatible shell and standard tooling.
-- Go **1.27.3** for source builds (see [go.mod](go.mod)).
+- Go **1.27.4** for source builds (see [go.mod](go.mod)).
 - `kubectl` and a Kubernetes kubeconfig with permitted read access.
 - Docker or Podman to build/run the Linux image, or access to a published GHCR image.
 - For Amazon EKS: AWS CLI v2 with relevant IAM permissions, an EKS kubeconfig, and appropriate Kubernetes authorization to install the auditor's resources.
