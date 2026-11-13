@@ -125,6 +125,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -133,6 +136,11 @@ jobs:
 
       - name: Generate Checksums
         run: cd dist && sha256sum kubecis_* > SHA256SUMS
+
+      - name: Attest release archives and checksum manifest
+        uses: actions/attest@v4
+        with:
+          subject-path: 'dist/*'
 
       - name: Publish Release Assets
         uses: softprops/action-gh-release@v3
@@ -148,6 +156,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -165,6 +174,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Cosign for keyless OCI signing
+        uses: sigstore/cosign-installer@v4.1.0
+
       - name: Set image tags
         id: image-tags
         shell: bash
@@ -178,6 +190,7 @@ jobs:
           { echo 'tags<<EOF'; printf '%s\n' "$tags"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Multi-architecture Image
+        id: image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -191,3 +204,14 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ github.ref_name }}
+
+      - name: Sign published image by immutable digest
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          test -n "$DIGEST"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$DIGEST"
+          cosign sign --yes "$IMAGE"
+          cosign verify "$IMAGE" --certificate-identity-regexp '^https://github.com/' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
