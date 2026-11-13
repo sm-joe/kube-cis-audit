@@ -9,7 +9,7 @@ This deployment targets Amazon EKS **managed EC2 Linux worker nodes**. The node-
 - Linux host with a shell, `kubectl`, AWS CLI v2, and a Kubernetes kubeconfig.
 - A Kubernetes identity authorized to apply the project's RBAC and DaemonSet to `kube-system`.
 - Published `ghcr.io/sm-joe/kubecis` Linux image built from the **same source commit** as the local KubeCIS CLI. Never reuse an old image with a newer CLI.
-- For source builds: Go 1.27.3.
+- For source builds: Go 1.27.4.
 
 ## Build CLI from source
 
@@ -34,51 +34,32 @@ kubectl config current-context
 kubectl get nodes -L eks.amazonaws.com/nodegroup
 ```
 
-## Deploy matching Linux node auditor
+## Deploy and collect using Linux
 
-Review [node-auditor-daemonset.yaml](node-auditor-daemonset.yaml) and [RBAC](rbac.yaml), especially the restricted host-metadata helper, before applying the resources.
-
-```bash
-# Replace this placeholder with a real image published for the matching commit.
-IMAGE="ghcr.io/sm-joe/kubecis:cis210-eks135-<40-character-commit-sha>"
-
-kubectl apply -k deploy/eks
-kubectl -n kube-system set image daemonset/kubecis-node-auditor \
-  "node-metadata-init=$IMAGE" \
-  "node-auditor=$IMAGE" \
-  "node-metadata-helper=$IMAGE"
-
-kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=300s
-kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
-```
-
-These commands install/update KubeCIS resources but do **not** remediate security findings. Validate the image's registry, digest, and the node-auditor version. The node metadata helper reads restricted paths from `/var/lib/kubelet` and, for EKS AL2023, allowlisted kubelet settings under `/etc/kubernetes/kubelet/config.json`. Raw credentials and unrestricted kubelet configuration should not be exported.
-
-## Execute a Kubernetes API scan on Linux
+Use an immutable verified GHCR image digest. Do not deploy the DaemonSet's
+candidate image tag from the raw manifest. The helper pins all three containers
+before submitting any objects.
 
 ```bash
-mkdir -p reports/eks
-./kubecis scan \
-  --engine native \
-  --benchmark cis-eks-2.1.0 \
-  --target policies \
-  --output json \
-  --output-file reports/eks/cluster.json \
-  --exit-code-on-fail=false
+bash scripts/deploy-eks.sh --context YOUR_EKS_CONTEXT \
+  --image ghcr.io/sm-joe/kubecis@sha256:YOUR_VERIFIED_64_CHARACTER_DIGEST
 
-./kubecis render --input reports/eks/cluster.json --output-file reports/eks/results.txt
+bash scripts/collect-eks.sh --context YOUR_EKS_CONTEXT \
+  --cluster-name YOUR_CLUSTER --region YOUR_REGION \
+  --binary ./kubecis --output-dir reports/eks
 ```
 
-The API scan is useful independently but **does not include all managed-node and AWS provider findings**. Cluster identity, per-node sources, AWS provider inventory, freshness and compatibility must be validated before issuing a consolidated EKS dossier. The current repository does **not yet provide a verified POSIX-shell replacement** for the full integrated EKS collector; the Go scanner and Linux node image themselves are native. Do not label API-only output as a complete EKS assessment.
+The image value shown is a non-deployable placeholder. Use the actual digest
+published from the matching CLI source. The collection is read-only but the
+deploy step creates/updates its own Kubernetes resources and requires review.
+The preview gate requires evidence for every supported Linux managed EC2 worker.
+Mixed compute modes, mismatched AWS identity, inconsistent build versions and
+missing essential AL2023 kubelet evidence fail closed. Unavailable optional AWS
+inventories and `nodes/proxy` results never become PASS.
 
-For a validated consolidated JSON produced by the supported collector, the Go review/finalization CLI runs on Linux:
-
-```bash
-./kubecis review-init --input reports/eks/consolidated.json --output-file reports/eks/review-template.json
-./kubecis finalize --input reports/eks/consolidated.json --output-dir reports/eks
-```
-
-When verified human decisions are available, add `--decisions reports/eks/review-decisions.json` to `finalize`. Decisions remain distinct from automated findings; the score stays WITHHELD for provisional benchmark coverage.
+See [Linux EKS collection](../../docs/LINUX-EKS-COLLECTION.md). The Go scanner
+and Bash workflow are Linux-native, but **live Linux EKS end-to-end acceptance
+remains outstanding**. A complete official CIS EKS score is withheld.
 
 ## Evidence and security boundaries
 
