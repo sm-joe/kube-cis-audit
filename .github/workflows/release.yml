@@ -92,13 +92,21 @@ jobs:
           STAGE="$RUNNER_TEMP/kubecis"
           mkdir -p "$STAGE/benchmarks" dist
           cp -R benchmarks/. "$STAGE/benchmarks/"
-          cp README.md "$STAGE/README.md"
+          cp README.md LICENSE ATTRIBUTION.md "$STAGE/"
           cp -R docs "$STAGE/docs"
+          mkdir -p "$STAGE/scripts" "$STAGE/deploy"
+          cp scripts/*.sh "$STAGE/scripts/"
+          cp -R deploy/eks "$STAGE/deploy/eks"
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
           CGO_ENABLED=0 go build -trimpath -buildvcs=false \
             -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=$VERSION" \
             -o "$STAGE/kubecis$EXT" ./cmd/kubecis
+          if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "amd64" ]; then
+            "$STAGE/kubecis" version | grep -Fx "$VERSION"
+            bash "$STAGE/scripts/test-linux-eks.sh"
+            bash "$STAGE/scripts/test-deploy-eks.sh"
+          fi
           NAME="kubecis_${GOOS}_${GOARCH}"
           if [ "$ARCHIVE" = "zip" ]; then
             (cd "$STAGE" && zip -qr "$GITHUB_WORKSPACE/dist/${NAME}.zip" .)
