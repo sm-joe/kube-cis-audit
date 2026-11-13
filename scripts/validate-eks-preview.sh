@@ -26,6 +26,7 @@ done
 [[ -s "$report" ]] || die "Missing report $report"
 command -v jq >/dev/null || die 'jq required'
 jq -e --arg name "$name" --arg region "$region" '
+  . as $r |
   .auditMode == "consolidated" and .cloudProvider == "eks"
   and .benchmark == "cis-eks-2.1.0"
   and .benchmarkCompatibilityStatus == "provisional"
@@ -46,9 +47,9 @@ jq -e --arg name "$name" --arg region "$region" '
   and (.providerEvidence.region == $region)
   and (.providerEvidence.cloudProvider == "eks")
   and (.providerEvidence.clusterArn | test("^arn:aws[a-z-]*:eks:" + $region + ":[0-9]{12}:cluster/" + $name + "$"))
-  and (.clusterVersion | startswith("v" + .providerEvidence.kubernetesVersion + "."))
+  and (.clusterVersion | startswith("v" + $r.providerEvidence.kubernetesVersion + "."))
   and (["api","audit","authenticator","controllerManager","scheduler"] |
-       all(. as $t | .providerEvidence.controlPlaneLogging | has($t)))
+       all(. as $t | $r.providerEvidence.controlPlaneLogging | has($t)))
 ' "$report" >/dev/null || die 'Report fails identity, accounting or withheld-score contract'
 # Temporal checks are evaluated using date(1), not timestamps supplied by the
 # report. Accept at most two minutes future clock skew.
