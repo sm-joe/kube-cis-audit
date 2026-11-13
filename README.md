@@ -92,6 +92,17 @@ For an API scan, supply kubeconfig or an in-cluster service account with careful
 
 ### Amazon EKS deployment
 
+For Linux/Unix operators, [the digest-pinned EKS deployment helper](docs/LINUX-EKS-DEPLOY.md) provides a fail-closed installation entry point. It does **not** replace the currently unverified Linux provider evidence collection workflow.
+
+```bash
+bash scripts/test-deploy-eks.sh
+bash scripts/deploy-eks.sh --context YOUR_EKS_CONTEXT \\
+  --image ghcr.io/sm-joe/kubecis@sha256:YOUR_VERIFIED_64_CHARACTER_DIGEST
+```
+
+The digest is an example placeholder, not a deployable image. Obtain a real published digest before running the helper.
+
+
 Use a deliberately selected cluster context and confirm AWS/Kubernetes identity:
 
 ```bash
