@@ -40,6 +40,7 @@ jobs:
         shell: bash
         run: |
           bash scripts/test-linux-eks.sh
+          bash scripts/test-eks-provider.sh
           bash scripts/test-linux-install.sh
           bash scripts/test-deploy-eks.sh
 
