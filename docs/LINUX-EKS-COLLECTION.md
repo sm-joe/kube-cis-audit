@@ -46,6 +46,40 @@ and ECR enrichment: their status is **UNAVAILABLE**, not PASS.
 Do not equate its reduced provider coverage to the richer, separately
 implemented PowerShell adapter. Do not publish a full CIS score.
 
+## Verified Linux archive installation and rollback
+
+Download the platform release archive, `SHA256SUMS`, and the archive's
+matching `.sigstore.json` bundle from the same GitHub release tag. Verify the
+release archive before deploying its matching image digest. Use non-root user
+directories for the CLI and benchmarks:
+
+```bash
+# Example for an x86-64 Linux host. Replace the tag and use real downloaded assets.
+bash scripts/install-linux.sh \
+  --archive kubecis_linux_amd64.tar.gz \
+  --checksums SHA256SUMS \
+  --bundle kubecis_linux_amd64.tar.gz.sigstore.json \
+  --release vX.Y.Z-rcN
+
+"$HOME/.local/bin/kubecis" version
+
+# After installing a different signed version, restore the prior version:
+bash scripts/install-linux.sh --rollback
+```
+
+This installer checks architecture, checksum, Sigstore certificate identity,
+OIDC issuer, benchmark bundle and binary version; then switches an installation
+symlink. It retains the previous version for rollback. It uses a wrapper that
+points `KUBECIS_CONFIG_DIR` at the active release, so scans do not depend on
+the current working directory.
+
+Run `bash scripts/test-linux-install.sh` for mocked-signature install,
+upgrade and rollback functional testing. **It does not verify Sigstore
+cryptography**; the tagged release workflow must successfully sign and verify
+the actual published artifacts. Neither CLI rollback nor an archive smoke test
+establishes safe Kubernetes DaemonSet upgrades; those require a live EKS
+rollout, canary and rollback acceptance.
+
 ## Evidence files
 
 - `cluster.json`: Kubernetes API findings
