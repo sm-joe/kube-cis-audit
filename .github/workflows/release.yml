@@ -23,6 +23,206 @@ jobs:
             exit 1
           fi
 
+      - name: Prevent stable release while official CIS EKS mapping is provisional
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
+             grep -Eq '^compatibilityStatus: provisional
+        with:
+          go-version: '1.27.4'
+          cache: true
+
+      - name: Verify Formatting
+        shell: bash
+        run: |
+          files=$(find . -type f -name '*.go' -not -path './vendor/*')
+          test -z "$(gofmt -l $files)"
+
+      - name: Validate Linux acceptance helpers
+        shell: bash
+        run: bash scripts/test-linux-eks.sh
+
+      - name: Run Go Vet
+        run: go vet ./...
+
+      - name: Run Complete Go Test Suite
+        run: go test ./... -count=1
+
+      - name: Build Release CLI
+        run: CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /tmp/kubecis ./cmd/kubecis
+
+  binaries:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            archive: zip
+          - goos: linux
+            goarch: amd64
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            archive: tar.gz
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.4'
+          cache: true
+
+      - name: Build and Package
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ github.ref_name }}
+          ARCHIVE: ${{ matrix.archive }}
+        run: |
+          STAGE="$RUNNER_TEMP/kubecis"
+          mkdir -p "$STAGE/benchmarks" dist
+          cp -R benchmarks/. "$STAGE/benchmarks/"
+          cp README.md LICENSE ATTRIBUTION.md "$STAGE/"
+          cp -R docs "$STAGE/docs"
+          mkdir -p "$STAGE/scripts" "$STAGE/deploy"
+          cp scripts/*.sh "$STAGE/scripts/"
+          cp -R deploy/eks "$STAGE/deploy/eks"
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+            -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=$VERSION" \
+            -o "$STAGE/kubecis$EXT" ./cmd/kubecis
+          if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "amd64" ]; then
+            "$STAGE/kubecis" version | grep -Fx "$VERSION"
+            bash "$STAGE/scripts/test-linux-eks.sh"
+            bash "$STAGE/scripts/test-deploy-eks.sh"
+          fi
+          NAME="kubecis_${GOOS}_${GOARCH}"
+          if [ "$ARCHIVE" = "zip" ]; then
+            (cd "$STAGE" && zip -qr "$GITHUB_WORKSPACE/dist/${NAME}.zip" .)
+          else
+            tar -C "$STAGE" -czf "$GITHUB_WORKSPACE/dist/${NAME}.tar.gz" .
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kubecis-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate Checksums
+        run: cd dist && sha256sum kubecis_* > SHA256SUMS
+
+      - name: Attest release archives and checksum manifest
+        uses: actions/attest@v4
+        with:
+          subject-path: 'dist/*'
+
+      - name: Publish Release Assets
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  container:
+    name: Publish Container Image
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Cosign for keyless OCI signing
+        uses: sigstore/cosign-installer@v4.1.0
+
+      - name: Set image tags
+        id: image-tags
+        shell: bash
+        run: |
+          tags="ghcr.io/${GITHUB_REPOSITORY_OWNER}/kubecis:${GITHUB_REF_NAME}"
+          # A prerelease (for example v3.0.0-rc4) must never move the stable
+          # latest tag. Only a stable semantic-version tag may publish latest.
+          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags+=$'\nghcr.io/'"${GITHUB_REPOSITORY_OWNER}"'/kubecis:latest'
+          fi
+          { echo 'tags<<EOF'; printf '%s\n' "$tags"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
+
+      - name: Build and Push Multi-architecture Image
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          tags: ${{ steps.image-tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+
+      - name: Sign published image by immutable digest
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          test -n "$DIGEST"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$DIGEST"
+          cosign sign --yes "$IMAGE"
+          cosign verify "$IMAGE" --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}" \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
+ benchmarks/cis-eks-2.1.0/benchmark.yaml; then
+            echo "::error::Stable release blocked: official EKS benchmark mapping remains provisional"
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
@@ -213,5 +413,5 @@ jobs:
           test -n "$DIGEST"
           IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$DIGEST"
           cosign sign --yes "$IMAGE"
-          cosign verify "$IMAGE" --certificate-identity-regexp '^https://github.com/' \
+          cosign verify "$IMAGE" --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
