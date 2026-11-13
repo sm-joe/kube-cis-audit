@@ -40,7 +40,7 @@ jq -e --arg name "$cluster" --arg region "$region" --arg server "${endpoint%/}" 
    and ($c.resourcesVpcConfig.endpointPrivateAccess | type) == "boolean"
    and ($c.resourcesVpcConfig.endpointPublicAccess | type) == "boolean"
    and ([ "api", "audit", "authenticator", "controllerManager", "scheduler" ] |
-       all(. as $t | ([$c.logging.clusterLogging[]? | select(.types | index($t)) | .enabled] | length) == 1))
+       all(. as $t | ([$c.logging.clusterLogging[]? | select(.types | index($t)) | .enabled] | length) == 1)))
   ' <<<"$raw" >/dev/null || die 'AWS EKS identity or mandatory provider fields invalid'
 # jq never persists credentials. Other API evidence requires independent
 # permission-scoped collection; mark it explicitly unavailable for this
