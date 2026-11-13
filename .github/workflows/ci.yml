@@ -32,6 +32,10 @@ jobs:
           gofmt -d internal/audit/eks_kubelet_extended.go internal/audit/eks_kubelet_extended_test.go
           test -z "$(gofmt -l $files)"
 
+      - name: Validate Linux EKS deployment helper
+        shell: bash
+        run: bash scripts/test-deploy-eks.sh
+
       - name: Run Go Vet
         run: go vet ./...
 
