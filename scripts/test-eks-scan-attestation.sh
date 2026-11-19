@@ -27,6 +27,31 @@ verify() {
 }
 verify
 jq -e --arg child "$child" '.verified == true and .scanDigests == [$child]' "$tmp/evidence.json" >/dev/null
+# Verify actual collector integration against an AWS-owned registry with
+# deliberately denied cross-account ECR scan-read API calls.
+mkdir -p "$tmp/bin"
+cat > "$tmp/bin/kubectl" <<'MOCK'
+#!/usr/bin/env bash
+cat "$MOCK_PODS"
+MOCK
+cat > "$tmp/bin/aws" <<'MOCK'
+#!/usr/bin/env bash
+if [[ "$*" == *"sts get-caller-identity"* ]]; then
+ echo '638631156706'
+else
+ echo 'AccessDeniedException' >&2
+ exit 1
+fi
+MOCK
+chmod +x "$tmp/bin/"*
+export MOCK_PODS="$tmp/pods.json"
+cat > "$MOCK_PODS" <<EOF
+{"items":[{"spec":{"containers":[{"name":"coredns","image":"602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/coredns@$digest"}]},"status":{"phase":"Running","containerStatuses":[{"name":"coredns","imageID":"602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/coredns@$digest"}]}}]}
+EOF
+PATH="$tmp/bin:$PATH" KUBECIS_ATTESTATION_DIR="$tmp/claims" \
+ KUBECIS_ATTESTATION_PUBLIC_KEY="$tmp/public.pem" KUBECIS_ATTESTATION_KEY_SHA256="$pin" \
+ bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/provider.json"
+jq -e --arg key "$pin" '.ecrInventoryStatus == "COLLECTED" and .ecrImages[0].scanType == "THIRD_PARTY" and .ecrImages[0].scanStatus == "COMPLETE" and .ecrImages[0].error == "" and .ecrImages[0].attestationSignerKeySha256 == $key' "$tmp/provider.json" >/dev/null
 if bash "$root/scripts/verify-eks-scan-attestation.sh" \
  --dir "$tmp/claims" --public-key "$tmp/public.pem" --key-sha256 "$pin" \
  --registry "602401143452.dkr.ecr.us-east-1.amazonaws.com" \
@@ -36,6 +61,10 @@ fi
 jq '.scanId = "tampered"' "$file" > "$tmp/tampered"
 mv "$tmp/tampered" "$file"
 if verify >/dev/null 2>&1; then echo 'FAIL: accepted tampered scan evidence' >&2;exit 1;fi
+PATH="$tmp/bin:$PATH" KUBECIS_ATTESTATION_DIR="$tmp/claims" \
+ KUBECIS_ATTESTATION_PUBLIC_KEY="$tmp/public.pem" KUBECIS_ATTESTATION_KEY_SHA256="$pin" \
+ bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/provider.json"
+jq -e '.ecrImages[0].scanStatus == "" and .ecrImages[0].error == "EXTERNAL_ATTESTATION_INVALID"' "$tmp/provider.json" >/dev/null
 jq '.scanId = "run-001" | .scannedAt = "2020-01-01T00:00:00Z"' "$file" > "$tmp/stale"
 mv "$tmp/stale" "$file"
 openssl dgst -sha256 -sign "$tmp/private.pem" -out "$sig" "$file"
