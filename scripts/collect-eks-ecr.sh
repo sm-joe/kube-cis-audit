@@ -66,7 +66,7 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
   seen["$key"]=1
   ((count+=1))
   if ((count>80)); then status=UNAVAILABLE;break;fi
-  scan_type=''; scan_status=''; error=''
+  scan_type=''; scan_status=''; error=''; resolved_scan_digests='[]'
   if [[ -z "$digest" ]];then
    error='runtime image digest unavailable'
   else
@@ -100,8 +100,53 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
      error="CROSS_ACCOUNT_ECR_$scan_error"
     fi
    fi
+   # A deployed OCI image index (or Docker manifest list) is an immutable
+   # pointer to platform-specific image manifests. ECR Basic does not scan
+   # index digests. Resolve the exact index through ECR, then require every
+   # runnable Linux child digest to have an independently verified scan.
+   # Ignore OCI attestation descriptors with unknown/unknown platform.
+   # Never infer a PASS from a child that cannot be read or matched.
+   if [[ "$error" == 'SCAN_RESULT_SCAN_NOT_FOUND' && "$account" == "$caller_account" ]]; then
+    if manifest="$(aws ecr batch-get-image --registry-id "$account" --repository-name "$repository" --image-ids "imageDigest=$digest" --region "$image_region" --query 'images[0].imageManifest' --output text 2>"$work/aws-error")"; then
+     if jq -e '(.mediaType == "application/vnd.oci.image.index.v1+json" or .mediaType == "application/vnd.docker.distribution.manifest.list.v2+json") and (.manifests | type == "array")' <<<"$manifest" >/dev/null 2>&1; then
+      child_digests="$(jq -cr '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64")) | select(.mediaType == "application/vnd.oci.image.manifest.v1+json" or .mediaType == "application/vnd.docker.distribution.manifest.v2+json") | .digest] | unique' <<<"$manifest")"
+      child_count="$(jq 'length' <<<"$child_digests")"
+      if ((child_count == 0 || child_count > 8)); then
+       error='OCI_INDEX_NO_BOUNDED_LINUX_CHILDREN'
+      elif ! jq -e 'all(.[]; test("^sha256:[a-fA-F0-9]{64}$"))' <<<"$child_digests" >/dev/null; then
+       error='OCI_INDEX_INVALID_CHILD_DIGEST'
+      else
+       error=''
+       all_complete=true
+       all_active=false
+       while IFS= read -r child_digest; do
+        if ! child_result="$(aws ecr describe-image-scan-findings --registry-id "$account" --repository-name "$repository" --image-id "imageDigest=$child_digest" --region "$image_region" --query '{imageId:imageId,scanStatus:imageScanStatus.status}' --output json 2>"$work/aws-error")"; then
+         all_complete=false
+         error="OCI_CHILD_$(classify_aws_error "$(cat "$work/aws-error")")"
+         break
+        fi
+        if ! jq -e --arg digest "$child_digest" '.imageId.imageDigest == $digest and (.scanStatus == "COMPLETE" or .scanStatus == "ACTIVE")' <<<"$child_result" >/dev/null 2>&1; then
+         all_complete=false
+         error='OCI_CHILD_SCAN_NOT_VERIFIED'
+         break
+        fi
+        [[ "$(jq -r '.scanStatus' <<<"$child_result")" == 'ACTIVE' ]] && all_active=true
+        resolved_scan_digests="$(jq -c --arg digest "$child_digest" '. + [$digest]' <<<"$resolved_scan_digests")"
+       done < <(jq -r '.[]' <<<"$child_digests")
+       if [[ "$all_complete" == true && "$(jq 'length' <<<"$resolved_scan_digests")" -eq "$child_count" ]]; then
+        if [[ "$all_active" == true ]]; then scan_status='ACTIVE'; else scan_status='COMPLETE'; fi
+        if [[ -z "$scan_type" ]]; then error='SCAN_STATUS_OBSERVED_BUT_REGISTRY_MODE_UNVERIFIED'; fi
+       else
+        scan_status=''
+       fi
+      fi
+     fi
+    else
+     error="OCI_INDEX_LOOKUP_$(classify_aws_error "$(cat "$work/aws-error")")"
+    fi
+   fi
   fi
-  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error}]' <<<"$images")"
+  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" --argjson scanDigests "$resolved_scan_digests" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error,scanDigests:$scanDigests}]' <<<"$images")"
  done < "$work/rows"
  non_ecr="${#non_ecr_seen[@]}"
  [[ -s "$work/rows" ]] || status=UNAVAILABLE
