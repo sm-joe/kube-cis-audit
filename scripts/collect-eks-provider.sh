@@ -6,16 +6,17 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 usage() {
   echo 'Usage: bash scripts/collect-eks-provider.sh --cluster-name NAME --region REGION --expected-server HTTPS_URL --output-file PATH' 
 }
-cluster='' region='' endpoint='' outfile=''
+cluster='' region='' endpoint='' outfile='' context=''
 while (($#)); do
   case "$1" in
-    --cluster-name|--region|--expected-server|--output-file)
+    --cluster-name|--region|--expected-server|--output-file|--context)
       (($# >= 2)) || die "Missing value for $1"
       case "$1" in
         --cluster-name) cluster=$2 ;;
         --region) region=$2 ;;
         --expected-server) endpoint=$2 ;;
         --output-file) outfile=$2 ;;
+        --context) context=$2 ;;
       esac
       shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -61,5 +62,16 @@ jq -n --argjson aws "$raw" --arg region "$region" --arg now "$(date -u +%Y-%m-%d
    accessInventoryStatus:"UNAVAILABLE",accessEntries:[],
    vpcCniStatus:"UNAVAILABLE",ecrInventoryStatus:"UNAVAILABLE",ecrImages:[],nonEcrImageCount:0
   }' > "$outfile" || die 'Cannot write provider evidence'
+# Optional Linux ECR inventory is the same context as the cluster API scan.
+# If a provider API denies access, the helper emits UNAVAILABLE (never PASS).
+if [[ -n "$context" ]]; then
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  ecr="$(mktemp)"
+  merged="$(mktemp)"
+  trap 'rm -f -- "$ecr" "$merged"' EXIT
+  bash "$script_dir/collect-eks-ecr.sh" --context "$context" --region "$region" --output-file "$ecr"
+  jq -s '.[0] * .[1]' "$outfile" "$ecr" > "$merged" || die 'Cannot merge ECR evidence'
+  mv -- "$merged" "$outfile"
+fi
 jq -e '.schemaVersion == 1 and .assessmentStatus == "INVENTORY_ONLY"' "$outfile" >/dev/null || die 'Invalid generated evidence'
 echo "Collected provisional EKS provider inventory for $cluster ($region)"
