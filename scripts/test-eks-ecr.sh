@@ -15,10 +15,12 @@ SH
 cat > "$tmp/bin/aws" <<'SH'
 #!/usr/bin/env bash
 if [[ "$*" == *"sts get-caller-identity"* ]]; then
- echo "${MOCK_ACCOUNT:-999999999999}"
+ echo "${MOCK_ACCOUNT:-123456789012}"
 elif [[ "$*" == *get-registry-scanning-configuration* ]]; then
+ if [[ "$*" == *"--registry-id"* ]]; then echo 'unknown options: --registry-id' >&2; exit 2; fi
  if [[ "${MOCK_CASE:-}" == awsdeny || "${MOCK_CASE:-}" == indexconfigdeny ]]; then echo 'AccessDeniedException' >&2; exit 1; fi
- echo '{"scanningConfiguration":{"scanType":"ENHANCED"}}'
+ if [[ "${MOCK_CASE:-}" == registryMismatch ]]; then echo '{"registryId":"999999999999","scanningConfiguration":{"scanType":"ENHANCED"}}'; exit 0; fi
+ printf '{"registryId":"%s","scanningConfiguration":{"scanType":"ENHANCED"}}\n' "${MOCK_ACCOUNT:-123456789012}"
 elif [[ "$*" == *batch-get-image* ]]; then
  if [[ "${MOCK_CASE:-}" != index && "${MOCK_CASE:-}" != indexpartial && "${MOCK_CASE:-}" != indexinvalid && "${MOCK_CASE:-}" != indexconfigdeny ]]; then exit 1; fi
  if [[ "${MOCK_CASE:-}" == indexinvalid ]]; then
@@ -47,14 +49,16 @@ cat > "$MOCK_PODS" <<EOF
 EOF
 PATH="$tmp/bin:$PATH" bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e --arg d "$MOCK_DIGEST" '.ecrInventoryStatus=="COLLECTED" and .nonEcrImageCount==1 and (.ecrImages|length)==1 and .ecrImages[0].digest==$d and .ecrImages[0].scanStatus=="ACTIVE"' "$tmp/out.json" >/dev/null
-PATH="$tmp/bin:$PATH" MOCK_CASE=awsdeny bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
+PATH="$tmp/bin:$PATH" MOCK_CASE=awsdeny MOCK_ACCOUNT=999999999999 bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e '.ecrInventoryStatus=="COLLECTED" and (.ecrImages[0].error | startswith("CROSS_ACCOUNT_ECR_AWS_READ_ACCESS_DENIED")) and .ecrImages[0].scanStatus==""' "$tmp/out.json" >/dev/null
-PATH="$tmp/bin:$PATH" MOCK_CASE=scannotfound bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
+PATH="$tmp/bin:$PATH" MOCK_CASE=scannotfound MOCK_ACCOUNT=999999999999 bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e '.ecrImages[0].error=="CROSS_ACCOUNT_ECR_SCAN_NOT_FOUND"' "$tmp/out.json" >/dev/null
 PATH="$tmp/bin:$PATH" MOCK_CASE=mismatch bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e '.ecrImages[0].error=="SCAN_RESPONSE_DIGEST_OR_STATUS_UNVERIFIED" and .ecrImages[0].scanStatus==""' "$tmp/out.json" >/dev/null
 PATH="$tmp/bin:$PATH" MOCK_CASE=index MOCK_ACCOUNT=123456789012 bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e --arg parent "$MOCK_DIGEST" --arg child "$MOCK_CHILD_DIGEST" '.ecrImages[0].digest==$parent and .ecrImages[0].scanStatus=="COMPLETE" and .ecrImages[0].error=="" and .ecrImages[0].scanDigests==[$child]' "$tmp/out.json" >/dev/null
+PATH="$tmp/bin:$PATH" MOCK_CASE=registryMismatch bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
+jq -e '.ecrImages[0].scanStatus=="ACTIVE" and .ecrImages[0].scanType=="" and .ecrImages[0].error=="REGISTRY_SCAN_CONFIG_REGISTRY_ID_MISMATCH"' "$tmp/out.json" >/dev/null
 PATH="$tmp/bin:$PATH" MOCK_CASE=indexconfigdeny MOCK_ACCOUNT=123456789012 bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
 jq -e --arg child "$MOCK_CHILD_DIGEST" '.ecrImages[0].scanStatus=="COMPLETE" and .ecrImages[0].scanDigests==[$child] and .ecrImages[0].error=="REGISTRY_SCAN_CONFIG_AWS_READ_ACCESS_DENIED"' "$tmp/out.json" >/dev/null
 PATH="$tmp/bin:$PATH" MOCK_CASE=indexpartial MOCK_ACCOUNT=123456789012 bash "$root/scripts/collect-eks-ecr.sh" --context demo --region us-east-1 --output-file "$tmp/out.json"
