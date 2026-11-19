@@ -105,13 +105,15 @@ approved configuration has been independently verified.
 
 ## 6. Unresolved evidence, not automatic failures
 
-- **5.1.1 ECR/third-party scanning:** Linux provider evidence reports
-  `ecrInventoryStatus=UNAVAILABLE`. Implement/authorize full deployed-image
-  registry/digest scanning inventory or obtain validated third-party attestations
-  before determining PASS/FAIL. No invented PASS.
-- **3.2.7 on both workers:** the effective kubelet `/configz` omitted
-  `rotateCertificates`. Review active kubelet authentication mode and
-  configuration; do not infer defaults. Keep NOT_ASSESSED without new evidence.
+- **5.1.1 ECR/third-party scanning:** Linux now collects deployed-image
+  digest scan status if AWS/Kubernetes permissions permit. Review per-image
+  errors and non-ECR images; incomplete inventories remain unknown.
+  Never invent PASS for absent digests or AWS denials.
+- **3.2.7 on both workers:** the new node-metadata schema identifies the
+  active kubelet client authentication method from an allowlisted kubeconfig
+  without exporting secrets. IAM exec-token-only kubelets receive MANUAL
+  applicability review; client-certificate kubelets require explicit rotation
+  evidence. Unknown remains NOT_ASSESSED.
 - **Other MANUAL controls:** require explicit evidence-backed human review.
   A reviewer approval is not a replacement for automated source observations.
 
