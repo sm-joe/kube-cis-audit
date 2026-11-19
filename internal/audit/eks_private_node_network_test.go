@@ -39,6 +39,12 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 			}
 		})
 	}
+	// Inactive gateway routes are not effective internet paths.
+	blackhole := base
+	blackhole.Items = []json.RawMessage{data(`{"SubnetId":"subnet-123","VpcId":"vpc-123","MapPublicIpOnLaunch":false,"routeSource":"MAIN","routeTableId":"rtb-123","routes":[{"ipv4":"0.0.0.0/0","gateway":"igw-123","state":"blackhole"}]}`)}
+	if status, _, _ := assessEKSPrivateNodes(blackhole); status != "MANUAL" {
+		t.Fatalf("inactive IGW route must not be treated as active, got %s", status)
+	}
 	publicNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":"203.0.113.5","State":"running"}`)
 	private := base
 	private.Items = []json.RawMessage{subnet(false, "MAIN", "nat-123")}
