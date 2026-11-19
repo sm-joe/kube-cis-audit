@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Eeuxo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 bash -n "$root/scripts/collect-eks-node-network.sh"
 tmp="$(mktemp -d)";trap 'rm -rf -- "$tmp"' EXIT
