@@ -564,7 +564,7 @@
       "id": "5.1.2",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
@@ -572,14 +572,14 @@
       "reviewer": "",
       "reviewedAt": "",
       "auditPage": 182,
-      "runtimeRoute": "manual_review_missing_aws_inventory",
-      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
+      "runtimeRoute": "aws_manual_review_inventory",
+      "implementationNote": "Read-only AWS evidence collector plus evidence-bound reviewer workflow; scanner does not auto-approve, and benchmark procedure conformance remains unverified."
     },
     {
       "id": "5.1.3",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
@@ -587,8 +587,8 @@
       "reviewer": "",
       "reviewedAt": "",
       "auditPage": 187,
-      "runtimeRoute": "manual_review_missing_aws_inventory",
-      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
+      "runtimeRoute": "aws_manual_review_inventory",
+      "implementationNote": "Read-only AWS evidence collector plus evidence-bound reviewer workflow; scanner does not auto-approve, and benchmark procedure conformance remains unverified."
     },
     {
       "id": "5.1.4",
@@ -624,7 +624,7 @@
       "id": "5.3.1",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
@@ -632,8 +632,8 @@
       "reviewer": "",
       "reviewedAt": "",
       "auditPage": 203,
-      "runtimeRoute": "manual_review_missing_aws_inventory",
-      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
+      "runtimeRoute": "aws_manual_review_inventory",
+      "implementationNote": "Read-only AWS evidence collector plus evidence-bound reviewer workflow; scanner does not auto-approve, and benchmark procedure conformance remains unverified."
     },
     {
       "id": "5.4.1",
@@ -669,7 +669,7 @@
       "id": "5.4.3",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
@@ -677,8 +677,8 @@
       "reviewer": "",
       "reviewedAt": "",
       "auditPage": 215,
-      "runtimeRoute": "manual_review_missing_aws_inventory",
-      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
+      "runtimeRoute": "aws_manual_review_inventory",
+      "implementationNote": "Read-only AWS evidence collector plus evidence-bound reviewer workflow; scanner does not auto-approve, and benchmark procedure conformance remains unverified."
     },
     {
       "id": "5.4.4",
