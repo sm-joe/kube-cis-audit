@@ -27,10 +27,12 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		Routes         []route `json:"routes"`
 	}
 	type node struct {
-		Name       string `json:"node"`
-		InstanceID string `json:"InstanceId"`
-		SubnetID   string `json:"SubnetId"`
-		PublicIP   string `json:"PublicIpAddress"`
+		Name                      string   `json:"node"`
+		InstanceID                string   `json:"InstanceId"`
+		SubnetID                  string   `json:"SubnetId"`
+		PublicIP                  string   `json:"PublicIpAddress"`
+		NetworkInterfacePublicIPs []string `json:"NetworkInterfacePublicIps"`
+		State                     string   `json:"State"`
 	}
 	var evidence []Evidence
 	var public []string
@@ -80,12 +82,21 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		if !subnetIDs[n.SubnetID] {
 			unknown = append(unknown, n.InstanceID+": node subnet missing from assessed groups")
 		}
+		if n.State != "running" {
+			unknown = append(unknown, n.InstanceID+": running EC2 instance state unverified")
+		}
 		if n.PublicIP != "" {
 			public = append(public, n.InstanceID+": assigned public IPv4")
 		}
+		for _, ip := range n.NetworkInterfacePublicIPs {
+			if ip != "" {
+				public = append(public, n.InstanceID+": secondary network interface public IPv4/EIP")
+				break
+			}
+		}
 		evidence = append(evidence, Evidence{
 			Resource: "AWS::EC2::Instance", Name: n.InstanceID, Field: "subnet/publicIPv4",
-			Observed: fmt.Sprintf("%s/public=%t", n.SubnetID, n.PublicIP != ""),
+			Observed: fmt.Sprintf("%s/state=%s/primaryPublic=%t/secondaryPublicInterfaces=%d", n.SubnetID, n.State, n.PublicIP != "", len(n.NetworkInterfacePublicIPs)),
 			Expected: "node in assessed private subnet without public IPv4",
 		})
 	}
