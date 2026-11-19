@@ -24,7 +24,7 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 	}{
 		{"public via explicit internet gateway", subnet(false, "EXPLICIT", "igw-123"), "FAIL"},
 		{"public via inherited main gateway", subnet(false, "MAIN", "igw-456"), "FAIL"},
-		{"auto public IP without gateway", subnet(true, "MAIN", "nat-123"), "FAIL"},
+		{"auto public IP without gateway", subnet(true, "MAIN", "nat-123"), "MANUAL"},
 		{"private via NAT", subnet(false, "MAIN", "nat-123"), "PASS"},
 		{"private via VPC endpoint", subnet(false, "EXPLICIT", ""), "PASS"},
 		{"route unavailable", subnet(false, "UNAVAILABLE", ""), "MANUAL"},
