@@ -161,10 +161,10 @@ func EvaluateEKSAdditionalPolicy(ctx context.Context, client kubernetes.Interfac
 		r.Evidence = assessed.Evidence
 		r.Status = assessed.Status
 		if r.Status == "FAIL" {
-			r.Details = "Workloads reference the default service account rather than a dedicated identity. " + assessed.Details
+			r.Details = "Non-platform workloads reference the default service account rather than a dedicated identity. " + assessed.Details
 		} else {
 			r.Status = "MANUAL"
-			r.Details = "No default service account workload references found. Review dedicated service accounts against EKS Pod Identity/IRSA, RBAC and approved workload identity assignments before attestation."
+			r.Details = assessed.Details + " Review EKS Pod Identity/IRSA, RBAC and approved workload identity assignments before attestation."
 		}
 		return r
 	case "4.3.1":
