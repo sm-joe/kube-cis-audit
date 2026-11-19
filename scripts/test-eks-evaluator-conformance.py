@@ -39,6 +39,13 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertTrue(any("duplicate" in x for x in gaps))
         self.assertTrue(any("absent" in x for x in gaps))
 
+    def test_official_audit_procedure_page_must_match_source(self):
+        data = json.loads(json.dumps(self.ledger))
+        data["controls"][0]["auditPage"] = 999
+        gaps, ready, _ = module.audit(data, self.catalog, ROOT)
+        self.assertFalse(ready)
+        self.assertTrue(any("audit procedure page mismatch" in x for x in gaps))
+
     def test_unimplemented_mapping_cannot_be_asserted_implemented(self):
         data = json.loads(json.dumps(self.ledger))
         item = next(x for x in data["controls"] if x["implementationStatus"] == "not_implemented")
