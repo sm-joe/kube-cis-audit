@@ -24,7 +24,7 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 	}{
 		{"public via explicit internet gateway", subnet(false, "EXPLICIT", "igw-123"), "FAIL"},
 		{"public via inherited main gateway", subnet(false, "MAIN", "igw-456"), "FAIL"},
-		{"auto public IP without gateway", subnet(true, "MAIN", "nat-123"), "FAIL"},
+		{"auto public IP without gateway", subnet(true, "MAIN", "nat-123"), "MANUAL"},
 		{"private via NAT", subnet(false, "MAIN", "nat-123"), "PASS"},
 		{"private via VPC endpoint", subnet(false, "EXPLICIT", ""), "PASS"},
 		{"route unavailable", subnet(false, "UNAVAILABLE", ""), "MANUAL"},
@@ -74,7 +74,7 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 
 func TestEKS543PublicPlacementRemainsFailEvenWithApprovedExceptionText(t *testing.T) {
 	review := EKSAWSManualEvidence{Status: "PARTIAL", Items: []json.RawMessage{
-		json.RawMessage(`{"SubnetId":"subnet-123","VpcId":"vpc-123","MapPublicIpOnLaunch":true,"routeSource":"EXPLICIT","routeTableId":"rtb-1","routes":[]}`),
+		json.RawMessage(`{"SubnetId":"subnet-123","VpcId":"vpc-123","MapPublicIpOnLaunch":true,"routeSource":"EXPLICIT","routeTableId":"rtb-1","routes":[{"ipv4":"0.0.0.0/0","gateway":"igw-1","state":"active"}]}`),
 	}, Note: "Approved by owner"}
 	status, detail, _ := assessEKSPrivateNodes(review)
 	if status != "FAIL" || !strings.Contains(detail, "separate approved exception") {

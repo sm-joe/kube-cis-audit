@@ -51,7 +51,10 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		if s.PublicOnLaunch == nil {
 			unknown = append(unknown, s.SubnetID+": subnet public IP default not verified")
 		} else if *s.PublicOnLaunch {
-			public = append(public, s.SubnetID+": auto-assign public IPv4 enabled")
+			// This setting permits future public IP assignment but does not
+			// prove that a worker is currently publicly routed. Require
+			// verified IGW routing or a public EC2 interface for FAIL.
+			unknown = append(unknown, s.SubnetID+": auto-assign public IPv4 enabled; inspect actual routing and node addresses")
 		}
 		if s.RouteSource != "MAIN" && s.RouteSource != "EXPLICIT" {
 			unknown = append(unknown, s.SubnetID+": effective route-table lookup unavailable")
