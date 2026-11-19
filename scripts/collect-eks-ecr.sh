@@ -140,11 +140,13 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
        done < <(jq -r '.[]' <<<"$child_digests")
        if [[ "$all_complete" == true && "$(jq 'length' <<<"$resolved_scan_digests")" -eq "$child_count" ]]; then
         if [[ "$all_active" == true ]]; then scan_status='ACTIVE'; else scan_status='COMPLETE'; fi
-        if [[ -z "$scan_type" ]]; then if [[ -n "$config_error" ]]; then
-       error="REGISTRY_SCAN_CONFIG_$config_error"
-      else
-       error='REGISTRY_SCAN_TYPE_UNKNOWN'
-      fi; fi
+        if [[ -z "$scan_type" ]]; then
+         if [[ -n "$config_error" ]]; then
+          error="REGISTRY_SCAN_CONFIG_$config_error"
+         else
+          error='REGISTRY_SCAN_TYPE_UNKNOWN'
+         fi
+        fi
        else
         scan_status=''
        fi
