@@ -15,6 +15,14 @@ while (($#)); do
 done
 [[ -n "$context" && -n "$region" && -n "$outfile" ]] || die 'Context, region, output required'
 for tool in jq kubectl aws; do command -v "$tool" >/dev/null || die "$tool required"; done
+# External evidence is opt-in and requires all three independent trust inputs.
+attest_dir="${KUBECIS_ATTESTATION_DIR:-}"
+attest_pub="${KUBECIS_ATTESTATION_PUBLIC_KEY:-}"
+attest_pin="${KUBECIS_ATTESTATION_KEY_SHA256:-}"
+if [[ -n "$attest_dir$attest_pub$attest_pin" && ( -z "$attest_dir" || -z "$attest_pub" || -z "$attest_pin" ) ]]; then
+ die 'External attestations require directory, pinned public key and its SHA256 together'
+fi
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 umask 077
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
@@ -172,7 +180,24 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
     fi
    fi
   fi
-  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" --argjson scanDigests "$resolved_scan_digests" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error,scanDigests:$scanDigests}]' <<<"$images")"
+  attestation_scanner='' attestation_key='' attestation_date=''
+  if [[ -n "$attest_dir" && -n "$digest" && -n "$error" && -f "$attest_dir/${digest#sha256:}.json" ]]; then
+   if bash "$script_dir/verify-eks-scan-attestation.sh" \
+     --dir "$attest_dir" --public-key "$attest_pub" --key-sha256 "$attest_pin" \
+     --registry "$registry" --repository "$repository" --digest "$digest" \
+     --output-file "$work/verified-attestation.json" >/dev/null 2>"$work/attestation-error"; then
+     scan_type='THIRD_PARTY'
+     scan_status='COMPLETE'
+     error=''
+     resolved_scan_digests="$(jq -c '.scanDigests' "$work/verified-attestation.json")"
+     attestation_scanner="$(jq -r '.scanner' "$work/verified-attestation.json")"
+     attestation_key="$(jq -r '.signerKeySha256' "$work/verified-attestation.json")"
+     attestation_date="$(jq -r '.scannedAt' "$work/verified-attestation.json")"
+   else
+     error='EXTERNAL_ATTESTATION_INVALID'
+   fi
+  fi
+  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" --argjson scanDigests "$resolved_scan_digests" --arg scanner "$attestation_scanner" --arg signer "$attestation_key" --arg scannedAt "$attestation_date" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error,scanDigests:$scanDigests,attestationScanner:$scanner,attestationSignerKeySha256:$signer,attestationScannedAt:$scannedAt}]' <<<"$images")"
  done < "$work/rows"
  non_ecr="${#non_ecr_seen[@]}"
  [[ -s "$work/rows" ]] || status=UNAVAILABLE
