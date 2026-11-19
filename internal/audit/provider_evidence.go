@@ -28,6 +28,8 @@ type EKSECRImageScanEvidence struct {
 	AttestationScanner         string   `json:"attestationScanner,omitempty"`
 	AttestationSignerKeySHA256 string   `json:"attestationSignerKeySha256,omitempty"`
 	AttestationScannedAt       string   `json:"attestationScannedAt,omitempty"`
+	AttestationClaimBase64     string   `json:"attestationClaimBase64,omitempty"`
+	AttestationSignatureBase64 string   `json:"attestationSignatureBase64,omitempty"`
 	Error                      string   `json:"error,omitempty"`
 }
 

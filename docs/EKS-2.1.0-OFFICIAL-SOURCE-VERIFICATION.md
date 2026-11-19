@@ -50,6 +50,12 @@ runtime fixtures. ECR/image scanner results and policy/manual decisions depend
 on the AWS/Kubernetes account permissions and deployed image inventory.
 Manual controls still need authenticated review and source-bound evidence.
 
+The routing inventory now has 47 candidate evaluator/human-review paths and
+zero independently verified audit-procedure mappings. This corrects a stale
+implementation boolean in the previous 19-candidate/28-unimplemented catalog,
+not the underlying verification deficit. Stable releases additionally
+require signed reviewer approval and SHA-256-bound control fixtures.
+
 The source clearly distinguishes the client certificate rotation control
 `3.2.7` on client-certificate nodes from IAM exec-token-only EKS nodeadm
 clients. The engine records IAM-client evidence without exporting secrets,

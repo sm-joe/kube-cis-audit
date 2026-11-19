@@ -33,6 +33,8 @@ openssl dgst -sha256 -verify "$key" -signature "$sig" "$payload" >/dev/null 2>&1
 jq -e --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" '
  type == "object" and
  (.schemaVersion == 1) and
+ ((keys | sort) == (["schemaVersion","subject","scanner","scanId","status","findingsAvailable","scannerReportSha256","scannedAt","scannedDigests"] | sort)) and
+ ((.subject | keys | sort) == (["registry","repository","digest"] | sort)) and
  (.subject.registry == $registry) and
  (.subject.repository == $repository) and
  (.subject.digest == $digest) and

@@ -16,33 +16,42 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 18
+      "auditPage": 18,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.1.1",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 23
+      "auditPage": 23,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.1.2",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 27
+      "auditPage": 27,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.1.3",
@@ -55,20 +64,26 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 31
+      "auditPage": 31,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.1.4",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 35
+      "auditPage": 35,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.1",
@@ -81,7 +96,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 40
+      "auditPage": 40,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.2",
@@ -94,7 +112,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 44
+      "auditPage": 44,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.3",
@@ -107,7 +128,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 48
+      "auditPage": 48,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.4",
@@ -120,7 +144,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 53
+      "auditPage": 53,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.5",
@@ -133,7 +160,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 57
+      "auditPage": 57,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.6",
@@ -146,7 +176,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 61
+      "auditPage": 61,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.7",
@@ -159,7 +192,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 66
+      "auditPage": 66,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "3.2.8",
@@ -172,59 +208,74 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 71
+      "auditPage": 71,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.1",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 79
+      "auditPage": 79,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.2",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 83
+      "auditPage": 83,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.3",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 87
+      "auditPage": 87,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.4",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 92
+      "auditPage": 92,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.5",
@@ -237,7 +288,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 96
+      "auditPage": 96,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.6",
@@ -250,85 +304,106 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 100
+      "auditPage": 100,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.7",
       "assessment": "automated",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 104
+      "auditPage": 104,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.8",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 110
+      "auditPage": 110,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.9",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 116
+      "auditPage": 116,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.10",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 120
+      "auditPage": 120,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.11",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 124
+      "auditPage": 124,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.1.12",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 128
+      "auditPage": 128,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.2.1",
@@ -341,7 +416,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 133
+      "auditPage": 133,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.2.2",
@@ -354,7 +432,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 137
+      "auditPage": 137,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.2.3",
@@ -367,7 +448,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 141
+      "auditPage": 141,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.2.4",
@@ -380,7 +464,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 145
+      "auditPage": 145,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.2.5",
@@ -393,163 +480,202 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 149
+      "auditPage": 149,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.3.1",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 154
+      "auditPage": 154,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.3.2",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 158
+      "auditPage": 158,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.4.1",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 162
+      "auditPage": 162,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.4.2",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 165
+      "auditPage": 165,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.5.1",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 169
+      "auditPage": 169,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "4.5.2",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 173
+      "auditPage": 173,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.1.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 178
+      "auditPage": 178,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.1.2",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 182
+      "auditPage": 182,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.1.3",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 187
+      "auditPage": 187,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.1.4",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 193
+      "auditPage": 193,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.2.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 198
+      "auditPage": 198,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.3.1",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 203
+      "auditPage": 203,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.4.1",
@@ -562,7 +688,10 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 208
+      "auditPage": 208,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.4.2",
@@ -575,46 +704,58 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 212
+      "auditPage": 212,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.4.3",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 215
+      "auditPage": 215,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.4.4",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 219
+      "auditPage": 219,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     },
     {
       "id": "5.5.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 223
+      "auditPage": 223,
+      "positiveFixtureSha256": "",
+      "negativeFixtureSha256": "",
+      "runtimeEvidenceSha256": ""
     }
   ]
 }
