@@ -141,6 +141,10 @@ func newReviewInitCommand() *cobra.Command {
 				if r.Status == "MANUAL" {
 					guidance := "Inspect evidence; record APPROVED, REJECTED or EXCEPTION only after human verification. Include reviewer, dated justification and independently resolvable evidenceRef. No auto-approval."
 					switch r.ID {
+					case "3.2.6":
+						guidance = "Assess the effective kubelet eventRecordQPS for this specific node against actual workload event throughput and throttling evidence. The default value 50 is not an automatic PASS; zero disables rate limiting and is not an automatic PASS. Record the reviewer, justification and evidence reference."
+					case "3.2.7":
+						guidance = "Verify the active kubelet client authentication mechanism for this node. IAM exec-token-only evidence can support a documented non-applicability judgment, not a PASS. Check whether any bootstrap or client-certificate path remains active; omitted rotateCertificates from /configz does not prove it is disabled. Record applicability reasoning and an independently resolvable evidence reference."
 					case "4.1.7":
 						guidance = "Review every IAM principal, EKS access-policy scope, Kubernetes group and aws-auth mapping against an independently maintained least-privilege access approval. Explicitly justify any cluster-wide administrative grant. APPROVED means the documented authorization review was completed; it does not rewrite native findings or release a CIS score."
 					case "5.5.1":
