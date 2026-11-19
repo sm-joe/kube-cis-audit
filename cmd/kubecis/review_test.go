@@ -70,3 +70,46 @@ func TestManualReviewRejectsUnattributedDecisions(t *testing.T) {
 		t.Fatal("review without identified reviewer accepted")
 	}
 }
+
+func TestCIS543PublicNodeExceptionDoesNotOverrideFailure(t *testing.T) {
+	raw := []byte("immutable public node scan")
+	hash := sha256.Sum256(raw)
+	now := time.Now().UTC()
+	report := audit.Report{Benchmark: "cis-eks-2.1.0", Results: []audit.Result{
+		{ID: "5.4.3", Target: "policies", Status: "FAIL", Details: "IGW route verified"},
+	}}
+	exception := reviewDecision{
+		ID:            "5.4.3",
+		Decision:      "EXCEPTION",
+		Reviewer:      "independent-security-owner",
+		EvidenceRef:   "change-control/CIS-543",
+		Justification: "Approved test-cluster public-node deviation",
+		ReviewedAt:    now,
+	}
+	input := reviewInput{ReportSHA256: hex.EncodeToString(hash[:]), Decisions: []reviewDecision{exception}}
+	accepted, err := validateReviews(raw, report, input, now)
+	if err != nil || len(accepted.Decisions) != 1 {
+		t.Fatalf("legitimate evidence-bound exception rejected: %+v %v", accepted, err)
+	}
+	final, err := assembleFinalAssessment(raw, report, input, now)
+	if err != nil || final.Summary.AutomatedFail != 1 || final.Summary.ReviewedException != 1 ||
+		len(final.Controls) != 1 || final.Controls[0].AutomatedStatus != "FAIL" ||
+		final.Controls[0].ReviewStatus != "EXCEPTION" || !strings.Contains(final.ScoreStatus, "WITHHELD") {
+		t.Fatalf("exception must annotate, not override, the CIS FAIL: %+v %v", final.Summary, err)
+	}
+	exception.Decision = "APPROVED"
+	_, err = validateReviews(raw, report, reviewInput{
+		ReportSHA256: input.ReportSHA256, Decisions: []reviewDecision{exception},
+	}, now)
+	if err == nil {
+		t.Fatal("an automated FAIL must not accept a PASS-equivalent approval")
+	}
+	exception.Decision = "EXCEPTION"
+	exception.ID = "5.4.2"
+	_, err = validateReviews(raw, report, reviewInput{
+		ReportSHA256: input.ReportSHA256, Decisions: []reviewDecision{exception},
+	}, now)
+	if err == nil {
+		t.Fatal("exception cannot apply to a different finding")
+	}
+}

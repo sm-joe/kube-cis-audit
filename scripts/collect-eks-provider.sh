@@ -78,5 +78,10 @@ if [[ -n "$context" ]]; then
 fi
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 bash "$script_dir/collect-eks-aws-review.sh" --cluster-name "$cluster" --region "$region" --evidence-file "$outfile"
+# Resolve effective explicit/main subnet routes and observed EC2 worker IPs.
+# No cluster context = incomplete node inventory, never a private-node PASS.
+args=(--evidence-file "$outfile" --region "$region")
+if [[ -n "$context" ]]; then args+=(--context "$context"); fi
+bash "$script_dir/collect-eks-node-network.sh" "${args[@]}"
 jq -e '.schemaVersion == 1 and .assessmentStatus == "INVENTORY_ONLY"' "$outfile" >/dev/null || die 'Invalid generated evidence'
 echo "Collected provisional EKS provider inventory for $cluster ($region)"

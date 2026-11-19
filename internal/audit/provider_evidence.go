@@ -35,9 +35,11 @@ type EKSECRImageScanEvidence struct {
 
 // EKSAWSManualEvidence is redacted, read-only context for human review.
 type EKSAWSManualEvidence struct {
-	Status string            `json:"status"`
-	Note   string            `json:"note"`
-	Items  []json.RawMessage `json:"items"`
+	Status              string            `json:"status"`
+	Note                string            `json:"note"`
+	Items               []json.RawMessage `json:"items"`
+	NodeInventoryStatus string            `json:"nodeInventoryStatus,omitempty"`
+	Nodes               []json.RawMessage `json:"nodes,omitempty"`
 }
 
 // EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
@@ -110,6 +112,14 @@ func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration
 		}
 		if review.Status != "COLLECTED" && review.Status != "PARTIAL" && review.Status != "UNAVAILABLE" {
 			return e, fmt.Errorf("invalid AWS manual status for %s", id)
+		}
+		if len(review.Nodes) > 200 || (review.NodeInventoryStatus != "" && review.NodeInventoryStatus != "COLLECTED" && review.NodeInventoryStatus != "PARTIAL" && review.NodeInventoryStatus != "UNAVAILABLE") {
+			return e, fmt.Errorf("invalid AWS node inventory for %s", id)
+		}
+		for _, node := range review.Nodes {
+			if len(node) > 1024 || !json.Valid(node) {
+				return e, fmt.Errorf("invalid AWS node evidence for %s", id)
+			}
 		}
 		if len(review.Items) > 40 || len(review.Note) > 1024 {
 			return e, fmt.Errorf("oversized AWS manual evidence for %s", id)
