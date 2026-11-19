@@ -28,6 +28,7 @@ classify_aws_error() {
  case "$output" in
   *AccessDenied*|*UnauthorizedOperation*|*"not authorized"*) echo 'AWS_READ_ACCESS_DENIED' ;;
   *ScanNotFoundException*) echo 'SCAN_NOT_FOUND' ;;
+  *UnsupportedImageTypeException*) echo 'UNSUPPORTED_IMAGE_TYPE' ;;
   *ImageNotFoundException*) echo 'IMAGE_NOT_FOUND' ;;
   *RepositoryNotFoundException*) echo 'REPOSITORY_NOT_FOUND' ;;
   *Throttling*|*TooManyRequests*) echo 'AWS_THROTTLED' ;;
@@ -106,7 +107,7 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
    # runnable Linux child digest to have an independently verified scan.
    # Ignore OCI attestation descriptors with unknown/unknown platform.
    # Never infer a PASS from a child that cannot be read or matched.
-   if [[ "$error" == 'SCAN_RESULT_SCAN_NOT_FOUND' && "$account" == "$caller_account" ]]; then
+   if [[ ( "$error" == 'SCAN_RESULT_SCAN_NOT_FOUND' || "$error" == 'SCAN_RESULT_UNSUPPORTED_IMAGE_TYPE' ) && "$account" == "$caller_account" ]]; then
     if manifest="$(aws ecr batch-get-image --registry-id "$account" --repository-name "$repository" --image-ids "imageDigest=$digest" --region "$image_region" --query 'images[0].imageManifest' --output text 2>"$work/aws-error")"; then
      if jq -e '(.mediaType == "application/vnd.oci.image.index.v1+json" or .mediaType == "application/vnd.docker.distribution.manifest.list.v2+json") and (.manifests | type == "array")' <<<"$manifest" >/dev/null 2>&1; then
       child_digests="$(jq -cr '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64")) | select(.mediaType == "application/vnd.oci.image.manifest.v1+json" or .mediaType == "application/vnd.docker.distribution.manifest.v2+json") | .digest] | unique' <<<"$manifest")"
