@@ -26,7 +26,7 @@ caller_account="$(aws sts get-caller-identity --query Account --output text 2>/d
 classify_aws_error() {
  local output="$1"
  case "$output" in
-  *AccessDenied*|*UnauthorizedOperation*|*not authorized*) echo 'AWS_READ_ACCESS_DENIED' ;;
+  *AccessDenied*|*UnauthorizedOperation*|*"not authorized"*) echo 'AWS_READ_ACCESS_DENIED' ;;
   *ScanNotFoundException*) echo 'SCAN_NOT_FOUND' ;;
   *ImageNotFoundException*) echo 'IMAGE_NOT_FOUND' ;;
   *RepositoryNotFoundException*) echo 'REPOSITORY_NOT_FOUND' ;;
