@@ -117,6 +117,44 @@ approved configuration has been independently verified.
 - **Other MANUAL controls:** require explicit evidence-backed human review.
   A reviewer approval is not a replacement for automated source observations.
 
+## ECR scan evidence diagnostics on AWS-managed test-cluster images
+
+A cluster can pull an image from a registry belonging to another AWS account
+without having permission to read that registry's ECR scanning configuration
+or scan findings. A successful pull is **not** proof of a completed scan.
+This is common with EKS system images, but cannot be assumed without
+checking the actual image account IDs.
+
+When all 14 ECR images in an assessment are MANUAL, distinguish a scan
+that does not exist from a read permission denial, unknown registry scanning
+mode, and an invalid returned digest. Use the sanitized per-image evidence:
+
+```bash
+jq -r '.ecrImages[] | [.registry, .repository, .scanType,
+  .scanStatus, .error] | @tsv' reports/eks/provider.json
+```
+
+The collector now includes stable reason codes in provider evidence and the
+5.1.1 summary. `CROSS_ACCOUNT_ECR_AWS_READ_ACCESS_DENIED` means the
+requested registry belongs to another account and the API denied the read;
+it does **not** imply vulnerability or missing scans.
+`CROSS_ACCOUNT_ECR_SCAN_NOT_FOUND` means the specified scan was not found
+by ECR for that digest, which may reflect unsupported/unenrolled images.
+`SCAN_RESPONSE_DIGEST_OR_STATUS_UNVERIFIED` means the returned API response
+could not be bound to the deployed digest; it must not receive PASS.
+
+For images owned by your own AWS account, verify ECR scanning is enabled,
+the repository is included in its scanning rules, and the digest has an
+actual completed or active scan status. For externally owned images, obtain
+approved third-party scan attestations tied to the deployed digest or use
+your own ECR copy and approved scanning workflow. Merely republishing an
+image does not establish that the original artifact was securely built,
+and an external registry's AWS scan status cannot be fabricated.
+
+The collector does **not** enable registry scans, modify permissions, copy
+images, or incur Inspector charges. Its required ECR APIs are read-only.
+Do not grant `ecr:*` or broad cross-account access as a workaround.
+
 ## 7. Acceptance: only a fresh authorized EKS scan counts
 
 ```bash
