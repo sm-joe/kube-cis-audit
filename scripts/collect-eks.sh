@@ -138,7 +138,7 @@ for node in "${nodes[@]}"; do
   inputs+=("$report")
 done
 bash "$script_dir/collect-eks-provider.sh" --cluster-name "$cluster" --region "$region" \
-  --expected-server "$api_server" --output-file "$tmp/provider.json"
+  --context "$context" --expected-server "$api_server" --output-file "$tmp/provider.json"
 args=(consolidate --cluster "$tmp/cluster.json" --provider-evidence "$tmp/provider.json"
   --expected-nodes "$(IFS=,; echo "${nodes[*]}")" --max-age 30m --output-file "$tmp/consolidated.json")
 for report in "${inputs[@]:1}"; do args+=(--local "$report"); done
