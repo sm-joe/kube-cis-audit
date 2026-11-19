@@ -40,13 +40,24 @@ func EnrichNodeWithConfigz(report *Report, nodeName string, data []byte) error {
 		}
 		found[r.ID] = true
 		raw, present := root.KubeletConfig[field]
-		r.EvidenceSource = "kubernetes-node-proxy-configz"
-		r.Status = "NOT_ASSESSED"
-		r.Details = "Effective kubelet /configz did not expose " + field + "; do not assume defaults."
-		r.Evidence = nil
 		if !present || string(raw) == "null" {
+			// Node-local metadata can contain an explicit setting from the
+			// allowlisted AL2023 config.json even when /configz omits it.
+			// A missing /configz field must not erase that trusted evidence.
+			if (r.Status == "PASS" || r.Status == "FAIL" || r.Status == "MANUAL") && len(r.Evidence) > 0 && r.EvidenceSource != "kubernetes-node-proxy-configz" {
+				r.Details += "; live /configz omitted " + field + ", preserving explicit node-local configuration evidence"
+				continue
+			}
+			r.EvidenceSource = "kubernetes-node-proxy-configz"
+			r.Status = "NOT_ASSESSED"
+			r.Details = "Neither explicit node-local evidence nor effective kubelet /configz exposed " + field + "; do not assume defaults."
+			r.Evidence = nil
 			continue
 		}
+		r.EvidenceSource = "kubernetes-node-proxy-configz"
+		r.Status = "NOT_ASSESSED"
+		r.Details = "Effective kubelet /configz value for " + field + " is invalid or unsupported."
+		r.Evidence = nil
 		switch r.ID {
 		case "3.2.5":
 			var value bool
