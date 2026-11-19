@@ -107,10 +107,27 @@ The first command checks all official source IDs and the truthful
 implementation status; the second requires each of the 47 mappings to
 have independently reviewed official audit procedures, positive/negative
 fixtures, runtime evidence and a named reviewer. It **fails** while
-any remain candidate/unimplemented.
+any remain unverified or the independent signed reviewer approval is absent.
 
-Current audit baseline: 47 official control identities, **19 implemented
-but not evaluator-verified**, **28 cataloged as not implemented**.
+For an independently approved full-conformance release, the reviewer must
+provide signed approval of the exact ledger bytes plus SHA-256-bound positive,
+negative and fresh runtime evidence files for every control:
+
+```bash
+python3 scripts/verify-eks-evaluator-conformance.py --require-full \
+  --approval-public-key /approved/reviewer-public.pem \
+  --approval-key-sha256 YOUR_INDEPENDENTLY_PINNED_64_HEX_SHA256 \
+  --approval-signature /approved/eks-2.1.0-evaluator-review.sig
+```
+
+The reviewer signing key must never be created or stored by the build
+pipeline. A self-signed local file is **not** independent verification. A
+successful structural audit without `--require-full` is not release approval.
+
+Current audit baseline: 47 official control identities with concrete node/API/AWS
+evaluator or evidence-bound human-review routes, **47 candidates, zero independently
+accepted evaluator mappings**. A candidate is not a verified implementation of
+every audit procedure, nor a completed human security review.
 This is a gap register rather than a full verified CIS EKS implementation.
 Original licensed CIS source remains private. Full compliance score:
 WITHHELD. No CIS certification claim is made.
