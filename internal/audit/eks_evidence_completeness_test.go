@@ -29,6 +29,11 @@ func TestEKSECRScanEvidenceRequiresVerifiedDigestAndCompleteInventory(t *testing
 	if result[0].Status != "MANUAL" {
 		t.Fatalf("missing ECR permissions must not pass: %+v", result)
 	}
+	e.ECRImages[0].Error = "CROSS_ACCOUNT_ECR_AWS_READ_ACCESS_DENIED"
+	result = EvaluateEKSAdditionalAWSControls(e)
+	if result[0].Status != "MANUAL" || !strings.Contains(result[0].Details, "CROSS_ACCOUNT_ECR_AWS_READ_ACCESS_DENIED=1") {
+		t.Fatalf("cross-account ECR diagnostic must remain reviewable, not PASS: %+v", result)
+	}
 	e.ECRInventoryStatus = "UNAVAILABLE"
 	result = EvaluateEKSAdditionalAWSControls(e)
 	if result[0].Status != "NOT_ASSESSED" {
