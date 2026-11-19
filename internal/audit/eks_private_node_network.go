@@ -18,13 +18,13 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		State   string `json:"state"`
 	}
 	type subnet struct {
-		SubnetID      string  `json:"SubnetId"`
-		VPCID         string  `json:"VpcId"`
-		NodeGroup     string  `json:"nodeGroup"`
-		PublicOnLaunch *bool  `json:"MapPublicIpOnLaunch"`
-		RouteTableID  string  `json:"routeTableId"`
-		RouteSource   string  `json:"routeSource"`
-		Routes        []route `json:"routes"`
+		SubnetID       string  `json:"SubnetId"`
+		VPCID          string  `json:"VpcId"`
+		NodeGroup      string  `json:"nodeGroup"`
+		PublicOnLaunch *bool   `json:"MapPublicIpOnLaunch"`
+		RouteTableID   string  `json:"routeTableId"`
+		RouteSource    string  `json:"routeSource"`
+		Routes         []route `json:"routes"`
 	}
 	type node struct {
 		Name       string `json:"node"`
