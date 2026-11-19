@@ -14,7 +14,7 @@ while (($#)); do
  esac
 done
 [[ -n "$context" && -n "$region" && -n "$outfile" ]] || die 'Context, region, output required'
-for tool in jq kubectl aws; do command -v "$tool" >/dev/null || die "$tool required"; done
+for tool in jq kubectl aws base64; do command -v "$tool" >/dev/null || die "$tool required"; done
 # External evidence is opt-in and requires all three independent trust inputs.
 attest_dir="${KUBECIS_ATTESTATION_DIR:-}"
 attest_pub="${KUBECIS_ATTESTATION_PUBLIC_KEY:-}"
@@ -181,6 +181,7 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
    fi
   fi
   attestation_scanner='' attestation_key='' attestation_date=''
+  attestation_claim_b64='' attestation_signature_b64=''
   if [[ -n "$attest_dir" && -n "$digest" && -n "$error" && -f "$attest_dir/${digest#sha256:}.json" ]]; then
    if bash "$script_dir/verify-eks-scan-attestation.sh" \
      --dir "$attest_dir" --public-key "$attest_pub" --key-sha256 "$attest_pin" \
@@ -193,11 +194,16 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
      attestation_scanner="$(jq -r '.scanner' "$work/verified-attestation.json")"
      attestation_key="$(jq -r '.signerKeySha256' "$work/verified-attestation.json")"
      attestation_date="$(jq -r '.scannedAt' "$work/verified-attestation.json")"
+     # Include only the bounded signed claim and detached signature so the
+     # Go evaluator can re-check the trust boundary. Signed claim schema
+     # rejects unknown fields; raw vulnerability details are never embedded.
+     attestation_claim_b64="$(base64 -w0 -- "$attest_dir/${digest#sha256:}.json")"
+     attestation_signature_b64="$(base64 -w0 -- "$attest_dir/${digest#sha256:}.sig")"
    else
      error='EXTERNAL_ATTESTATION_INVALID'
    fi
   fi
-  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" --argjson scanDigests "$resolved_scan_digests" --arg scanner "$attestation_scanner" --arg signer "$attestation_key" --arg scannedAt "$attestation_date" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error,scanDigests:$scanDigests,attestationScanner:$scanner,attestationSignerKeySha256:$signer,attestationScannedAt:$scannedAt}]' <<<"$images")"
+  images="$(jq -c --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" --arg scanType "$scan_type" --arg scanStatus "$scan_status" --arg error "$error" --argjson scanDigests "$resolved_scan_digests" --arg scanner "$attestation_scanner" --arg signer "$attestation_key" --arg scannedAt "$attestation_date" --arg signedClaim "$attestation_claim_b64" --arg signedSignature "$attestation_signature_b64" '. + [{registry:$registry,repository:$repository,digest:$digest,scanType:$scanType,scanStatus:$scanStatus,error:$error,scanDigests:$scanDigests,attestationScanner:$scanner,attestationSignerKeySha256:$signer,attestationScannedAt:$scannedAt,attestationClaimBase64:$signedClaim,attestationSignatureBase64:$signedSignature}]' <<<"$images")"
  done < "$work/rows"
  non_ecr="${#non_ecr_seen[@]}"
  [[ -s "$work/rows" ]] || status=UNAVAILABLE
