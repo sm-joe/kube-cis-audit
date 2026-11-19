@@ -26,8 +26,9 @@ actual="$(sha256sum -- "$key" | cut -d' ' -f1)"
 [[ "$actual" == "$pinned" ]] || die 'Public key pin mismatch'
 payload="$dir/$hex.json"
 sig="$dir/$hex.sig"
-[[ -f "$payload" && ! -L "$payload" && -f "$sig" && ! -L "$sig" ]] || die 'No signed claim for deployed digest'
-(( $(stat -c %s -- "$payload") <= 65536 && $(stat -c %s -- "$sig") <= 8192 )) || die 'Signed claim exceeds limits'
+scan_report="$dir/$hex.scan.json"
+[[ -f "$payload" && ! -L "$payload" && -f "$sig" && ! -L "$sig" && -f "$scan_report" && ! -L "$scan_report" ]] || die 'No signed claim and scan report for deployed digest'
+(( $(stat -c %s -- "$payload") <= 65536 && $(stat -c %s -- "$sig") <= 8192 && $(stat -c %s -- "$scan_report") <= 10485760 )) || die 'Signed claim or report exceeds limits'
 openssl dgst -sha256 -verify "$key" -signature "$sig" "$payload" >/dev/null 2>&1 || die 'Invalid detached signature'
 jq -e --arg registry "$registry" --arg repository "$repository" --arg digest "$digest" '
  type == "object" and
@@ -39,11 +40,16 @@ jq -e --arg registry "$registry" --arg repository "$repository" --arg digest "$d
  (.scanId | type == "string" and length > 0 and length <= 256) and
  (.status == "COMPLETE") and
  (.findingsAvailable == true) and
+ (.scannerReportSha256 | type == "string" and test("^[a-f0-9]{64}$")) and
  (.scannedAt | type == "string") and
  (.scannedDigests | type == "array" and length > 0 and length <= 8) and
  all(.scannedDigests[]; type == "string" and test("^sha256:[a-f0-9]{64}$")) and
  ([.scannedDigests[]] | unique | length) == (.scannedDigests | length)
 ' "$payload" >/dev/null || die 'Signed claim missing required matching scan details'
+report_sha="$(sha256sum -- "$scan_report" | cut -d' ' -f1)"
+[[ "$report_sha" == "$(jq -r '.scannerReportSha256' "$payload")" ]] || die 'Scanner report digest does not match signed claim'
+# Do not interpret arbitrary scanner JSON as a clean bill of health; this
+# guarantees only the signed claim binds existing, reviewable result bytes.
 scanned="$(jq -r '.scannedAt' "$payload")"
 timestamp="$(date -u -d "$scanned" +%s 2>/dev/null)" || die 'Invalid scan date'
 now="$(date -u +%s)"
