@@ -22,6 +22,8 @@ func EvaluateEKSAdditionalPolicy(ctx context.Context, client kubernetes.Interfac
 			return r
 		}
 		violations := 0
+		platformReferences := 0
+		nonPlatformReferences := 0
 		for _, pod := range pods.Items {
 			if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 				continue
@@ -48,14 +50,23 @@ func EvaluateEKSAdditionalPolicy(ctx context.Context, client kubernetes.Interfac
 				for _, env := range container.Env {
 					if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 						violations++
-						r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "ephemeral/" + container.Name + "/env/" + env.Name, Observed: "secretKeyRef", Expected: "mounted secret volume or approved exception"})
+							if pod.Namespace == "kube-system" { platformReferences++ } else { nonPlatformReferences++ }
+							r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "ephemeral/" + container.Name + "/env/" + env.Name, Observed: "secretKeyRef", Expected: "mounted secret volume or approved exception"})
 					}
 				}
 			}
 		}
 		if violations > 0 {
-			r.Status = "FAIL"
-			r.Details = fmt.Sprintf("%d references inject Kubernetes Secrets through environment variables in active Pods; only reference names were collected, never secret values.", violations)
+			// Presence of a Secret reference is actual configuration evidence,
+			// not proof of leaked credentials. kube-system controllers may be
+			// managed add-ons; their ownership and supported configuration
+			// require independent review rather than an automatic PASS/FAIL.
+			if nonPlatformReferences > 0 {
+				r.Status = "FAIL"
+			} else {
+				r.Status = "MANUAL"
+			}
+			r.Details = fmt.Sprintf("%d active Pod Secret environment references (%d kube-system requiring add-on ownership/exception review, %d other namespace). Collected references only, never Secret values; Pod replicas may duplicate one underlying workload. A reference does not prove credential compromise.", violations, platformReferences, nonPlatformReferences)
 		} else {
 			r.Status = "PASS"
 			r.Details = fmt.Sprintf("No SecretKeyRef/SecretRef environment injections in %d inventoried Pods; this evaluates observed Pods, not future admission.", len(pods.Items))
