@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -9,9 +10,10 @@ import (
 func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 	data := func(value string) json.RawMessage { return json.RawMessage(value) }
 	subnet := func(public bool, source, gateway string) json.RawMessage {
-		return data(`{"SubnetId":"subnet-123","VpcId":"vpc-123","nodeGroup":"workers","MapPublicIpOnLaunch":`+
-			func() string { if public { return "true" }; return "false" }()+
-			`,"routeSource":"`+source+`","routeTableId":"rtb-123","routes":[{"ipv4":"0.0.0.0/0","gateway":"`+gateway+`","state":"active"}]}`)
+		return data(fmt.Sprintf(
+			`{"SubnetId":"subnet-123","VpcId":"vpc-123","nodeGroup":"workers","MapPublicIpOnLaunch":%t,"routeSource":"%s","routeTableId":"rtb-123","routes":[{"ipv4":"0.0.0.0/0","gateway":"%s","state":"active"}]}`,
+			public, source, gateway,
+		))
 	}
 	privateNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":null}`)
 	base := EKSAWSManualEvidence{Status: "COLLECTED", NodeInventoryStatus: "COLLECTED", Nodes: []json.RawMessage{privateNode}}
