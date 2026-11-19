@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // EvaluateEKSAdditionalAWSControls evaluates the read-only AWS evidence
@@ -58,13 +59,24 @@ func EvaluateEKSAdditionalAWSControls(e EKSProviderEvidence) []Result {
 				observed = "unavailable: " + item.Error
 				reasons[item.Error]++
 				problems++
-			} else if item.ScanType == "THIRD_PARTY" && (item.ScanStatus != "COMPLETE" || len(item.ScanDigests) == 0 || item.AttestationScanner == "" || len(item.AttestationSignerKeySHA256) != 64 || item.AttestationScannedAt == "") {
-				reasons["EXTERNAL_ATTESTATION_PROVENANCE_INCOMPLETE"]++
-				problems++
-			} else if item.Digest == "" || (item.ScanStatus != "COMPLETE" && item.ScanStatus != "ACTIVE") {
-				if item.Digest == "" {
-					reasons["DEPLOYED_DIGEST_MISSING"]++
+			} else if item.ScanType == "THIRD_PARTY" {
+				// Metadata fields can be fabricated in a hand-edited provider
+				// snapshot. Independently verify the signed claim against the
+				// operator-pinned key before allowing a decisive PASS.
+				if err := verifyExternalScanEvidence(item, time.Now().UTC()); err != nil {
+					observed = "unverified signed scan claim: " + err.Error()
+					reasons["EXTERNAL_ATTESTATION_SIGNATURE_OR_SCOPE_UNVERIFIED"]++
+					problems++
 				} else {
+					successful++
+				}
+			} else if item.Digest == "" || (item.ScanType != "BASIC" && item.ScanType != "ENHANCED") || (item.ScanStatus != "COMPLETE" && item.ScanStatus != "ACTIVE") {
+				switch {
+				case item.Digest == "":
+					reasons["DEPLOYED_DIGEST_MISSING"]++
+				case item.ScanType != "BASIC" && item.ScanType != "ENHANCED":
+					reasons["REGISTRY_SCAN_TYPE_UNVERIFIED"]++
+				default:
 					reasons["IMAGE_SCAN_NOT_ACTIVE_OR_COMPLETE"]++
 				}
 				problems++
