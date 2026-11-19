@@ -116,13 +116,16 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 	for _, b := range rb.Items {
 		inspect("RoleBinding", b.Namespace, b.Name, b.RoleRef, b.Subjects)
 	}
-	if unresolved > 0 {
+	// Evidence truncation prevents a reviewer from seeing every grant.
+	// Keep the summary/counts, but fail closed instead of allowing an
+	// apparently complete MANUAL review on the first 200 records.
+	if unresolved > 0 || candidates > 200 {
 		r.Status = "NOT_ASSESSED"
 	}
 	r.Details = fmt.Sprintf("Bound RBAC inventory: %d ClusterRoles, %d Roles, %d ClusterRoleBindings and %d RoleBindings; %d sensitive grant(s), %d unresolved role reference(s), %d binding(s) without subjects; evidence retained for %d of %d candidate(s). Effective namespace scope and bound subjects are recorded. Authorization necessity requires human review; no automatic PASS.",
 		len(cr.Items), len(roles.Items), len(cb.Items), len(rb.Items), candidates, unresolved, emptySubjects, min(candidates, len(r.Evidence)), candidates)
 	if len(r.Evidence) >= 200 && candidates > 200 {
-		r.Details += " Evidence sample truncated at 200; do not approve without full inventory."
+		r.Details += " Evidence truncated at 200: assessment NOT_ASSESSED until a complete inventory is available."
 	}
 	return r
 }
