@@ -123,9 +123,16 @@ func EvaluateEKSPodAdmissionControl(ctx context.Context, client kubernetes.Inter
 func EvaluateEKSDefaultServiceAccountUse(ctx context.Context, client kubernetes.Interface) (Result, error) {
 	r := Result{ID: "4.1.5", Title: "Dedicated workload service accounts", Target: "policies", Status: "NOT_ASSESSED", Method: "kubernetes_workload_identity", Scored: true, Remediation: "Assign dedicated service accounts to application workloads; disable unnecessary auto-mounted API tokens."}
 	var uses []Evidence
+	platformReferences := 0
+	nonPlatformReferences := 0
 	record := func(kind, ns, name, sa string) {
 		if sa == "" || sa == "default" {
-			uses = append(uses, Evidence{Resource: kind, Namespace: ns, Name: name, Field: "serviceAccountName", Observed: firstNonEmpty(sa, "<unset; defaults to default>"), Expected: "dedicated service account"})
+			uses = append(uses, Evidence{Resource: kind, Namespace: ns, Name: name, Field: "serviceAccountName", Observed: firstNonEmpty(sa, "<unset; defaults to default>"), Expected: "dedicated service account or documented platform exception"})
+			if ns == "kube-system" {
+				platformReferences++
+			} else {
+				nonPlatformReferences++
+			}
 		}
 	}
 	pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
@@ -174,8 +181,16 @@ func EvaluateEKSDefaultServiceAccountUse(ctx context.Context, client kubernetes.
 	}
 	r.Evidence = uses
 	if len(uses) > 0 {
-		r.Status = "FAIL"
-		r.Details = fmt.Sprintf("%d Pods/workload templates rely on the default service account; parent/child duplicates are retained to show deployment sources.", len(uses))
+		// kube-system is not automatically trusted: AWS and third-party add-ons
+		// can be managed separately, and ownership cannot be proven by namespace.
+		// Preserve each observed reference for reviewer triage. Only an
+		// observed non-platform default-SA reference is an automated FAIL.
+		if nonPlatformReferences > 0 {
+			r.Status = "FAIL"
+		} else {
+			r.Status = "MANUAL"
+		}
+		r.Details = fmt.Sprintf("%d default service account references (%d in kube-system requiring ownership and RBAC review, %d in other namespaces); Pod/controller duplicates are evidence, not independent security exposures. kube-system references are not automatically exempt.", len(uses), platformReferences, nonPlatformReferences)
 		return r, nil
 	}
 	r.Status = "MANUAL"
