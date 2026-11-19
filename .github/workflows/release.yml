@@ -57,6 +57,7 @@ jobs:
           bash scripts/test-eks-access-cni.sh
           bash scripts/test-eks-ecr.sh
           bash scripts/test-eks-scan-attestation.sh
+          bash scripts/test-eks-aws-review.sh
           python3 scripts/verify-eks-evaluator-conformance.py
           python3 scripts/test-eks-evaluator-conformance.py
           bash scripts/test-linux-install.sh

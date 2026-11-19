@@ -75,6 +75,7 @@ func AttachEKSCISProviderEvidence(out *ConsolidatedReport, evidence EKSProviderE
 		out.CoverageMetrics.ScoredPercent = math.Round(float64(out.CoverageMetrics.ScoredAssessed)*10000/float64(out.CoverageMetrics.ScoredTotal)) / 100
 	}
 	ApplyEKSCNIProviderEvidence(out, evidence)
+	ApplyEKSAWSManualEvidence(out, evidence)
 	recalculateEKSConsolidatedMetrics(out)
 	out.Compliance.CoveragePercent = out.CoverageMetrics.ScoredPercent
 	// In particular, these three actual CIS findings do not imply that the
