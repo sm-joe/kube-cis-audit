@@ -34,6 +34,35 @@ kubectl config current-context
 kubectl get nodes -L eks.amazonaws.com/nodegroup
 ```
 
+## Build and publish a matching image using Docker Buildx
+
+This Dockerfile uses BuildKit's `BUILDPLATFORM` and `TARGETARCH`
+arguments. Docker's deprecated legacy builder cannot build it and fails
+with `failed to parse platform: ""`. Install the
+[Docker Buildx plugin](https://docs.docker.com/build/buildx/install/)
+(e.g. `sudo apt-get install docker-buildx-plugin` when using Docker's
+official Ubuntu/Debian package repository). Verify with `docker buildx version`.
+
+For an EKS cluster where **all** Linux workers are AMD64, from the repository
+root after configuring `IMAGE_REPO` and `IMAGE_TAG`:
+
+```bash
+docker buildx version
+KUBECIS_VERSION="$(./kubecis version)"
+docker buildx build --platform linux/amd64 \
+  --build-arg VERSION="$KUBECIS_VERSION" \
+  --load -t "${IMAGE_REPO}:${IMAGE_TAG}" .
+docker run --rm "${IMAGE_REPO}:${IMAGE_TAG}" version
+docker push "${IMAGE_REPO}:${IMAGE_TAG}"
+```
+
+The local and image versions must be identical. For mixed AMD64/ARM64
+workers, use a `docker-container` Buildx builder and
+`docker buildx build --platform linux/amd64,linux/arm64 --push ...`
+instead of `--load`. Fetch the digest from your registry and pass the
+immutable `repository@sha256:<digest>` to the deployment helper.
+An image built locally is not an independently signed release artifact.
+
 ## Deploy and collect using Linux
 
 Use an immutable verified GHCR image digest. Do not deploy the DaemonSet's
