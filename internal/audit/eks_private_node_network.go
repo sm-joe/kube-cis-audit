@@ -58,9 +58,16 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		} else if s.RouteTableID == "" {
 			unknown = append(unknown, s.SubnetID+": effective route-table ID missing")
 		} else {
+			if len(s.Routes) == 0 {
+				unknown = append(unknown, s.SubnetID+": effective route table has no route entries")
+			}
 			for _, r := range s.Routes {
+				if r.State != "active" {
+					unknown = append(unknown, s.SubnetID+": route state missing or inactive")
+					continue
+				}
 				if strings.HasPrefix(r.Gateway, "igw-") && (r.IPv4 != "" || r.IPv6 != "") {
-					public = append(public, fmt.Sprintf("%s: internet-gateway route via %s (%s)", s.SubnetID, r.Gateway, s.RouteTableID))
+					public = append(public, fmt.Sprintf("%s: active internet-gateway route via %s (%s)", s.SubnetID, r.Gateway, s.RouteTableID))
 				}
 			}
 		}
