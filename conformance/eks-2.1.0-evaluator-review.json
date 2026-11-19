@@ -16,33 +16,39 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 18
+      "auditPage": 18,
+      "runtimeRoute": "aws_eks_describe_cluster",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.1.1",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 23
+      "auditPage": 23,
+      "runtimeRoute": "host_file_mode",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.1.2",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 27
+      "auditPage": 27,
+      "runtimeRoute": "host_file_owner",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.1.3",
@@ -55,20 +61,24 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 31
+      "auditPage": 31,
+      "runtimeRoute": "host_file_mode",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.1.4",
       "assessment": "automated",
       "sourcePage": 228,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 35
+      "auditPage": 35,
+      "runtimeRoute": "host_file_owner",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.1",
@@ -81,7 +91,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 40
+      "auditPage": 40,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.2",
@@ -94,7 +106,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 44
+      "auditPage": 44,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.3",
@@ -107,7 +121,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 48
+      "auditPage": 48,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.4",
@@ -120,7 +136,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 53
+      "auditPage": 53,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.5",
@@ -133,7 +151,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 57
+      "auditPage": 57,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.6",
@@ -146,7 +166,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 61
+      "auditPage": 61,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.7",
@@ -159,7 +181,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 66
+      "auditPage": 66,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "3.2.8",
@@ -172,59 +196,69 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 71
+      "auditPage": 71,
+      "runtimeRoute": "host_kubelet_config_field",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.1",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 79
+      "auditPage": 79,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.2",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 83
+      "auditPage": 83,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.3",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 87
+      "auditPage": 87,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.4",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 92
+      "auditPage": 92,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.5",
@@ -237,7 +271,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 96
+      "auditPage": 96,
+      "runtimeRoute": "eks_default_service_account",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.6",
@@ -250,85 +286,99 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 100
+      "auditPage": 100,
+      "runtimeRoute": "eks_token_mounts",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.7",
       "assessment": "automated",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 104
+      "auditPage": 104,
+      "runtimeRoute": "aws_eks_access_entries",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.8",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 110
+      "auditPage": 110,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.9",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 116
+      "auditPage": 116,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.10",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 120
+      "auditPage": 120,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.11",
       "assessment": "manual",
       "sourcePage": 229,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 124
+      "auditPage": 124,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.1.12",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 128
+      "auditPage": 128,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.2.1",
@@ -341,7 +391,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 133
+      "auditPage": 133,
+      "runtimeRoute": "eks_psa_admission",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.2.2",
@@ -354,7 +406,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 137
+      "auditPage": 137,
+      "runtimeRoute": "eks_psa_admission",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.2.3",
@@ -367,7 +421,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 141
+      "auditPage": 141,
+      "runtimeRoute": "eks_psa_admission",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.2.4",
@@ -380,7 +436,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 145
+      "auditPage": 145,
+      "runtimeRoute": "eks_psa_admission",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.2.5",
@@ -393,98 +451,114 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 149
+      "auditPage": 149,
+      "runtimeRoute": "eks_psa_admission",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.3.1",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 154
+      "auditPage": 154,
+      "runtimeRoute": "eks_vpc_cni_network_policy",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.3.2",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 158
+      "auditPage": 158,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.4.1",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 162
+      "auditPage": 162,
+      "runtimeRoute": "eks_secret_env",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.4.2",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 165
+      "auditPage": 165,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.5.1",
       "assessment": "manual",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 169
+      "auditPage": 169,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "4.5.2",
       "assessment": "automated",
       "sourcePage": 230,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 173
+      "auditPage": 173,
+      "runtimeRoute": "eks_default_namespace",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.1.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 178
+      "auditPage": 178,
+      "runtimeRoute": "aws_ecr_image_scanning",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.1.2",
@@ -497,7 +571,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 182
+      "auditPage": 182,
+      "runtimeRoute": "manual_review_missing_aws_inventory",
+      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
     },
     {
       "id": "5.1.3",
@@ -510,33 +586,39 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 187
+      "auditPage": 187,
+      "runtimeRoute": "manual_review_missing_aws_inventory",
+      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
     },
     {
       "id": "5.1.4",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 193
+      "auditPage": 193,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.2.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 198
+      "auditPage": 198,
+      "runtimeRoute": "eks_dedicated_service_account",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.3.1",
@@ -549,7 +631,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 203
+      "auditPage": 203,
+      "runtimeRoute": "manual_review_missing_aws_inventory",
+      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
     },
     {
       "id": "5.4.1",
@@ -562,7 +646,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 208
+      "auditPage": 208,
+      "runtimeRoute": "aws_eks_describe_cluster",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.4.2",
@@ -575,7 +661,9 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 212
+      "auditPage": 212,
+      "runtimeRoute": "aws_eks_describe_cluster",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.4.3",
@@ -588,33 +676,39 @@
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 215
+      "auditPage": 215,
+      "runtimeRoute": "manual_review_missing_aws_inventory",
+      "implementationNote": "Manual review framework exists, but required AWS IAM/ECR/KMS/subnet evidence is not yet collected."
     },
     {
       "id": "5.4.4",
       "assessment": "manual",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 219
+      "auditPage": 219,
+      "runtimeRoute": "kubernetes_inventory_human_attestation",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     },
     {
       "id": "5.5.1",
       "assessment": "automated",
       "sourcePage": 231,
-      "implementationStatus": "not_implemented",
+      "implementationStatus": "candidate",
       "auditProcedureReviewed": false,
       "positiveFixture": "",
       "negativeFixture": "",
       "runtimeEvidence": "",
       "reviewer": "",
       "reviewedAt": "",
-      "auditPage": 223
+      "auditPage": 223,
+      "runtimeRoute": "aws_eks_access_entries",
+      "implementationNote": "Runtime evaluator or manual evidence workflow routed; independent benchmark procedure verification pending."
     }
   ]
 }
