@@ -11,7 +11,7 @@ import (
 
 // '*' in RBAC resources/verbs/apiGroups includes the sensitive resources.
 // All CIS manual controls retain MANUAL status, but the reviewer must see
-// the potentially privileged roles rather than a falsely empty inventory.
+// the bound subject and role rather than an unbound role inventory.
 func TestEKS210ManualRBACWildcardInventoryFindsEverySensitivePermission(t *testing.T) {
 	role := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "unrestricted"},
@@ -21,7 +21,11 @@ func TestEKS210ManualRBACWildcardInventoryFindsEverySensitivePermission(t *testi
 			Verbs:     []string{"*"},
 		}},
 	}
-	client := fake.NewSimpleClientset(role)
+	client := fake.NewSimpleClientset(role, &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "explicit-test-grant"},
+		RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "unrestricted"},
+		Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-subject"}},
+	})
 	for _, id := range []string{
 		"4.1.2", "4.1.3", "4.1.4", "4.1.8", "4.1.9",
 		"4.1.10", "4.1.11", "4.1.12",
