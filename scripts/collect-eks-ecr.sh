@@ -87,7 +87,11 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
     if jq -e --arg digest "$digest" '.imageId.imageDigest == $digest and (.scanStatus | type) == "string" and (.scanStatus | length) > 0' <<<"$detail" >/dev/null; then
      scan_status="$(jq -r '.scanStatus' <<<"$detail")"
      if [[ -z "$scan_type" ]]; then
-      error='SCAN_STATUS_OBSERVED_BUT_REGISTRY_MODE_UNVERIFIED'
+      if [[ -n "$config_error" ]]; then
+       error="REGISTRY_SCAN_CONFIG_$config_error"
+      else
+       error='REGISTRY_SCAN_TYPE_UNKNOWN'
+      fi
      else
       error=''
      fi
@@ -136,7 +140,13 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
        done < <(jq -r '.[]' <<<"$child_digests")
        if [[ "$all_complete" == true && "$(jq 'length' <<<"$resolved_scan_digests")" -eq "$child_count" ]]; then
         if [[ "$all_active" == true ]]; then scan_status='ACTIVE'; else scan_status='COMPLETE'; fi
-        if [[ -z "$scan_type" ]]; then error='SCAN_STATUS_OBSERVED_BUT_REGISTRY_MODE_UNVERIFIED'; fi
+        if [[ -z "$scan_type" ]]; then
+         if [[ -n "$config_error" ]]; then
+          error="REGISTRY_SCAN_CONFIG_$config_error"
+         else
+          error='REGISTRY_SCAN_TYPE_UNKNOWN'
+         fi
+        fi
        else
         scan_status=''
        fi
