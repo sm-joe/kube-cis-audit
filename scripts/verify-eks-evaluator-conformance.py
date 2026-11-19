@@ -89,12 +89,14 @@ def audit(ledger, catalog, repo, profile_routes=None):
         if route != expected_route and not (
             expected_route == "manual" and route in (
                 "kubernetes_inventory_human_attestation",
-                "manual_review_missing_aws_inventory",
+                "aws_manual_review_inventory",
             )
         ):
             problems.append(f"{control}: runtime evaluator route mismatch ({route!r}, expected {expected_route!r})")
-        if route == "manual_review_missing_aws_inventory" and canonical["implemented"]:
-            problems.append(f"{control}: AWS manual evidence is not collected")
+        if route == "aws_manual_review_inventory" and control not in (
+            "5.1.2", "5.1.3", "5.3.1", "5.4.3"
+        ):
+            problems.append(f"{control}: unexpected AWS manual-review route")
         status = c.get("implementationStatus")
         if status not in VALID:
             problems.append(f"{control}: unsupported state")
