@@ -79,11 +79,12 @@ func TestCIS543PublicNodeExceptionDoesNotOverrideFailure(t *testing.T) {
 		{ID: "5.4.3", Target: "policies", Status: "FAIL", Details: "IGW route verified"},
 	}}
 	exception := reviewDecision{
-		ID: "5.4.3", Decision: "EXCEPTION",
-		Reviewer: "independent-security-owner",
-		EvidenceRef: "change-control/CIS-543",
+		ID:            "5.4.3",
+		Decision:      "EXCEPTION",
+		Reviewer:      "independent-security-owner",
+		EvidenceRef:   "change-control/CIS-543",
 		Justification: "Approved test-cluster public-node deviation",
-		ReviewedAt: now,
+		ReviewedAt:    now,
 	}
 	input := reviewInput{ReportSHA256: hex.EncodeToString(hash[:]), Decisions: []reviewDecision{exception}}
 	accepted, err := validateReviews(raw, report, input, now)
