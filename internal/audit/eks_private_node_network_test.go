@@ -15,7 +15,7 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 			public, source, gateway,
 		))
 	}
-	privateNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":null}`)
+	privateNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":null,"State":"running"}`)
 	base := EKSAWSManualEvidence{Status: "COLLECTED", NodeInventoryStatus: "COLLECTED", Nodes: []json.RawMessage{privateNode}}
 	tests := []struct {
 		name   string
@@ -39,12 +39,16 @@ func TestEKS543PublicPrivateAndIncompleteNetworkEvidence(t *testing.T) {
 			}
 		})
 	}
-	publicNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":"203.0.113.5"}`)
+	publicNode := data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":"203.0.113.5","State":"running"}`)
 	private := base
 	private.Items = []json.RawMessage{subnet(false, "MAIN", "nat-123")}
 	private.Nodes = []json.RawMessage{publicNode}
 	if status, _, _ := assessEKSPrivateNodes(private); status != "FAIL" {
 		t.Fatalf("public EC2 node must FAIL even if subnet's default route is NAT, got %s", status)
+	}
+	private.Nodes = []json.RawMessage{data(`{"node":"worker","InstanceId":"i-123","SubnetId":"subnet-123","State":"running","NetworkInterfacePublicIps":["203.0.113.10"]}`)}
+	if status, _, _ := assessEKSPrivateNodes(private); status != "FAIL" {
+		t.Fatalf("secondary network interface EIP must FAIL: %s", status)
 	}
 	private.Nodes = nil
 	if status, _, _ := assessEKSPrivateNodes(private); status != "MANUAL" {
