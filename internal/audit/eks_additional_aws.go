@@ -2,6 +2,7 @@ package audit
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -44,12 +45,19 @@ func EvaluateEKSAdditionalAWSControls(e EKSProviderEvidence) []Result {
 	if e.ECRInventoryStatus != "" {
 		r := Result{ID: "5.1.1", Title: "ECR or approved third-party image vulnerability scanning", Target: "policies", Status: "NOT_ASSESSED", Method: "aws_ecr_image_scanning", Scored: true, EvidenceSource: "aws-ecr-image-scan", Remediation: "Enable ECR Basic scan-on-push or Enhanced continuous scanning for all deployed ECR images, confirm image digest scan status and remediate findings; approve third-party coverage separately."}
 		successful, problems := 0, 0
+		reasons := map[string]int{}
 		for _, item := range e.ECRImages {
 			observed := item.ScanType + "/" + item.ScanStatus
 			if item.Error != "" {
 				observed = "unavailable: " + item.Error
+				reasons[item.Error]++
 				problems++
 			} else if item.Digest == "" || (item.ScanStatus != "COMPLETE" && item.ScanStatus != "ACTIVE") {
+				if item.Digest == "" {
+					reasons["DEPLOYED_DIGEST_MISSING"]++
+				} else {
+					reasons["IMAGE_SCAN_NOT_ACTIVE_OR_COMPLETE"]++
+				}
 				problems++
 			} else {
 				successful++
@@ -64,7 +72,16 @@ func EvaluateEKSAdditionalAWSControls(e EKSProviderEvidence) []Result {
 			r.Details = fmt.Sprintf("%d ECR images and %d non-ECR image references; verify approved third-party scanning of non-ECR images.", len(e.ECRImages), e.NonECRImageCount)
 		case problems > 0:
 			r.Status = "MANUAL"
-			r.Details = fmt.Sprintf("%d of %d ECR images lack verified scan results; check scan eligibility, registry rules and alternate approved scanner evidence.", problems, len(e.ECRImages))
+			reasonKeys := make([]string, 0, len(reasons))
+			for reason := range reasons {
+				reasonKeys = append(reasonKeys, reason)
+			}
+			sort.Strings(reasonKeys)
+			reasonCounts := make([]string, 0, len(reasonKeys))
+			for _, reason := range reasonKeys {
+				reasonCounts = append(reasonCounts, fmt.Sprintf("%s=%d", reason, reasons[reason]))
+			}
+			r.Details = fmt.Sprintf("%d of %d ECR images lack verified scan results; reasons: %s. Cross-account image owners may not grant scan-read access; image pull permission does not imply scan-result permission.", problems, len(e.ECRImages), strings.Join(reasonCounts, ", "))
 		default:
 			r.Status = "PASS"
 			r.Details = fmt.Sprintf("%d of %d deployed ECR image digests have confirmed ECR scan status; review vulnerability findings separately.", successful, len(e.ECRImages))
