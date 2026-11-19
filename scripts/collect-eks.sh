@@ -10,13 +10,14 @@ usage() {
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd -- "$script_dir/.." && pwd)"
 context='' cluster='' region='' binary="$root/kubecis" output="$root/reports/eks" namespace='kube-system'
+binary_explicit=false
 while (($#)); do
   case "$1" in
     --context|--cluster-name|--region|--binary|--output-dir|--namespace)
       (($# >= 2)) || die "Missing value for $1"
       case "$1" in
         --context) context=$2 ;; --cluster-name) cluster=$2 ;;
-        --region) region=$2 ;; --binary) binary=$2 ;;
+        --region) region=$2 ;; --binary) binary=$2; binary_explicit=true ;;
         --output-dir) output=$2 ;; --namespace) namespace=$2 ;;
       esac
       shift 2 ;;
@@ -26,9 +27,25 @@ while (($#)); do
 done
 [[ -n "$context" && -n "$cluster" && -n "$region" ]] || { usage >&2; exit 2; }
 [[ "$namespace" == kube-system ]] || die 'Only kube-system deployment is supported'
-for tool in jq kubectl aws; do command -v "$tool" >/dev/null || die "$tool missing"; done
-[[ -x "$binary" ]] || die "Missing executable $binary"
+# Resolve the source directory and compiled executable as distinct inputs.
+# The documented --binary ./cmd/kubecis is a Go package, never an executable.
+if [[ -d "$binary" ]]; then
+  if [[ "$(cd "$binary" && pwd -P)" == "$root/cmd/kubecis" ]]; then
+    echo "INFO: $binary is the Go source directory, not a runnable CLI. Building ./kubecis from source." >&2
+    binary="$root/kubecis"
+  else
+    die "--binary points to a directory: $binary. Pass a compiled executable (for example --binary ./kubecis)."
+  fi
+fi
+if [[ ! -f "$binary" && "$binary" == "$root/kubecis" ]]; then
+  command -v go >/dev/null || die "Compiled CLI is missing at $binary and Go is unavailable. Install Go per go.mod, or supply --binary /path/to/kubecis."
+  [[ -f "$root/go.mod" && -d "$root/cmd/kubecis" ]] || die "Cannot build: Go module and cmd/kubecis package are missing."
+  echo "INFO: Compiled CLI missing; building Linux KubeCIS executable at $binary" >&2
+  (cd "$root" && CGO_ENABLED=0 go build -trimpath -o "$binary" ./cmd/kubecis) || die "Go build failed. Check Go version against go.mod and dependency access."
+fi
+[[ -f "$binary" && -x "$binary" ]] || die "Not a runnable KubeCIS CLI: $binary. From the repository root run: CGO_ENABLED=0 go build -trimpath -o ./kubecis ./cmd/kubecis"
 [[ -s "$root/benchmarks/cis-eks-2.1.0/benchmark.yaml" ]] || die 'Missing benchmark profile'
+for tool in jq kubectl aws; do command -v "$tool" >/dev/null || die "$tool missing"; done
 [[ "$(kubectl config current-context)" == "$context" ]] || die "Selected context must equal current kubeconfig context ($context)"
 version_json="$(kubectl --context "$context" version -o json)"
 jq -e '.serverVersion.gitVersion | contains("-eks-")' <<<"$version_json" >/dev/null || die 'Expected EKS API server'
