@@ -3,8 +3,9 @@ package audit
 import "fmt"
 
 // ApplyEKSAWSManualEvidence adds read-only AWS reviewer observations to the
-// corresponding manual CIS EKS findings. The inventory never changes PASS,
-// FAIL, MANUAL, or NOT_ASSESSED, and cannot satisfy the official review gate.
+// corresponding CIS EKS findings. Control 5.4.3 is assessed using effective
+// routing and actual node placement; other manual controls remain unchanged.
+// Independent exceptions never override automated failure.
 func ApplyEKSAWSManualEvidence(out *ConsolidatedReport, e EKSProviderEvidence) {
 	if out == nil {
 		return
