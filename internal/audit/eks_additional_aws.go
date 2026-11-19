@@ -51,9 +51,15 @@ func EvaluateEKSAdditionalAWSControls(e EKSProviderEvidence) []Result {
 			if len(item.ScanDigests) > 0 {
 				observed += fmt.Sprintf(" (OCI index %s; verified platform manifests: %s)", item.Digest, strings.Join(item.ScanDigests, ", "))
 			}
+			if item.ScanType == "THIRD_PARTY" {
+				observed += fmt.Sprintf(" (signed external scanner=%s signerSha256=%s scannedAt=%s)", item.AttestationScanner, item.AttestationSignerKeySHA256, item.AttestationScannedAt)
+			}
 			if item.Error != "" {
 				observed = "unavailable: " + item.Error
 				reasons[item.Error]++
+				problems++
+			} else if item.ScanType == "THIRD_PARTY" && (item.ScanStatus != "COMPLETE" || len(item.ScanDigests) == 0 || item.AttestationScanner == "" || len(item.AttestationSignerKeySHA256) != 64 || item.AttestationScannedAt == "") {
+				reasons["EXTERNAL_ATTESTATION_PROVENANCE_INCOMPLETE"]++
 				problems++
 			} else if item.Digest == "" || (item.ScanStatus != "COMPLETE" && item.ScanStatus != "ACTIVE") {
 				if item.Digest == "" {
