@@ -30,7 +30,10 @@ func ApplyEKSAWSManualEvidence(out *ConsolidatedReport, e EKSProviderEvidence) {
 			// A manual benchmark recommendation can have an objective
 			// native assessment, but an approved exception remains a
 			// separate human decision and never rewrites a FAIL.
-			r.Status, r.Details, r.Evidence = assessEKSPrivateNodes(review)
+			status, details, networkEvidence := assessEKSPrivateNodes(review)
+			r.Status = status
+			r.Details += " " + details
+			r.Evidence = append(r.Evidence, networkEvidence...)
 		}
 	}
 }
