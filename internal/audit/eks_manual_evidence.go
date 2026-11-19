@@ -21,21 +21,21 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 				interesting := false
 				switch c.ID {
 				case "4.1.2":
-					interesting = hasRBACItem(rule.Resources, "secrets") && hasRBACAny(rule.Verbs, "get", "list", "watch", "*")
+					interesting = hasRBACAny(rule.Resources, "secrets", "*") && hasRBACAny(rule.Verbs, "get", "list", "watch", "*")
 				case "4.1.3":
 					interesting = hasRBACItem(rule.Verbs, "*") || hasRBACItem(rule.Resources, "*") || hasRBACItem(rule.APIGroups, "*")
 				case "4.1.4":
-					interesting = hasRBACItem(rule.Resources, "pods") && hasRBACAny(rule.Verbs, "create", "*")
+					interesting = hasRBACAny(rule.Resources, "pods", "*") && hasRBACAny(rule.Verbs, "create", "*")
 				case "4.1.8":
 					interesting = hasRBACAny(rule.Verbs, "bind", "impersonate", "escalate")
 				case "4.1.9":
-					interesting = hasRBACItem(rule.Resources, "persistentvolumes") && hasRBACAny(rule.Verbs, "create", "*")
+					interesting = hasRBACAny(rule.Resources, "persistentvolumes", "*") && hasRBACAny(rule.Verbs, "create", "*")
 				case "4.1.10":
-					interesting = hasRBACItem(rule.Resources, "nodes/proxy")
+					interesting = hasRBACAny(rule.Resources, "nodes/proxy", "nodes/*", "*")
 				case "4.1.11":
-					interesting = hasRBACAny(rule.Resources, "validatingwebhookconfigurations", "mutatingwebhookconfigurations") && hasRBACAny(rule.Verbs, "create", "update", "patch", "delete", "*")
+					interesting = hasRBACAny(rule.Resources, "validatingwebhookconfigurations", "mutatingwebhookconfigurations", "*") && hasRBACAny(rule.Verbs, "create", "update", "patch", "delete", "*")
 				case "4.1.12":
-					interesting = hasRBACItem(rule.Resources, "serviceaccounts/token") && hasRBACAny(rule.Verbs, "create", "*")
+					interesting = hasRBACAny(rule.Resources, "serviceaccounts/token", "serviceaccounts/*", "*") && hasRBACAny(rule.Verbs, "create", "*")
 				}
 				if interesting {
 					r.Evidence = append(r.Evidence, Evidence{Resource: kind, Namespace: ns, Name: name, Field: fmt.Sprintf("rules[%d]", i), Observed: "sensitive RBAC permission candidate", Expected: "approved least-privilege use"})
