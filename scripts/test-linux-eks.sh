@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-for name in collect-eks-provider.sh collect-eks.sh validate-eks-preview.sh deploy-eks.sh; do
+for name in collect-eks-provider.sh collect-eks-ecr.sh collect-eks.sh validate-eks-preview.sh deploy-eks.sh; do
   bash -n "$root/scripts/$name"
 done
 if bash "$root/scripts/validate-eks-preview.sh" --release-level full --report /dev/null --cluster-name sample --region us-east-1 >/dev/null 2>&1; then
@@ -52,6 +52,10 @@ jq -n --arg now "$now" '
    summary:{total:6}
   }' > "$tmp"
 bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 >/dev/null
+if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
+  echo 'FAIL: incomplete six-control fixture passed exact 47-ID inventory gate' >&2
+  exit 1
+fi
 if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name wrong --region us-east-1 >/dev/null 2>&1; then
   echo 'FAIL: wrong AWS cluster identity accepted' >&2; exit 1
 fi

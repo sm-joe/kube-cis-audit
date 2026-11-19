@@ -43,10 +43,28 @@ deletes that sensitive raw response. It collects AWS provider configuration,
 consolidates reports with a 30-minute freshness limit, and validates the
 provisional release contract before publishing output.
 
-The Linux provider adapter intentionally omits optional access-entry, VPC CNI
-and ECR enrichment: their status is **UNAVAILABLE**, not PASS.
-Do not equate its reduced provider coverage to the richer, separately
-implemented PowerShell adapter. Do not publish a full CIS score.
+Linux now collects bounded, read-only ECR deployed-image evidence for active
+Pod containers, init containers and ephemeral containers. It requests
+`ecr:GetRegistryScanningConfiguration` and
+`ecr:DescribeImageScanFindings` for resolved deployed digests. It does not
+copy raw vulnerability descriptions or image contents into reports. A complete
+Pod inventory is mandatory; unavailable AWS image scan data is preserved as
+MANUAL/NOT_ASSESSED, and non-ECR images require third-party review. Denied
+Pod inventory is explicitly UNAVAILABLE.
+
+EKS access-entry and managed VPC CNI AWS inventories remain unavailable in
+the Linux adapter. This is less provider coverage than the PowerShell collector.
+The official score must remain withheld.
+
+Kubelet metadata schema v5 adds a bounded parse of the active allowlisted
+`/var/lib/kubelet/kubeconfig`, recording only whether the actual client
+authenticates with a recognized AWS IAM exec-token provider, a client
+certificate/key pair, or an unknown mechanism. It never exports credentials.
+The official 3.2.7 check is not applicable to IAM-token-only kubelet clients,
+but the existing report model records that as MANUAL pending reviewer
+disposition; no automatic PASS is issued. Client-cert nodes require explicit
+rotation evidence. A missing /configz field must not erase trusted host data,
+and unknown remains NOT_ASSESSED.
 
 ## Verified Linux archive installation and rollback
 

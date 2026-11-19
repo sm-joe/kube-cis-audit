@@ -15,13 +15,14 @@ import (
 // NodeMetadataSnapshot contains allowlisted file metadata and two validated kubelet settings.
 // It never includes raw host-file content, secrets, or arbitrary configuration values.
 type NodeMetadataSnapshot struct {
-	SchemaVersion   int                         `json:"schemaVersion"`
-	Benchmark       string                      `json:"benchmark"`
-	Target          string                      `json:"target"`
-	KubeletSettings map[string]KubeletSetting   `json:"kubeletSettings,omitempty"`
-	NodeName        string                      `json:"nodeName"`
-	GeneratedAt     time.Time                   `json:"generatedAt"`
-	Files           map[string]NodeFileMetadata `json:"files"`
+	SchemaVersion               int                          `json:"schemaVersion"`
+	Benchmark                   string                       `json:"benchmark"`
+	Target                      string                       `json:"target"`
+	KubeletSettings             map[string]KubeletSetting    `json:"kubeletSettings,omitempty"`
+	KubeletClientAuthentication *KubeletClientAuthentication `json:"kubeletClientAuthentication,omitempty"`
+	NodeName                    string                       `json:"nodeName"`
+	GeneratedAt                 time.Time                    `json:"generatedAt"`
+	Files                       map[string]NodeFileMetadata  `json:"files"`
 }
 
 // KubeletSetting is bounded, allowlisted, evaluated configuration evidence.
@@ -32,7 +33,7 @@ type KubeletSetting struct {
 	Error      string `json:"error,omitempty"`
 }
 
-const nodeSnapshotSchemaVersion = 4
+const nodeSnapshotSchemaVersion = 5
 
 type NodeFileMetadata struct {
 	SourcePath string  `json:"sourcePath,omitempty"`
@@ -134,6 +135,8 @@ func RunHostMetadataSnapshotWithKubeletRoot(configDir, benchmark, target, hostRo
 		} else {
 			snapshot.KubeletSettings = collectKubeletSettings(root)
 		}
+		auth := collectKubeletClientAuthentication(root)
+		snapshot.KubeletClientAuthentication = &auth
 	}
 	data, err := json.Marshal(snapshot)
 	if err != nil {

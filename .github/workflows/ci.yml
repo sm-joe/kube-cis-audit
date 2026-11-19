@@ -42,6 +42,7 @@ jobs:
           bash scripts/test-linux-eks.sh
           bash scripts/test-node-auditor-readiness.sh
           bash scripts/test-eks-provider.sh
+          bash scripts/test-eks-ecr.sh
           bash scripts/test-linux-install.sh
           bash scripts/test-deploy-eks.sh
 

@@ -7,7 +7,7 @@ die() { echo "EKS preview rejected: $*" >&2; exit 1; }
 usage() {
   echo 'Usage: bash scripts/validate-eks-preview.sh --report PATH --cluster-name NAME --region REGION [--release-level preview|full]'
 }
-report='' name='' region='' level='preview'
+report='' name='' region='' level='preview' complete_inventory=false
 while (($#)); do
   case "$1" in
     --report|--cluster-name|--region|--release-level)
@@ -17,6 +17,7 @@ while (($#)); do
         --region) region=$2 ;; --release-level) level=$2 ;;
       esac
       shift 2 ;;
+    --complete-inventory) complete_inventory=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument $1" ;;
   esac
@@ -77,4 +78,26 @@ jq -e '
     ([ $r.results[] | select(.id == $id and .method == "aws_eks_describe_cluster" and
       (.status == "PASS" or .status == "FAIL" or .status == "MANUAL") and (.evidence | length > 0))] | length) == 1)
 ' "$report" >/dev/null || die 'AWS provider findings incomplete'
+if $complete_inventory; then
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  catalog="$script_dir/../internal/audit/catalogs/eks-2.1.0.json"
+  [[ -s "$catalog" ]] || die 'Official factual control inventory unavailable'
+  jq -e --slurpfile source "$catalog" '
+    . as $r | $source[0].controls as $controls |
+    ($controls | length) == 47 and
+    ([ $controls[].id ] | unique | length) == 47 and
+    all($controls[]; . as $c |
+      ([ $r.results[] | select(.id == $c.id) ] | length) ==
+      (if ($c.id | startswith("3.")) then ($r.expectedNodes | length) else 1 end)
+    ) and
+    all($r.results[]; . as $finding |
+      any($controls[]; .id == $finding.id)
+    ) and
+    all($r.expectedNodes[]; . as $n |
+      all($controls[] | select(.id | startswith("3.")); . as $c |
+        ([ $r.results[] | select(.id == $c.id and .scope == $n) ] | length) == 1
+      )
+    )
+  ' "$report" >/dev/null || die 'Consolidated report does not contain the exact official 47-control ID inventory for every worker'
+fi
 echo 'PASS (PREVIEW ONLY): EKS sources, node evidence and score-withholding validated'

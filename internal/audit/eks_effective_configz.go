@@ -39,14 +39,34 @@ func EnrichNodeWithConfigz(report *Report, nodeName string, data []byte) error {
 			return fmt.Errorf("unexpected or duplicated kubelet control %s scope", r.ID)
 		}
 		found[r.ID] = true
+		// Preserve the independently collected active kubeconfig authentication
+		// method when reading only a bounded effective /configz field.
+		authMode := KubeletAuthUnknown
+		for _, evidence := range r.Evidence {
+			if evidence.Field == "clientAuthentication" {
+				authMode = evidence.Observed
+				break
+			}
+		}
 		raw, present := root.KubeletConfig[field]
-		r.EvidenceSource = "kubernetes-node-proxy-configz"
-		r.Status = "NOT_ASSESSED"
-		r.Details = "Effective kubelet /configz did not expose " + field + "; do not assume defaults."
-		r.Evidence = nil
 		if !present || string(raw) == "null" {
+			// Node-local metadata can contain an explicit setting from the
+			// allowlisted AL2023 config.json even when /configz omits it.
+			// A missing /configz field must not erase that trusted evidence.
+			if (r.Status == "PASS" || r.Status == "FAIL" || r.Status == "MANUAL") && len(r.Evidence) > 0 && r.EvidenceSource != "kubernetes-node-proxy-configz" {
+				r.Details += "; live /configz omitted " + field + ", preserving explicit node-local configuration evidence"
+				continue
+			}
+			r.EvidenceSource = "kubernetes-node-proxy-configz"
+			r.Status = "NOT_ASSESSED"
+			r.Details = "Neither explicit node-local evidence nor effective kubelet /configz exposed " + field + "; do not assume defaults."
+			r.Evidence = nil
 			continue
 		}
+		r.EvidenceSource = "kubernetes-node-proxy-configz"
+		r.Status = "NOT_ASSESSED"
+		r.Details = "Effective kubelet /configz value for " + field + " is invalid or unsupported."
+		r.Evidence = nil
 		switch r.ID {
 		case "3.2.5":
 			var value bool
@@ -75,9 +95,24 @@ func EnrichNodeWithConfigz(report *Report, nodeName string, data []byte) error {
 				r.Details = "Invalid effective rotateCertificates in /configz"
 				continue
 			}
-			r.Evidence = []Evidence{{Resource: "Node", Name: nodeName, Field: field, Observed: strconv.FormatBool(value), Expected: "true when client certificate authentication is used; otherwise not applicable"}}
-			r.Status = "MANUAL"
-			r.Details = fmt.Sprintf("Effective rotateCertificates=%t. Inspect active kubelet kubeconfig to determine certificate versus IAM exec-token authentication before deciding PASS/FAIL/NOT_APPLICABLE.", value)
+			r.Evidence = []Evidence{
+				{Resource: "Node", Name: nodeName, Field: field, Observed: strconv.FormatBool(value), Expected: "true when client certificate authentication is used; otherwise not applicable"},
+				{Resource: "host-file", Name: "var/lib/kubelet/kubeconfig", Field: "clientAuthentication", Observed: authMode, Expected: "CLIENT_CERT for applicable nodes"},
+			}
+			switch authMode {
+			case KubeletIAMExecToken:
+				r.Status = "MANUAL"
+				r.Details = "Active kubelet uses IAM exec-token authentication; certificate rotation is not applicable. Human review must confirm the authentication mode."
+			case KubeletClientCert:
+				r.Status = "FAIL"
+				if value {
+					r.Status = "PASS"
+				}
+				r.Details = fmt.Sprintf("Effective rotateCertificates=%t for active client-certificate kubelet authentication.", value)
+			default:
+				r.Status = "MANUAL"
+				r.Details = fmt.Sprintf("Effective rotateCertificates=%t; active kubelet client authentication mode remains unknown, so applicability requires review.", value)
+			}
 		}
 	}
 	for id := range targets {

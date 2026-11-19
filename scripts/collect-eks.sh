@@ -138,12 +138,12 @@ for node in "${nodes[@]}"; do
   inputs+=("$report")
 done
 bash "$script_dir/collect-eks-provider.sh" --cluster-name "$cluster" --region "$region" \
-  --expected-server "$api_server" --output-file "$tmp/provider.json"
+  --context "$context" --expected-server "$api_server" --output-file "$tmp/provider.json"
 args=(consolidate --cluster "$tmp/cluster.json" --provider-evidence "$tmp/provider.json"
   --expected-nodes "$(IFS=,; echo "${nodes[*]}")" --max-age 30m --output-file "$tmp/consolidated.json")
 for report in "${inputs[@]:1}"; do args+=(--local "$report"); done
 "$binary" "${args[@]}" || die 'Consolidation failed (missing/stale/inconsistent evidence)'
-bash "$script_dir/validate-eks-preview.sh" --report "$tmp/consolidated.json" --cluster-name "$cluster" --region "$region"
+bash "$script_dir/validate-eks-preview.sh" --report "$tmp/consolidated.json" --cluster-name "$cluster" --region "$region" --complete-inventory
 "$binary" render --input "$tmp/consolidated.json" --output-file "$tmp/results.txt"
 "$binary" review-init --input "$tmp/consolidated.json" --output-file "$tmp/review-template.json"
 "$binary" finalize --input "$tmp/consolidated.json" --output-dir "$tmp"

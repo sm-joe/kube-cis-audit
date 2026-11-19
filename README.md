@@ -98,8 +98,9 @@ For an API scan, supply kubeconfig or an in-cluster service account with careful
 
 The **Linux/Unix** operator workflow now includes a Bash-based collector for
 API findings, all supported EKS managed EC2 Linux workers and AWS DescribeCluster
-inventory. It deliberately reports optional IAM/CNI/ECR provider inventories as
-unavailable until verified Linux collectors are implemented. This is a
+inventory. It collects ECR scan-status evidence by deployed image digest on Linux;
+missing ECR permissions or unresolved images remain unknown/reviewable.
+Optional IAM access-entry and VPC CNI provider inventories remain unavailable. This is a
 **provisional CIS EKS preview**, not an official CIS compliance assessment.
 
 Prerequisites: AWS CLI v2, `kubectl`, Bash, `jq`, GNU coreutils and a Linux
