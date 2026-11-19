@@ -99,8 +99,10 @@ unavailable until verified Linux collectors are implemented. This is a
 **provisional CIS EKS preview**, not an official CIS compliance assessment.
 
 Prerequisites: AWS CLI v2, `kubectl`, Bash, `jq`, GNU coreutils and a Linux
-`kubecis` binary built from the same commit/version as the published auditor
-image. The selected Kubernetes context and AWS identity must identify the same
+`kubecis` binary matching the published auditor image. When `./kubecis` is
+missing, the collector builds it from local Go source (requires the Go version
+specified in `go.mod`). The `cmd/kubecis` path is a Go source directory, not a
+runnable executable. The selected Kubernetes context and AWS identity must identify the same
 EKS cluster and Kubernetes minor version. `nodes/proxy` access is optional
 and security-sensitive; missing evidence remains unknown.
 
@@ -112,7 +114,7 @@ bash scripts/deploy-eks.sh --context YOUR_EKS_CONTEXT \
 # The placeholder digest above must be replaced with a real verified digest.
 bash scripts/collect-eks.sh \
   --context YOUR_EKS_CONTEXT --cluster-name YOUR_CLUSTER \
-  --region YOUR_REGION --binary ./kubecis --output-dir reports/eks
+  --region YOUR_REGION --output-dir reports/eks
 
 # The full CIS acceptance mode is intentionally blocked:
 bash scripts/validate-eks-preview.sh --report reports/eks/consolidated.json \
