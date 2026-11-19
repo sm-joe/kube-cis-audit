@@ -7,10 +7,10 @@ import (
 
 func TestEKSECRScanEvidenceRequiresVerifiedDigestAndCompleteInventory(t *testing.T) {
 	good := EKSECRImageScanEvidence{
-		Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com",
+		Registry:   "123456789012.dkr.ecr.us-east-1.amazonaws.com",
 		Repository: "nested/app",
-		Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		ScanType: "ENHANCED",
+		Digest:     "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		ScanType:   "ENHANCED",
 		ScanStatus: "ACTIVE",
 	}
 	e := EKSProviderEvidence{ECRInventoryStatus: "COLLECTED", ECRImages: []EKSECRImageScanEvidence{good}}
