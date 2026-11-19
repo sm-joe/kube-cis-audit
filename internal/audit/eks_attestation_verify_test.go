@@ -41,12 +41,12 @@ func TestEKSExternalScanCannotPassWithoutPinnedValidSignature(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	child := "sha256:" + strings.Repeat("b", 64)
 	item := EKSECRImageScanEvidence{
-		Registry: "602401143452.dkr.ecr.us-east-1.amazonaws.com",
+		Registry:   "602401143452.dkr.ecr.us-east-1.amazonaws.com",
 		Repository: "eks/coredns", Digest: digest, ScanType: "THIRD_PARTY",
 		ScanStatus: "COMPLETE", ScanDigests: []string{child},
-		AttestationScanner: "approved-vulnerability-scanner",
+		AttestationScanner:         "approved-vulnerability-scanner",
 		AttestationSignerKeySHA256: pin,
-		AttestationScannedAt: now.Format(time.RFC3339),
+		AttestationScannedAt:       now.Format(time.RFC3339),
 	}
 	var claim externalScanClaim
 	claim.SchemaVersion = 1
@@ -107,8 +107,8 @@ func TestEKSExternalScanCannotPassWithoutPinnedValidSignature(t *testing.T) {
 
 func TestEKSECRUnknownScanningModeNeverPasses(t *testing.T) {
 	base := EKSECRImageScanEvidence{
-		Registry: "123456789012.dkr.ecr.us-east-1.amazonaws.com",
-		Repository: "kubecis", Digest: "sha256:" + strings.Repeat("1",64),
+		Registry:   "123456789012.dkr.ecr.us-east-1.amazonaws.com",
+		Repository: "kubecis", Digest: "sha256:" + strings.Repeat("1", 64),
 		ScanStatus: "COMPLETE",
 	}
 	for _, mode := range []string{"", "UNKNOWN", "THIRD_PARTY"} {
