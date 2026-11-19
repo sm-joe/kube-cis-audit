@@ -151,6 +151,39 @@ your own ECR copy and approved scanning workflow. Merely republishing an
 image does not establish that the original artifact was securely built,
 and an external registry's AWS scan status cannot be fabricated.
 
+## OCI index and platform manifest scanning
+
+ECR Basic scanning cannot scan the OCI image **index** digest directly.
+A single deployed index can reference an AMD64 image manifest, an ARM64
+image manifest, and attestation descriptors. KubeCIS now performs a
+bounded, read-only `ecr:BatchGetImage` for an unscannable index in
+the collector's own ECR account, verifies the manifest's index media type,
+and asks `ecr:DescribeImageScanFindings` separately for **each Linux
+AMD64/ARM64 child image digest**. Unknown/unknown platform attestation
+entries are not treated as runnable images. An index is considered
+scan-covered only if all supported runnable Linux children have
+independently verified `COMPLETE` or `ACTIVE` scan status and the
+registry scanning mode is known. A missing or inaccessible child yields
+MANUAL, never PASS.
+
+The parent deployed index remains in `ecrImages[].digest`, while
+`ecrImages[].scanDigests` contains each verified platform child digest;
+the evaluator carries that evidence into control 5.1.1. This is a
+**conservative all-supported-child check**, not a statement that every
+platform child is running in the cluster. The collector never starts
+scans, deletes image manifests or edits the registry.
+
+For an existing KubeCIS index and scanned AMD64 child, inspect:
+
+```bash
+jq -r '.ecrImages[] | select(.repository == "kubecis") |
+  {digest, scanDigests, scanType, scanStatus, error}' reports/eks/provider.json
+```
+
+`ecr:BatchGetImage` is required in addition to existing read-only
+ECR scanning permissions. Cross-account access denial still requires
+independent owner-provided/third-party scanning evidence.
+
 The collector does **not** enable registry scans, modify permissions, copy
 images, or incur Inspector charges. Its required ECR APIs are read-only.
 Do not grant `ecr:*` or broad cross-account access as a workaround.
