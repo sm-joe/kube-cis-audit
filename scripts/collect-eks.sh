@@ -67,7 +67,42 @@ jq -e --argjson count "${#nodes[@]}" '
  all(.items[]; .metadata.labels["kubernetes.io/os"] == "linux" and
      (.metadata.labels["eks.amazonaws.com/nodegroup"] // "") != "")
 ' <<<"$nodes_json" >/dev/null || die 'Mixed or unsupported compute modes; refusing incomplete assessment'
-pods_json="$(kubectl --context "$context" -n "$namespace" get pods -l app.kubernetes.io/name=kubecis-node-auditor -o json)"
+# Missing DaemonSet resources must not look like missing scan evidence.
+if ! kubectl --context "$context" -n "$namespace" get daemonset kubecis-node-auditor -o json > /dev/null 2>&1; then
+  die "The kubecis-node-auditor DaemonSet is not installed in $namespace for context $context. Review deploy/eks/README.md and deploy with scripts/deploy-eks.sh using a verified matching image digest before collecting."
+fi
+pods_json="$(kubectl --context "$context" -n "$namespace" get pods -l app.kubernetes.io/name=kubecis-node-auditor -o json)" || die "Unable to list node-auditor Pods in $namespace"
+
+diagnose_node_auditor() {
+  local node="$1" matched
+  echo "ERROR: node-auditor not ready on node $node (namespace $namespace, context $context)" >&2
+  matched="$(jq -r --arg n "$node" '
+    [.items[] | select(.spec.nodeName == $n) |
+      {name:.metadata.name,phase:(.status.phase // "Unknown"),
+       init:[.status.initContainerStatuses[]? |
+          {name:.name,ready:.ready,waiting:(.state.waiting.reason // ""),
+           terminated:(.state.terminated.reason // ""),restarts:.restartCount}],
+       containers:[.status.containerStatuses[]? |
+          {name:.name,ready:.ready,waiting:(.state.waiting.reason // ""),
+           terminated:(.state.terminated.reason // ""),restarts:.restartCount}]}]
+  ' <<<"$pods_json")"
+  if [[ "$matched" == "[]" ]]; then
+    echo "No labelled DaemonSet Pod is assigned to this node; check node selector, taints/tolerations, and DaemonSet scheduling." >&2
+    echo "Labelled Pods on other nodes:" >&2
+    jq -r '.items[] | [.metadata.name, (.spec.nodeName // "<unscheduled>"), (.status.phase // "Unknown")] | @tsv' <<<"$pods_json" >&2
+  else
+    echo "Assigned Pod status (including init and container reasons):" >&2
+    printf '%s\n' "$matched" >&2
+  fi
+  echo "DaemonSet desired/current/ready counts:" >&2
+  kubectl --context "$context" -n "$namespace" get daemonset kubecis-node-auditor \
+    -o 'custom-columns=NAME:.metadata.name,DESIRED:.status.desiredNumberScheduled,CURRENT:.status.currentNumberScheduled,READY:.status.numberReady' >&2 || true
+  echo "Node taints (verify whether tolerations are needed):" >&2
+  jq -r --arg n "$node" '.items[] | select(.metadata.name == $n) |
+    ((.spec.taints // []) | if length == 0 then "none" else map(.key + ":" + (.effect // "")) | join(", ") end)' <<<"$nodes_json" >&2
+  echo "Inspect using: kubectl --context $context -n $namespace get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide" >&2
+  echo "And: kubectl --context $context -n $namespace describe daemonset kubecis-node-auditor" >&2
+}
 local_version="$("$binary" version)" || die 'CLI version unavailable'
 [[ -n "$local_version" ]] || die 'CLI version missing'
 tmp="$(mktemp -d)"
@@ -79,7 +114,10 @@ jq -e '.auditMode == "native" and .cloudProvider == "eks" and (.summary.total ==
 inputs+=("$tmp/cluster.json")
 for node in "${nodes[@]}"; do
   mapfile -t matches < <(jq -r --arg n "$node" '.items[] | select(.spec.nodeName == $n and .status.phase == "Running") | .metadata.name' <<<"$pods_json")
-  (("${#matches[@]}" == 1)) || die "Need exactly one running node-auditor Pod for $node; got ${#matches[@]}"
+  if (("${#matches[@]}" != 1)); then
+    diagnose_node_auditor "$node"
+    die "Expected exactly one Running node-auditor Pod for $node; found ${#matches[@]}. No partial EKS report was published."
+  fi
   pod="${matches[0]}"
   node_version="$(kubectl --context "$context" -n "$namespace" exec "$pod" -c node-auditor -- /usr/local/bin/kubecis version)" || die "Cannot inspect node auditor version for $node"
   [[ "$node_version" == "$local_version" ]] || die "Version mismatch on $node: CLI=$local_version auditor=$node_version"
