@@ -86,6 +86,15 @@ func assembleFinalAssessment(raw []byte, report audit.Report, input reviewInput,
 			out.Summary.AutomatedPass++
 		case "FAIL":
 			out.Summary.AutomatedFail++
+			if r.ID == "5.4.3" {
+				if d, ok := decisions[r.ID+"|"+r.Scope]; ok {
+					// An approved exception is a separate annotation, never
+					// a reduction of the original automated FAIL count.
+					c.Decision = &d
+					c.ReviewStatus = d.Decision
+					out.Summary.ReviewedException++
+				}
+			}
 		case "WARN":
 			out.Summary.AutomatedWarn++
 		case "NOT_ASSESSED":
@@ -147,7 +156,7 @@ func renderFinalAssessment(out finalAssessment) string {
 			scope = " [node: " + c.Scope + "]"
 		}
 		fmt.Fprintf(&b, "[%s] %s %s%s\n", c.AutomatedStatus, c.ID, c.Title, scope)
-		if c.AutomatedStatus == "MANUAL" {
+		if c.AutomatedStatus == "MANUAL" || c.Decision != nil {
 			fmt.Fprintf(&b, "  Human review: %s\n", c.ReviewStatus)
 			if c.Decision != nil {
 				fmt.Fprintf(&b, "  Attestation: %s by %s at %s\n  Evidence reference: %s\n  Justification: %s\n", c.Decision.Decision, c.Decision.Reviewer, c.Decision.ReviewedAt.Format(time.RFC3339), c.Decision.EvidenceRef, c.Decision.Justification)
