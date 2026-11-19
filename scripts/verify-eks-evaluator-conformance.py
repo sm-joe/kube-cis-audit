@@ -15,6 +15,25 @@ SOURCE_SHA = "c3c9eb01253643a0176b21aafd19cc7c08af0a19872f869712d2d82be8a967e9"
 PATH = pathlib.Path("conformance/eks-2.1.0-evaluator-review.json")
 CATALOG = pathlib.Path("internal/audit/catalogs/eks-2.1.0.json")
 VALID = {"not_implemented", "candidate", "verified"}
+# Factual page numbers from the privately supplied official v2.1.0 table of
+# contents, not redistributions of its proprietary audit procedures.
+AUDIT_PAGES = dict(
+    (entry.split(":")[0], int(entry.split(":")[1]))
+    for entry in """
+    2.1.1:18 3.1.1:23 3.1.2:27 3.1.3:31 3.1.4:35
+    3.2.1:40 3.2.2:44 3.2.3:48 3.2.4:53 3.2.5:57 3.2.6:61
+    3.2.7:66 3.2.8:71
+    4.1.1:79 4.1.2:83 4.1.3:87 4.1.4:92 4.1.5:96 4.1.6:100
+    4.1.7:104 4.1.8:110 4.1.9:116 4.1.10:120 4.1.11:124 4.1.12:128
+    4.2.1:133 4.2.2:137 4.2.3:141 4.2.4:145 4.2.5:149
+    4.3.1:154 4.3.2:158 4.4.1:162 4.4.2:165
+    4.5.1:169 4.5.2:173
+    5.1.1:178 5.1.2:182 5.1.3:187 5.1.4:193
+    5.2.1:198 5.3.1:203
+    5.4.1:208 5.4.2:212 5.4.3:215 5.4.4:219
+    5.5.1:223
+    """.split()
+)
 
 def audit(ledger, catalog, repo):
     problems = []
@@ -33,6 +52,8 @@ def audit(ledger, catalog, repo):
         canonical = expected[control]
         if c.get("assessment") != canonical["assessment"] or c.get("sourcePage") != canonical["pdfPage"]:
             problems.append(f"{control}: source classification/provenance mismatch")
+        if c.get("auditPage") != AUDIT_PAGES.get(control):
+            problems.append(f"{control}: official audit procedure page mismatch")
         status = c.get("implementationStatus")
         if status not in VALID:
             problems.append(f"{control}: unsupported state")
