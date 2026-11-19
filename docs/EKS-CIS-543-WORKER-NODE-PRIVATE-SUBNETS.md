@@ -31,3 +31,31 @@ jq '.awsManualEvidence["5.4.3"]' reports/eks/provider.json
 ```
 
 Because the CIS control remains a manual recommendation, no official benchmark score is released and approved exceptions remain separate evidence-bound decisions.
+
+### Intentional public test clusters: record an exception without changing FAIL
+
+After collecting a consolidated report, use the existing CLI to generate an
+immutable-digest review template. A `5.4.3` FAIL appears as an **optional
+EXCEPTION-only** candidate; it is never eligible for `APPROVED` or `REJECTED`
+as an automated PASS-equivalent decision.
+
+```bash
+./kubecis review-init --input reports/eks/consolidated.json \
+  --output-file reports/eks/review-template.json
+```
+
+Use the actual consolidated-report path produced by the collection workflow.
+Create a decision with the exact `reportSha256`, finding ID and scope, the
+literal `decision: "EXCEPTION"`, a named reviewer, approved justification,
+an independently resolvable `evidenceRef`, and a real timestamp. Then run:
+
+```bash
+./kubecis finalize --input reports/eks/consolidated.json \
+  --decisions reports/eks/approved-decisions.json \
+  --output-dir reports/eks/assessment
+```
+
+The final dossier retains `automatedStatus: FAIL` for 5.4.3 and records the
+exception separately. The official compliance score remains WITHHELD.
+A review template is not itself an approval and no exception is auto-created.
+
