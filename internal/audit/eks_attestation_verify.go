@@ -25,18 +25,18 @@ var sha256HexPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 type externalScanClaim struct {
 	SchemaVersion int `json:"schemaVersion"`
-	Subject struct {
-		Registry string `json:"registry"`
+	Subject       struct {
+		Registry   string `json:"registry"`
 		Repository string `json:"repository"`
-		Digest string `json:"digest"`
+		Digest     string `json:"digest"`
 	} `json:"subject"`
-	Scanner string `json:"scanner"`
-	ScanID string `json:"scanId"`
-	Status string `json:"status"`
-	FindingsAvailable bool `json:"findingsAvailable"`
-	ScannerReportSHA256 string `json:"scannerReportSha256"`
-	ScannedAt string `json:"scannedAt"`
-	ScannedDigests []string `json:"scannedDigests"`
+	Scanner             string   `json:"scanner"`
+	ScanID              string   `json:"scanId"`
+	Status              string   `json:"status"`
+	FindingsAvailable   bool     `json:"findingsAvailable"`
+	ScannerReportSHA256 string   `json:"scannerReportSha256"`
+	ScannedAt           string   `json:"scannedAt"`
+	ScannedDigests      []string `json:"scannedDigests"`
 }
 
 func verifyExternalScanEvidence(item EKSECRImageScanEvidence, now time.Time) error {
