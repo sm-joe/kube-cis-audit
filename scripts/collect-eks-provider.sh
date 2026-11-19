@@ -76,5 +76,7 @@ if [[ -n "$context" ]]; then
   jq -s '.[0] * .[1] * .[2]' "$outfile" "$ecr" "$access" > "$merged" || die 'Cannot merge AWS evidence'
   mv -- "$merged" "$outfile"
 fi
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+bash "$script_dir/collect-eks-aws-review.sh" --cluster-name "$cluster" --region "$region" --evidence-file "$outfile"
 jq -e '.schemaVersion == 1 and .assessmentStatus == "INVENTORY_ONLY"' "$outfile" >/dev/null || die 'Invalid generated evidence'
 echo "Collected provisional EKS provider inventory for $cluster ($region)"
