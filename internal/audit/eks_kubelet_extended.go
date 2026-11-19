@@ -85,6 +85,17 @@ func evaluateExtendedKubeletSetting(nodeName string, c Check, snapshot NodeMetad
 		r.Details = "Control/field/path combination not allowlisted"
 		return r
 	}
+	// The official EKS benchmark makes client certificate rotation
+	// inapplicable to the standard IAM exec-token kubelet client.
+	// Keep a reviewable status because this engine has no NOT_APPLICABLE
+	// aggregate classification; never misreport IAM token use as PASS.
+	if c.ID == "3.2.7" && snapshot.KubeletClientAuthentication != nil && snapshot.KubeletClientAuthentication.Mode == KubeletIAMExecToken {
+		r.Status = "MANUAL"
+		r.EvidenceSource = "node-local-kubeconfig-auth"
+		r.Evidence = []Evidence{{Resource: "host-file", Name: "var/lib/kubelet/kubeconfig", Field: "clientAuthentication", Observed: KubeletIAMExecToken, Expected: "client certificate authentication for rotation applicability"}}
+		r.Details = "Active kubelet kubeconfig uses AWS IAM exec-token authentication; CIS EKS 3.2.7 is not applicable to IAM-token-only clients. Confirm reviewer applicability; no client certificate or token data was collected."
+		return r
+	}
 	setting, ok := snapshot.KubeletSettings[field]
 	if !ok || setting.Error != "" || setting.Value == "" {
 		r.Details = "Kubelet configuration evidence unavailable"
@@ -119,9 +130,18 @@ func evaluateExtendedKubeletSetting(nodeName string, c Check, snapshot NodeMetad
 			r.Status = "MANUAL"
 		}
 	case "3.2.7":
-		if setting.Value == "true" {
-			r.Status = "PASS"
-		} else if setting.Value == "false" {
+		authMode := KubeletAuthUnknown
+		if snapshot.KubeletClientAuthentication != nil {
+			authMode = snapshot.KubeletClientAuthentication.Mode
+		}
+		r.Evidence = append(r.Evidence, Evidence{Resource: "host-file", Name: "var/lib/kubelet/kubeconfig", Field: "clientAuthentication", Observed: authMode, Expected: "CLIENT_CERT for applicable nodes"})
+		if authMode == KubeletClientCert {
+			if setting.Value == "true" {
+				r.Status = "PASS"
+			} else if setting.Value == "false" {
+				r.Status = "FAIL"
+			}
+		} else {
 			r.Status = "MANUAL"
 		}
 	case "3.2.8":
