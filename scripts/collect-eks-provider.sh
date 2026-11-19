@@ -57,7 +57,7 @@ jq -n --argjson aws "$raw" --arg region "$region" --arg now "$(date -u +%Y-%m-%d
    controlPlaneLogging:(reduce ["api","audit","authenticator","controllerManager","scheduler"][] as $t
      ({}; .[$t] = ([ $c.logging.clusterLogging[] | select(.types | index($t)) | .enabled ][0]))),
    assessmentStatus:"INVENTORY_ONLY",
-   assessmentNote:"Read-only AWS inventory; optional IAM/CNI/ECR evidence not collected by POSIX preview; no official compliance score",
+   assessmentNote:"Read-only AWS inventory; optional IAM/CNI/ECR read APIs collected when explicitly authorized, missing data remains unavailable. Official compliance score withheld.",
    authenticationMode:($c.accessConfig.authenticationMode // ""),
    accessInventoryStatus:"UNAVAILABLE",accessEntries:[],
    vpcCniStatus:"UNAVAILABLE",ecrInventoryStatus:"UNAVAILABLE",ecrImages:[],nonEcrImageCount:0
@@ -67,10 +67,13 @@ jq -n --argjson aws "$raw" --arg region "$region" --arg now "$(date -u +%Y-%m-%d
 if [[ -n "$context" ]]; then
   script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   ecr="$(mktemp)"
+  access="$(mktemp)"
   merged="$(mktemp)"
-  trap 'rm -f -- "$ecr" "$merged"' EXIT
+  trap 'rm -f -- "$ecr" "$access" "$merged"' EXIT
   bash "$script_dir/collect-eks-ecr.sh" --context "$context" --region "$region" --output-file "$ecr"
-  jq -s '.[0] * .[1]' "$outfile" "$ecr" > "$merged" || die 'Cannot merge ECR evidence'
+  bash "$script_dir/collect-eks-access-cni.sh" --cluster-name "$cluster" --region "$region" \
+    --authentication-mode "$(jq -r '.authenticationMode // "UNAVAILABLE"' "$outfile")" --output-file "$access"
+  jq -s '.[0] * .[1] * .[2]' "$outfile" "$ecr" "$access" > "$merged" || die 'Cannot merge AWS evidence'
   mv -- "$merged" "$outfile"
 fi
 jq -e '.schemaVersion == 1 and .assessmentStatus == "INVENTORY_ONLY"' "$outfile" >/dev/null || die 'Invalid generated evidence'
