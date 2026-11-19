@@ -31,6 +31,14 @@ type EKSECRImageScanEvidence struct {
 	Error                      string   `json:"error,omitempty"`
 }
 
+// EKSAWSManualEvidence is a bounded, read-only human-review inventory.
+// It cannot be used to turn MANUAL into PASS without evidence-bound approval.
+type EKSAWSManualEvidence struct {
+	Status string            `json:"status"`
+	Note   string            `json:"note"`
+	Items  []json.RawMessage `json:"items"`
+}
+
 // EKSProviderEvidence is a narrowly scoped, redacted AWS DescribeCluster
 // snapshot. It contains configuration inventory, NOT a CIS pass/fail score.
 type EKSProviderEvidence struct {
@@ -56,6 +64,7 @@ type EKSProviderEvidence struct {
 	ECRInventoryStatus    string                    `json:"ecrInventoryStatus,omitempty"`
 	ECRImages             []EKSECRImageScanEvidence `json:"ecrImages,omitempty"`
 	NonECRImageCount      int                       `json:"nonEcrImageCount,omitempty"`
+	AWSManualEvidence map[string]EKSAWSManualEvidence `json:"awsManualEvidence,omitempty"`
 }
 
 func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration, now time.Time) (EKSProviderEvidence, error) {
@@ -90,6 +99,24 @@ func DecodeEKSProviderEvidence(data []byte, cluster Report, maxAge time.Duration
 	for _, logType := range []string{"api", "audit", "authenticator", "controllerManager", "scheduler"} {
 		if _, ok := e.ControlPlaneLogging[logType]; !ok {
 			return e, fmt.Errorf("EKS provider evidence missing logging field %q", logType)
+		}
+	}
+	for id, review := range e.AWSManualEvidence {
+		switch id {
+		case "5.1.2", "5.1.3", "5.3.1", "5.4.3":
+		default:
+			return e, fmt.Errorf("unrecognized AWS manual-review evidence control %q", id)
+		}
+		if review.Status != "COLLECTED" && review.Status != "PARTIAL" && review.Status != "UNAVAILABLE" {
+			return e, fmt.Errorf("invalid AWS review inventory status for %s", id)
+		}
+		if len(review.Items) > 40 || len(review.Note) > 1024 {
+			return e, fmt.Errorf("oversized AWS manual-review evidence for %s", id)
+		}
+		for _, item := range review.Items {
+			if len(item) > 4096 || !json.Valid(item) {
+				return e, fmt.Errorf("invalid AWS manual-review item for %s", id)
+			}
 		}
 	}
 	return e, nil
