@@ -64,10 +64,15 @@ func collectKubeletClientAuthentication(hostRoot string) KubeletClientAuthentica
 					Command string   `yaml:"command"`
 					Args    []string `yaml:"args"`
 				} `yaml:"exec"`
-				ClientCertificate     string `yaml:"client-certificate"`
-				ClientCertificateData string `yaml:"client-certificate-data"`
-				ClientKey             string `yaml:"client-key"`
-				ClientKeyData         string `yaml:"client-key-data"`
+				ClientCertificate     string    `yaml:"client-certificate"`
+				ClientCertificateData string    `yaml:"client-certificate-data"`
+				ClientKey             string    `yaml:"client-key"`
+				ClientKeyData         string    `yaml:"client-key-data"`
+				Token                 string    `yaml:"token"`
+				TokenFile             string    `yaml:"tokenFile"`
+				Username              string    `yaml:"username"`
+				Password              string    `yaml:"password"`
+				AuthProvider          *struct{} `yaml:"auth-provider"`
 			} `yaml:"user"`
 		} `yaml:"users"`
 	}
@@ -76,12 +81,14 @@ func collectKubeletClientAuthentication(hostRoot string) KubeletClientAuthentica
 		return out
 	}
 	userName := ""
+	contextMatches := 0
 	for _, ctx := range config.Contexts {
-		if ctx.Name == config.CurrentContext && userName == "" {
+		if ctx.Name == config.CurrentContext {
+			contextMatches++
 			userName = ctx.Context.User
 		}
 	}
-	if config.CurrentContext == "" || userName == "" {
+	if config.CurrentContext == "" || userName == "" || contextMatches != 1 {
 		out.Error = "active kubeconfig context/user not identified"
 		return out
 	}
@@ -94,7 +101,8 @@ func collectKubeletClientAuthentication(hostRoot string) KubeletClientAuthentica
 		cert := user.User.ClientCertificate != "" || user.User.ClientCertificateData != ""
 		key := user.User.ClientKey != "" || user.User.ClientKeyData != ""
 		exec := user.User.Exec
-		if exec != nil && !cert && !key {
+		other := user.User.Token != "" || user.User.TokenFile != "" || user.User.Username != "" || user.User.Password != "" || user.User.AuthProvider != nil
+		if exec != nil && !cert && !key && !other {
 			cmd := filepath.Base(strings.TrimSpace(exec.Command))
 			if cmd == "aws" && len(exec.Args) >= 2 && exec.Args[0] == "eks" && exec.Args[1] == "get-token" {
 				out.Mode = KubeletIAMExecToken
@@ -102,7 +110,7 @@ func collectKubeletClientAuthentication(hostRoot string) KubeletClientAuthentica
 			if cmd == "aws-iam-authenticator" && len(exec.Args) > 0 && exec.Args[0] == "token" {
 				out.Mode = KubeletIAMExecToken
 			}
-		} else if exec == nil && cert && key {
+		} else if exec == nil && cert && key && !other {
 			out.Mode = KubeletClientCert
 		}
 	}
