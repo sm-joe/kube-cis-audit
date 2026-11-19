@@ -7,7 +7,7 @@ statement**, not an official CIS benchmark compatibility certification.
 | --- | --- | --- | --- | --- |
 | Self-managed Kubernetes on Linux | Native available | Allowlisted metadata / node auditor | Not applicable | Requires distribution-specific E2E |
 | Kind Linux nodes | Native available | Dedicated Kind auditor | Not applicable | Development integration path exists |
-| Amazon EKS managed EC2 Linux, Kubernetes 1.35 | Native preview | AL2023 nodeadm supported | DescribeCluster plus optional Windows PowerShell enrichment | Prior PowerShell test evidence; **new Linux runner not yet live-verified** |
+| Amazon EKS managed EC2 Linux, Kubernetes 1.35 | Native preview | AL2023 nodeadm supported | DescribeCluster + read-only Linux ECR image scanning evidence; Windows PowerShell has additional IAM/CNI | Prior PowerShell test evidence; **new Linux runner not yet live-verified** |
 | Amazon EKS managed EC2 Linux, Kubernetes 1.34 / 1.36 / 1.37 | Provisional compatibility entries | Depends on node OS, manifest and kubelet sources | Linux DescribeCluster preview | **Not independently certified** |
 | Amazon EKS Fargate / EKS Auto Mode / self-managed EKS workers | API-only where authorized | Not supported by strict managed EC2 collector | Provider inventory possible | Rejected for complete EKS consolidation |
 | EKS managed control plane | Provider-owned metadata only | No customer host access | DescribeCluster snapshot | Manual / not assessed as applicable |
