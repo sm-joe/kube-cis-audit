@@ -21,8 +21,24 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertEqual(gaps, [])
         self.assertFalse(ready)
         self.assertEqual(sum(counts.values()), 47)
-        self.assertEqual(counts["candidate"], 19)
-        self.assertEqual(counts["not_implemented"], 28)
+        self.assertEqual(counts["candidate"], 43)
+        self.assertEqual(counts["not_implemented"], 4)
+
+    def test_missing_and_mismatched_runtime_route_fail(self):
+        data = json.loads(json.dumps(self.ledger))
+        data["controls"][0]["runtimeRoute"] = "fake_evaluator"
+        routes = module.load_profile_routes(ROOT / "benchmarks/cis-eks-2.1.0/benchmark.yaml")
+        problems, ready, _ = module.audit(data, self.catalog, ROOT, routes)
+        self.assertFalse(ready)
+        self.assertTrue(any("runtime evaluator route mismatch" in x for x in problems))
+
+    def test_every_profile_control_has_named_runtime_route(self):
+        routes = module.load_profile_routes(ROOT / "benchmarks/cis-eks-2.1.0/benchmark.yaml")
+        self.assertEqual(len(routes), 41)
+        problems, ready, counts = module.audit(self.ledger, self.catalog, ROOT, routes)
+        self.assertEqual(problems, [])
+        self.assertEqual(sum(counts.values()), 47)
+        self.assertFalse(ready)
 
     def test_fabricated_verification_is_rejected(self):
         data = json.loads(json.dumps(self.ledger))
