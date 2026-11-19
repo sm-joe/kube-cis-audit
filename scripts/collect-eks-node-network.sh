@@ -46,7 +46,7 @@ for ((i=0;i<count;i++)); do
  fi
  if [[ "$route_source" != UNAVAILABLE ]];then
   route_table="$(jq -r '.RouteTableId // empty' <<<"$selected")"
-  if [[ ! "$route_table" =~ ^rtb-[a-f0-9]+$ ]];then
+  if [[ ! "$route_table" =~ ^rtb-[a-f0-9]+$ ]] || ! jq -e '(.Routes|type)=="array" and (.Routes|length)>0' <<<"$selected" >/dev/null 2>&1;then
    route_source='UNAVAILABLE'
   else
    routes="$(jq -c '[.Routes[]? | {
@@ -73,7 +73,7 @@ if [[ -n "$context" ]] && command -v kubectl >/dev/null;then
     instance_id="${BASH_REMATCH[0]}"
     instance_id="${instance_id#/}"
     if instance="$(aws ec2 describe-instances --instance-ids "$instance_id" --region "$region" \
-      --query 'Reservations[].Instances[].{InstanceId:InstanceId,SubnetId:SubnetId,PublicIpAddress:PublicIpAddress,State:State.Name}' --output json 2>/dev/null)" &&
+      --query 'Reservations[].Instances[].{InstanceId:InstanceId,SubnetId:SubnetId,PublicIpAddress:PublicIpAddress,State:State.Name,NetworkInterfacePublicIps:NetworkInterfaces[].Association.PublicIp}' --output json 2>/dev/null)" &&
       jq -e --arg id "$instance_id" 'type=="array" and length==1 and .[0].InstanceId==$id and (.[0].SubnetId|type)=="string"' <<<"$instance" >/dev/null 2>&1;then
      entry="$(jq -c --arg node "$node" '.[0]+{node:$node}' <<<"$instance")"
      nodes="$(jq -c --argjson x "$entry" '.+[$x]' <<<"$nodes")"
