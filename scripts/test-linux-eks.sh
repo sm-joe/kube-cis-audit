@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-for name in collect-eks-provider.sh collect-eks-ecr.sh verify-eks-scan-attestation.sh collect-eks.sh validate-eks-preview.sh deploy-eks.sh; do
+for name in collect-eks-provider.sh collect-eks-access-cni.sh collect-eks-ecr.sh verify-eks-scan-attestation.sh collect-eks.sh validate-eks-preview.sh deploy-eks.sh; do
   bash -n "$root/scripts/$name"
 done
 if bash "$root/scripts/validate-eks-preview.sh" --release-level full --report /dev/null --cluster-name sample --region us-east-1 >/dev/null 2>&1; then
