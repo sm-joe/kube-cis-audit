@@ -22,7 +22,7 @@ func TestExtendedKubeletMetadataAndDecisions(t *testing.T) {
 		value.SourcePath = "etc/kubernetes/kubelet/config.json"
 		values[field] = value
 	}
-	snapshot := NodeMetadataSnapshot{KubeletSettings: values}
+	snapshot := NodeMetadataSnapshot{KubeletSettings: values, KubeletClientAuthentication: &KubeletClientAuthentication{SourcePath: "var/lib/kubelet/kubeconfig", Mode: KubeletClientCert}}
 	cases := []struct {
 		id    string
 		field string
