@@ -27,14 +27,22 @@ PROVIDER_ROUTES = {
 }
 
 def load_profile_routes(path):
-    """Read the minimal id/kind mapping from the reviewed benchmark YAML.
-    This is not a YAML validator: the main Go loader independently validates
-    the complete benchmark and controls. Reject duplicate or missing mappings.
+    """Parse the control id/kind pairs in the fixed-format EKS benchmark.
+    The Go loader separately validates full YAML syntax and supported kinds.
     """
-    profile = path.read_text()
+    source = path.read_text()
     pairs = re.findall(
-        r'(?m)^  - id: "([2-5]\\.\\d+\\.\\d+)"\\n'
-        r'(?:^    [^\\n]*\\n)*?^    kind: ([a-z_]+)\\s*
+        r'(?m)^  - id: "([2-5]\.\d+\.\d+)"\n'
+        r'(?:^    [^\n]*\n)*?^    kind: ([a-z_]+)\s*$',
+        source,
+    )
+    routes = {}
+    for control, kind in pairs:
+        if control in routes:
+            raise ValueError("duplicate profile route " + control)
+        routes[control] = kind
+    return routes
+
 # Factual page numbers from the privately supplied official v2.1.0 table of
 # contents, not redistributions of its proprietary audit procedures.
 AUDIT_PAGES = dict(
