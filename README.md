@@ -84,7 +84,11 @@ Inspect available CLI flags with `./kubecis <command> --help`. `--engine upstrea
 Build a Linux image locally:
 
 ```bash
-docker build --build-arg VERSION=local-dev -t kubecis-native:local .
+# BuildKit/Buildx is required: the Dockerfile uses BUILDPLATFORM/TARGETARCH.
+docker buildx version
+docker buildx build --platform linux/amd64 \
+  --build-arg VERSION=local-dev \
+  --load -t kubecis-native:local .
 docker run --rm kubecis-native:local version
 ```
 
