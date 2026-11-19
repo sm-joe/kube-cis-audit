@@ -87,17 +87,17 @@ func TestEKS543PrimaryPublicIPDoesNotDoubleCountNetworkInterface(t *testing.T) {
 	node := func(ips string) json.RawMessage {
 		return json.RawMessage(fmt.Sprintf(`{"InstanceId":"i-123","SubnetId":"subnet-123","PublicIpAddress":"203.0.113.5","State":"running","NetworkInterfacePublicIps":%s}`, ips))
 	}
-	review := EKSAWSManualEvidence{Status:"COLLECTED",NodeInventoryStatus:"COLLECTED",Items:[]json.RawMessage{subnet},Nodes:[]json.RawMessage{node(`["203.0.113.5","203.0.113.5"]`)}}
+	review := EKSAWSManualEvidence{Status: "COLLECTED", NodeInventoryStatus: "COLLECTED", Items: []json.RawMessage{subnet}, Nodes: []json.RawMessage{node(`["203.0.113.5","203.0.113.5"]`)}}
 	status, detail, evidence := assessEKSPrivateNodes(review)
 	if status != "FAIL" || !strings.Contains(detail, "assigned public IPv4") || strings.Contains(detail, "additional network-interface") {
-		t.Fatalf("primary IPv4 must be recorded once: %s %s",status,detail)
+		t.Fatalf("primary IPv4 must be recorded once: %s %s", status, detail)
 	}
-	if !strings.Contains(evidence[len(evidence)-1].Observed,"additionalPublicAddresses=0") {
-		t.Fatalf("duplicate primary interface must not inflate extra interface count: %+v",evidence)
+	if !strings.Contains(evidence[len(evidence)-1].Observed, "additionalPublicAddresses=0") {
+		t.Fatalf("duplicate primary interface must not inflate extra interface count: %+v", evidence)
 	}
 	review.Nodes = []json.RawMessage{node(`["203.0.113.5","203.0.113.6","203.0.113.6"]`)}
-	status,detail,evidence = assessEKSPrivateNodes(review)
-	if status!="FAIL" || !strings.Contains(detail,"additional network-interface") || !strings.Contains(evidence[len(evidence)-1].Observed,"additionalPublicAddresses=1") {
-		t.Fatalf("distinct additional IPv4 must remain visible: %s %s %+v",status,detail,evidence)
+	status, detail, evidence = assessEKSPrivateNodes(review)
+	if status != "FAIL" || !strings.Contains(detail, "additional network-interface") || !strings.Contains(evidence[len(evidence)-1].Observed, "additionalPublicAddresses=1") {
+		t.Fatalf("distinct additional IPv4 must remain visible: %s %s %+v", status, detail, evidence)
 	}
 }
