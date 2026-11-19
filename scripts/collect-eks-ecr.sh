@@ -72,10 +72,25 @@ if kubectl --context "$context" get pods --all-namespaces -o json > "$work/pods.
    error='runtime image digest unavailable'
   else
    config_error=''
-   if config="$(aws ecr get-registry-scanning-configuration --registry-id "$account" --region "$image_region" --output json 2>"$work/aws-error")"; then
-    scan_type="$(jq -er '.scanningConfiguration.scanType | select(. == "BASIC" or . == "ENHANCED")' <<<"$config" 2>/dev/null || true)"
-    if [[ -z "$scan_type" ]]; then
-     error='REGISTRY_SCAN_TYPE_UNKNOWN'
+   # GetRegistryScanningConfiguration has NO --registry-id input option.
+   # It describes only the caller's current regional registry. Never reuse
+   # that response for images published in a different AWS account.
+   if [[ -z "$caller_account" ]]; then
+    config_error='CALLER_ACCOUNT_UNVERIFIED'
+    error="REGISTRY_SCAN_CONFIG_$config_error"
+   elif [[ "$account" != "$caller_account" ]]; then
+    config_error='CROSS_ACCOUNT_REGISTRY_MODE_UNAVAILABLE'
+    error="REGISTRY_SCAN_CONFIG_$config_error"
+   elif config="$(aws ecr get-registry-scanning-configuration --region "$image_region" --output json 2>"$work/aws-error")"; then
+    # Verify the returned registry owner as well as the scanning mode.
+    if jq -e --arg account "$account" '.registryId == $account' <<<"$config" >/dev/null 2>&1; then
+     scan_type="$(jq -er '.scanningConfiguration.scanType | select(. == "BASIC" or . == "ENHANCED")' <<<"$config" 2>/dev/null || true)"
+     if [[ -z "$scan_type" ]]; then
+      error='REGISTRY_SCAN_TYPE_UNKNOWN'
+     fi
+    else
+     config_error='REGISTRY_ID_MISMATCH'
+     error="REGISTRY_SCAN_CONFIG_$config_error"
     fi
    else
     config_error="$(classify_aws_error "$(cat "$work/aws-error")")"
