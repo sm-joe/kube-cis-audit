@@ -13,8 +13,8 @@ func TestKubeletClientAuthMetadataUsesOnlyActiveContext(t *testing.T) {
 	raw := "apiVersion: v1\nkind: Config\ncurrent-context: aws-context\ncontexts:\n" +
 		"- name: aws-context\n  context:\n    user: aws-user\n" +
 		"users:\n" +
-		"- name: unused-cert\n  user:\n    client-certificate-data: PRIVATE-CERT-DATA-MUST-NOT-LEAK\n    client-key-data: PRIVATE-KEY-DATA-MUST-NOT-LEAK\n" +
-		"- name: aws-user\n  user:\n    token: SUPER-SECRET-UNUSED-TOKEN\n    exec:\n      command: /usr/local/bin/aws\n      args: [eks, get-token, --cluster-name, private-cluster]\n"
+		"- name: unused-cert\n  user:\n    client-certificate-data: PRIVATE-CERT-DATA-MUST-NOT-LEAK\n    client-key-data: PRIVATE-KEY-DATA-MUST-NOT-LEAK\n    token: SUPER-SECRET-UNUSED-TOKEN\n" +
+		"- name: aws-user\n  user:\n    exec:\n      command: /usr/local/bin/aws\n      args: [eks, get-token, --cluster-name, private-cluster]\n"
 	if err := os.WriteFile(filepath.Join(dir, "kubeconfig"), []byte(raw), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +49,10 @@ func TestKubeletClientAuthCertificateAndUnsafeInputs(t *testing.T) {
 	write("current-context: cert-context\ncontexts:\n- name: cert-context\n  context:\n    user: cert-user\nusers:\n- name: cert-user\n  user:\n    client-certificate: /etc/kubernetes/pki/kubelet.crt\n")
 	if got := collectKubeletClientAuthentication(dir); got.Mode != KubeletAuthUnknown {
 		t.Fatalf("incomplete client cert credentials were trusted: %+v", got)
+	}
+	write("current-context: aws-context\ncontexts:\n- name: aws-context\n  context:\n    user: aws-user\nusers:\n- name: aws-user\n  user:\n    token: unsafe-mixed-auth\n    exec:\n      command: aws\n      args: [eks, get-token]\n")
+	if got := collectKubeletClientAuthentication(dir); got.Mode != KubeletAuthUnknown {
+		t.Fatalf("mixed active token plus exec credentials were trusted: %+v", got)
 	}
 	if err := os.Remove(file); err != nil {
 		t.Fatal(err)
