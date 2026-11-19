@@ -73,5 +73,10 @@ if [[ -n "$context" ]]; then
   jq -s '.[0] * .[1]' "$outfile" "$ecr" > "$merged" || die 'Cannot merge ECR evidence'
   mv -- "$merged" "$outfile"
 fi
+# Collect optional bounded AWS IAM/ECR/KMS/subnet review inputs. These
+# produce only reviewable observations, never an automatic compliance PASS.
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+bash "$script_dir/collect-eks-aws-review.sh" \
+  --cluster-name "$cluster" --region "$region" --evidence-file "$outfile"
 jq -e '.schemaVersion == 1 and .assessmentStatus == "INVENTORY_ONLY"' "$outfile" >/dev/null || die 'Invalid generated evidence'
 echo "Collected provisional EKS provider inventory for $cluster ($region)"
