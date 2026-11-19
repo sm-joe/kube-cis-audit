@@ -48,6 +48,9 @@ func EvaluateEKSAdditionalAWSControls(e EKSProviderEvidence) []Result {
 		reasons := map[string]int{}
 		for _, item := range e.ECRImages {
 			observed := item.ScanType + "/" + item.ScanStatus
+			if len(item.ScanDigests) > 0 {
+				observed += fmt.Sprintf(" (OCI index %s; verified platform manifests: %s)", item.Digest, strings.Join(item.ScanDigests, ", "))
+			}
 			if item.Error != "" {
 				observed = "unavailable: " + item.Error
 				reasons[item.Error]++
