@@ -18,7 +18,7 @@ func TestEKS210ManualRBACWildcardInventoryFindsEverySensitivePermission(t *testi
 		Rules: []rbacv1.PolicyRule{{
 			APIGroups: []string{"*"},
 			Resources: []string{"*"},
-			Verbs: []string{"*"},
+			Verbs:     []string{"*"},
 		}},
 	}
 	client := fake.NewSimpleClientset(role)
