@@ -139,11 +139,18 @@ func newReviewInitCommand() *cobra.Command {
 					})
 				}
 				if r.Status == "MANUAL" {
+					guidance := "Inspect evidence; record APPROVED, REJECTED or EXCEPTION only after human verification. Include reviewer, dated justification and independently resolvable evidenceRef. No auto-approval."
+					switch r.ID {
+					case "4.1.7":
+						guidance = "Review every IAM principal, EKS access-policy scope, Kubernetes group and aws-auth mapping against an independently maintained least-privilege access approval. Explicitly justify any cluster-wide administrative grant. APPROVED means the documented authorization review was completed; it does not rewrite native findings or release a CIS score."
+					case "5.5.1":
+						guidance = "Verify that API or API_AND_CONFIG_MAP is active, that intended IAM principals use EKS access entries, and that any remaining aws-auth mappings are required for migration or node bootstrap. API_AND_CONFIG_MAP does not prove migration completeness. Record a separately evidenced reviewer decision; do not infer approval from entry counts."
+					}
 					template.PendingReviews = append(template.PendingReviews, reviewCandidate{
 						ID: r.ID, Scope: r.Scope, Title: r.Title, Details: r.Details,
 						Scored: r.Scored, Method: r.Method, EvidenceSource: r.EvidenceSource,
 						Evidence: r.Evidence, Remediation: r.Remediation,
-						ReviewGuidance: "Inspect evidence; record APPROVED, REJECTED or EXCEPTION only after human verification. Include reviewer, dated justification and independently resolvable evidenceRef. No auto-approval.",
+						ReviewGuidance: guidance,
 					})
 				}
 			}
