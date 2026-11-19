@@ -130,6 +130,14 @@ func newReviewInitCommand() *cobra.Command {
 				PendingReviews: []reviewCandidate{},
 			}
 			for _, r := range report.Results {
+				if r.Status == "FAIL" && r.ID == "5.4.3" {
+					template.PendingReviews = append(template.PendingReviews, reviewCandidate{
+						ID: r.ID, Scope: r.Scope, Title: r.Title, Details: r.Details,
+						Scored: r.Scored, Method: r.Method, EvidenceSource: r.EvidenceSource,
+						Evidence: r.Evidence, Remediation: r.Remediation,
+						ReviewGuidance: "Optional documented EXCEPTION only. The CIS FAIL remains unchanged; record reviewer, dated justification and resolvable evidenceRef.",
+					})
+				}
 				if r.Status == "MANUAL" {
 					template.PendingReviews = append(template.PendingReviews, reviewCandidate{
 						ID: r.ID, Scope: r.Scope, Title: r.Title, Details: r.Details,
@@ -172,16 +180,22 @@ func validateReviews(raw []byte, report audit.Report, input reviewInput, now tim
 		return reviewOutput{}, fmt.Errorf("review reportSha256 mismatch: attestations must bind to exact source report bytes")
 	}
 	pending := map[string]bool{}
+	exceptionEligible := map[string]bool{}
 	for _, result := range report.Results {
+		key := result.ID + "|" + result.Scope
 		if result.Status == "MANUAL" {
-			pending[result.ID+"|"+result.Scope] = true
+			pending[key] = true
+		}
+		if result.ID == "5.4.3" && result.Status == "FAIL" {
+			// An exception documents a deviation but cannot reclassify it.
+			exceptionEligible[key] = true
 		}
 	}
 	seen := map[string]bool{}
 	for _, decision := range input.Decisions {
 		key := decision.ID + "|" + decision.Scope
-		if !pending[key] {
-			return reviewOutput{}, fmt.Errorf("review %s: control is absent or not MANUAL in the report", key)
+		if !pending[key] && !(exceptionEligible[key] && decision.Decision == "EXCEPTION") {
+			return reviewOutput{}, fmt.Errorf("review %s: only MANUAL controls or an EXCEPTION for a verified 5.4.3 FAIL may be attested", key)
 		}
 		if seen[key] {
 			return reviewOutput{}, fmt.Errorf("duplicate review for control %s", key)
