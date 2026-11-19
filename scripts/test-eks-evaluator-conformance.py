@@ -21,8 +21,8 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertEqual(gaps, [])
         self.assertFalse(ready)
         self.assertEqual(sum(counts.values()), 47)
-        self.assertEqual(counts["candidate"], 43)
-        self.assertEqual(counts["not_implemented"], 4)
+        self.assertEqual(counts["candidate"], 47)
+        self.assertEqual(counts["not_implemented"], 0)
 
     def test_missing_and_mismatched_runtime_route_fail(self):
         data = json.loads(json.dumps(self.ledger))
@@ -62,13 +62,16 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertFalse(ready)
         self.assertTrue(any("audit procedure page mismatch" in x for x in gaps))
 
-    def test_unimplemented_mapping_cannot_be_asserted_implemented(self):
+    def test_candidate_cannot_be_labelled_unimplemented_or_verified_without_proof(self):
         data = json.loads(json.dumps(self.ledger))
-        item = next(x for x in data["controls"] if x["implementationStatus"] == "not_implemented")
-        item["implementationStatus"] = "candidate"
+        data["controls"][0]["implementationStatus"] = "not_implemented"
         gaps, ready, _ = module.audit(data, self.catalog, ROOT)
         self.assertFalse(ready)
-        self.assertTrue(any("catalog says otherwise" in x for x in gaps))
+        self.assertTrue(any("stale implementation" in x for x in gaps))
+        data["controls"][0]["implementationStatus"] = "verified"
+        gaps, ready, _ = module.audit(data, self.catalog, ROOT)
+        self.assertFalse(ready)
+        self.assertTrue(any("audit procedure not reviewed" in x for x in gaps))
 
 if __name__ == "__main__":
     unittest.main()
