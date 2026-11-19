@@ -26,5 +26,11 @@ func ApplyEKSAWSManualEvidence(out *ConsolidatedReport, e EKSProviderEvidence) {
 			Expected: "complete, provenance-bound inventory and independent human decision",
 		})
 		r.Details += fmt.Sprintf(" AWS manual evidence: %s; %d bounded records. %s", review.Status, len(review.Items), review.Note)
+		if r.ID == "5.4.3" {
+			// A manual benchmark recommendation can have an objective
+			// native assessment, but an approved exception remains a
+			// separate human decision and never rewrites a FAIL.
+			r.Status, r.Details, r.Evidence = assessEKSPrivateNodes(review)
+		}
 	}
 }
