@@ -90,6 +90,12 @@ func TestCIS543PublicNodeExceptionDoesNotOverrideFailure(t *testing.T) {
 	if err != nil || len(accepted.Decisions) != 1 {
 		t.Fatalf("legitimate evidence-bound exception rejected: %+v %v", accepted, err)
 	}
+	final, err := assembleFinalAssessment(raw, report, input, now)
+	if err != nil || final.Summary.AutomatedFail != 1 || final.Summary.ReviewedException != 1 ||
+		len(final.Controls) != 1 || final.Controls[0].AutomatedStatus != "FAIL" ||
+		final.Controls[0].ReviewStatus != "EXCEPTION" || !strings.Contains(final.ScoreStatus, "WITHHELD") {
+		t.Fatalf("exception must annotate, not override, the CIS FAIL: %+v %v", final.Summary, err)
+	}
 	exception.Decision = "APPROVED"
 	_, err = validateReviews(raw, report, reviewInput{
 		ReportSHA256: input.ReportSHA256, Decisions: []reviewDecision{exception},
