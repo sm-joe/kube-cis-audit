@@ -23,8 +23,8 @@ func TestEKS210ManualRBACWildcardInventoryFindsEverySensitivePermission(t *testi
 	}
 	client := fake.NewSimpleClientset(role, &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: "explicit-test-grant"},
-		RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "unrestricted"},
-		Subjects: []rbacv1.Subject{{Kind: "User", Name: "test-subject"}},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "unrestricted"},
+		Subjects:   []rbacv1.Subject{{Kind: "User", Name: "test-subject"}},
 	})
 	for _, id := range []string{
 		"4.1.2", "4.1.3", "4.1.4", "4.1.8", "4.1.9",
