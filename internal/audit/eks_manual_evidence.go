@@ -13,6 +13,10 @@ import (
 // EvaluateEKSManualEvidence supplies reproducible, read-only observations
 // for human controls. No heuristic auto-approves a manual CIS recommendation.
 func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface, c Check) Result {
+	switch c.ID {
+	case "4.1.2", "4.1.3", "4.1.8", "4.1.10", "4.1.11", "4.1.12":
+		return evaluateEKSBoundRBAC(ctx, client, c)
+	}
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "MANUAL", Method: "kubernetes_inventory_human_attestation", Scored: false, Remediation: c.Remediation}
 	r.Details = c.Description + " Reviewer must record the approval, exception or rejection with a linked evidence reference."
 	if strings.HasPrefix(c.ID, "4.1.") {
