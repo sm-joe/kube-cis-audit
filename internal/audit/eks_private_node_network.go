@@ -98,15 +98,21 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		if n.PublicIP != "" {
 			public = append(public, n.InstanceID+": assigned public IPv4")
 		}
+		// EC2 NetworkInterfaces includes the primary interface. Its
+		// Association.PublicIp can repeat Instance.PublicIpAddress; only
+		// distinct public addresses provide additional exposure evidence.
+		additionalIPs := make(map[string]bool)
 		for _, ip := range n.NetworkInterfacePublicIPs {
-			if ip != "" {
-				public = append(public, n.InstanceID+": secondary network interface public IPv4/EIP")
-				break
+			if ip != "" && ip != n.PublicIP {
+				additionalIPs[ip] = true
 			}
+		}
+		if len(additionalIPs) > 0 {
+			public = append(public, n.InstanceID+": additional network-interface public IPv4/EIP")
 		}
 		evidence = append(evidence, Evidence{
 			Resource: "AWS::EC2::Instance", Name: n.InstanceID, Field: "subnet/publicIPv4",
-			Observed: fmt.Sprintf("%s/state=%s/primaryPublic=%t/secondaryPublicInterfaces=%d", n.SubnetID, n.State, n.PublicIP != "", len(n.NetworkInterfacePublicIPs)),
+			Observed: fmt.Sprintf("%s/state=%s/primaryPublic=%t/additionalPublicAddresses=%d", n.SubnetID, n.State, n.PublicIP != "", len(additionalIPs)),
 			Expected: "node in assessed private subnet without public IPv4",
 		})
 	}

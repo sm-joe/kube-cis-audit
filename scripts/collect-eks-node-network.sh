@@ -95,6 +95,6 @@ status='COLLECTED'
 if ((errors>0||count==0)) || [[ "$node_status" != COLLECTED ]];then status='PARTIAL';fi
 updated="$(jq -c --argjson items "$enriched" --argjson nodes "$nodes" \
  --arg status "$status" --arg nodeStatus "$node_status" \
- '.awsManualEvidence["5.4.3"] |= (.items=$items | .status=$status | .nodeInventoryStatus=$nodeStatus | .nodes=$nodes | .note="Inspect verified effective subnet routes and actual worker EC2 public IPs. Private PASS requires complete node inventory, no IGW default route, and public IP assignment disabled; exceptions remain separate.")' "$evidence")"
+ '.awsManualEvidence["5.4.3"] |= (.items=$items | .status=$status | .nodeInventoryStatus=$nodeStatus | .nodes=$nodes | .note="Inspect verified effective subnet routes and actual worker EC2 public IPs. Private PASS requires complete node inventory, no active IGW routes, and public IP auto-assignment disabled. Network-interface addresses may repeat the primary instance IPv4 and are deduplicated in assessment; exceptions remain separate.")' "$evidence")"
 printf '%s\n' "$updated" > "$tmp/merged.json"
 mv -- "$tmp/merged.json" "$evidence"
