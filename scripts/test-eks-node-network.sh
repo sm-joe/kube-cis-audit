@@ -33,6 +33,7 @@ run(){ PATH="$tmp/bin:$PATH" bash "$root/scripts/collect-eks-node-network.sh" --
 run
 jq -e '.awsManualEvidence["5.4.3"] | .status=="COLLECTED" and .nodeInventoryStatus=="COLLECTED" and .items[0].routeSource=="EXPLICIT" and .items[0].routes[0].gateway=="igw-123" and .nodes[0].InstanceId=="i-123"' "$tmp/provider.json" >/dev/null
 TEST_ROUTE=main run
+jq '.awsManualEvidence["5.4.3"]' "$tmp/provider.json" >&2
 jq -e '.awsManualEvidence["5.4.3"] | .status=="COLLECTED" and .items[0].routeSource=="MAIN" and .items[0].routes[0].ipv6=="::/0" and .items[0].routes[0].gateway=="igw-456"' "$tmp/provider.json" >/dev/null
 TEST_UNAVAILABLE=aws run
 jq -e '.awsManualEvidence["5.4.3"] | .status=="PARTIAL" and .items[0].routeSource=="UNAVAILABLE"' "$tmp/provider.json" >/dev/null
