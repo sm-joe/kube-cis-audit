@@ -17,11 +17,7 @@ fi
 tmp="$(mktemp)"
 trap 'rm -f -- "$tmp"' EXIT
 echo '{"auditMode":"consolidated","cloudProvider":"eks","compliance":{"compliancePercent":100}}' > "$tmp"
-if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 >/dev/null
-if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
-  echo 'FAIL: incomplete six-control report passed complete 47-ID inventory gate' >&2
-  exit 1
-fi 2>&1; then
+if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 >/dev/null 2>&1; then
   echo 'FAIL: invented 100% CIS compliance incorrectly accepted' >&2
   exit 1
 fi
@@ -56,6 +52,10 @@ jq -n --arg now "$now" '
    summary:{total:6}
   }' > "$tmp"
 bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 >/dev/null
+if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
+  echo 'FAIL: incomplete six-control fixture passed exact 47-ID inventory gate' >&2
+  exit 1
+fi
 if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name wrong --region us-east-1 >/dev/null 2>&1; then
   echo 'FAIL: wrong AWS cluster identity accepted' >&2; exit 1
 fi
