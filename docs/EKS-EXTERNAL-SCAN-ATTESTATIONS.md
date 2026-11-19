@@ -109,8 +109,7 @@ have independently reviewed official audit procedures, positive/negative
 fixtures, runtime evidence and a named reviewer. It **fails** while
 any remain candidate/unimplemented.
 
-Current audit baseline: 47 official control identities, **19 implemented
-but not evaluator-verified**, **28 cataloged as not implemented**.
+Current audit baseline: 47 official control identities, **47 runtime routes now present, 0 independently evaluator-verified**.
 This is a gap register rather than a full verified CIS EKS implementation.
 Original licensed CIS source remains private. Full compliance score:
 WITHHELD. No CIS certification claim is made.
