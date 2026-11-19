@@ -61,6 +61,35 @@ See [Linux EKS collection](../../docs/LINUX-EKS-COLLECTION.md). The Go scanner
 and Bash workflow are Linux-native, but **live Linux EKS end-to-end acceptance
 remains outstanding**. A complete official CIS EKS score is withheld.
 
+## Troubleshoot: no Running auditor Pod on a worker
+
+If collection reports `Expected exactly one Running node-auditor Pod`,
+the CLI is working, but node-local evidence cannot be collected yet.
+Check the selected EKS context and the required DaemonSet first:
+
+```bash
+kubectl -n kube-system get daemonset kubecis-node-auditor
+kubectl -n kube-system get pods -l app.kubernetes.io/name=kubecis-node-auditor -o wide
+kubectl -n kube-system describe daemonset kubecis-node-auditor
+kubectl get node ip-10-10-0-165.ec2.internal --show-labels
+```
+
+If the DaemonSet is absent, install it with `scripts/deploy-eks.sh` and
+an actual, verified immutable image digest built from the matching CLI source.
+Do **not** apply the raw manifest with its legacy candidate image tag.
+
+If a Pod is `Pending`, inspect `kubectl -n kube-system describe pod POD_NAME`
+for insufficient resources, node affinity, taints, or missing host directories.
+If it is `ImagePullBackOff`, verify the digest, GHCR image availability,
+architecture and image pull access. If `Init:CrashLoopBackOff`, review
+`kubectl -n kube-system logs POD_NAME -c node-metadata-init --previous` and
+the allowlisted hostPath mounts (`/var/lib/kubelet` and
+`/etc/kubernetes/kubelet`); do not add broad host privileges as a workaround.
+
+Once the DaemonSet has a Running Pod on **every** supported managed EC2 worker,
+re-run `scripts/collect-eks.sh`. Missing nodes must not be silently excluded
+from a consolidated assessment.
+
 ## Evidence and security boundaries
 
 - Never assume customer access to EKS control-plane host files.
