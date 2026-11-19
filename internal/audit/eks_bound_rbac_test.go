@@ -103,3 +103,26 @@ func TestEKSBoundRBACIncompleteEvidenceNeverPass(t *testing.T) {
 		t.Fatalf("denied inventory must not pass: %+v", got)
 	}
 }
+
+func TestEKSBoundRBACTruncatedInventoryIsNotAssessed(t *testing.T) {
+ objects := []runtime.Object{}
+ for i := 0; i < 201; i++ {
+  name := fmt.Sprintf("sensitive-%03d", i)
+  objects = append(objects, &rbacv1.ClusterRoleBinding{
+   ObjectMeta: metav1.ObjectMeta{Name: name},
+   RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "secret-readers"},
+   Subjects: []rbacv1.Subject{{Kind: "User", Name: name}},
+  })
+ }
+ objects = append(objects, &rbacv1.ClusterRole{
+  ObjectMeta: metav1.ObjectMeta{Name: "secret-readers"},
+  Rules: []rbacv1.PolicyRule{{APIGroups: []string{""}, Resources: []string{"secrets"}, Verbs: []string{"get"}}},
+ })
+ client := fake.NewSimpleClientset(objects...)
+ result := EvaluateEKSManualEvidence(context.Background(), client, Check{ID: "4.1.2"})
+ if result.Status != "NOT_ASSESSED" || len(result.Evidence) != 200 ||
+  !strings.Contains(result.Details, "201 sensitive grant(s)") ||
+  !strings.Contains(result.Details, "Evidence truncated") {
+  t.Fatalf("truncated RBAC review evidence must fail closed: %+v", result)
+ }
+}
