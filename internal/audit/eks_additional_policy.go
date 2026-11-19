@@ -33,12 +33,14 @@ func EvaluateEKSAdditionalPolicy(ctx context.Context, client kubernetes.Interfac
 					for _, env := range container.Env {
 						if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 							violations++
+						if pod.Namespace == "kube-system" { platformReferences++ } else { nonPlatformReferences++ }
 							r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: kind + "/" + container.Name + "/env/" + env.Name, Observed: "secretKeyRef", Expected: "mounted secret volume or approved exception"})
 						}
 					}
 					for _, source := range container.EnvFrom {
 						if source.SecretRef != nil {
 							violations++
+						if pod.Namespace == "kube-system" { platformReferences++ } else { nonPlatformReferences++ }
 							r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: kind + "/" + container.Name + "/envFrom", Observed: "secretRef", Expected: "mounted secret volume or approved exception"})
 						}
 					}
@@ -50,7 +52,7 @@ func EvaluateEKSAdditionalPolicy(ctx context.Context, client kubernetes.Interfac
 				for _, env := range container.Env {
 					if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 						violations++
-							if pod.Namespace == "kube-system" { platformReferences++ } else { nonPlatformReferences++ }
+						if pod.Namespace == "kube-system" { platformReferences++ } else { nonPlatformReferences++ }
 							r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "ephemeral/" + container.Name + "/env/" + env.Name, Observed: "secretKeyRef", Expected: "mounted secret volume or approved exception"})
 					}
 				}
