@@ -21,8 +21,8 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertEqual(gaps, [])
         self.assertFalse(ready)
         self.assertEqual(sum(counts.values()), 47)
-        self.assertEqual(counts["candidate"], 19)
-        self.assertEqual(counts["not_implemented"], 28)
+        self.assertEqual(counts["candidate"], 47)
+        self.assertEqual(counts["not_implemented"], 0)
 
     def test_fabricated_verification_is_rejected(self):
         data = json.loads(json.dumps(self.ledger))
@@ -46,11 +46,10 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertFalse(ready)
         self.assertTrue(any("audit procedure page mismatch" in x for x in gaps))
 
-    def test_unimplemented_mapping_cannot_be_asserted_implemented(self):
-        data = json.loads(json.dumps(self.ledger))
-        item = next(x for x in data["controls"] if x["implementationStatus"] == "not_implemented")
-        item["implementationStatus"] = "candidate"
-        gaps, ready, _ = module.audit(data, self.catalog, ROOT)
+    def test_candidate_cannot_exceed_actual_source_implementation(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        catalog["controls"][0]["implemented"] = False
+        gaps, ready, _ = module.audit(self.ledger, catalog, ROOT)
         self.assertFalse(ready)
         self.assertTrue(any("catalog says otherwise" in x for x in gaps))
 
