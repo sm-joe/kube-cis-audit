@@ -62,3 +62,48 @@ if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name s
 fi
 echo 'PASS: positive fixture and missing-evidence/identity regression checks'
 
+
+# Regression: a missing compiled CLI and a --binary cmd/kubecis directory
+# should both trigger a source build instead of a directory execution failure.
+# Test with a disposable fixture repository and a MOCK Go builder. This does
+# not replace the real Go build/test CI job.
+fixture="$(mktemp -d)"
+trap 'rm -rf -- "$tmp" "$fixture"' EXIT
+mkdir -p "$fixture/scripts" "$fixture/cmd/kubecis" "$fixture/benchmarks/cis-eks-2.1.0" "$fixture/tools"
+cp "$root/scripts/collect-eks.sh" "$fixture/scripts/collect-eks.sh"
+cp "$root/go.mod" "$fixture/go.mod"
+touch "$fixture/benchmarks/cis-eks-2.1.0/benchmark.yaml"
+cat > "$fixture/tools/go" <<'EOF'
+#!/usr/bin/env bash
+[[ "$1" == build ]] || exit 5
+while (($#)); do
+  if [[ "$1" == -o ]]; then
+    shift
+    printf '#!/bin/sh\necho fixture-version\n' > "$1"
+    chmod 755 "$1"
+    exit 0
+  fi
+  shift
+done
+exit 5
+EOF
+chmod +x "$fixture/tools/go"
+for binary_arg in default source; do
+  rm -f "$fixture/kubecis"
+  args=(--context dummy --cluster-name sample --region us-east-1)
+  if [[ "$binary_arg" == source ]]; then
+    args+=(--binary "$fixture/cmd/kubecis")
+  fi
+  # The fixture must reach the missing kubectl prerequisite, not attempt to
+  # execute the source directory or fail finding the local binary.
+  if PATH="$fixture/tools:$PATH" bash "$fixture/scripts/collect-eks.sh" "${args[@]}" > "$fixture/log" 2>&1; then
+    echo 'FAIL: fixture reached a successful live scan unexpectedly' >&2; exit 1
+  fi
+  [[ -x "$fixture/kubecis" ]] || { cat "$fixture/log" >&2; echo 'FAIL: source build was not created' >&2; exit 1; }
+  if grep -q 'Is a directory\|CLI version unavailable\|Missing executable' "$fixture/log"; then
+    cat "$fixture/log" >&2
+    echo 'FAIL: source directory/binary resolution regressed' >&2
+    exit 1
+  fi
+done
+echo 'PASS: CLI missing/source-directory arguments build a runnable executable (mocked Go)'

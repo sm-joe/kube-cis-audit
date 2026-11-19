@@ -12,6 +12,8 @@ A real Linux-to-EKS acceptance run is still required.
 
 Linux with Bash, GNU `date`, `jq`, `kubectl`, AWS CLI v2, and a
 `kubecis` CLI built from the exact version as the published DaemonSet image.
+The collector builds `./kubecis` automatically when it is missing and Go is
+installed. `./cmd/kubecis` is a source directory; it is not an executable.
 The selected Kubernetes context must resolve to the named EKS cluster's API
 endpoint and Kubernetes minor version. The AWS identity needs
 `eks:DescribeCluster`. Kubernetes access needs read-only workload, cluster
@@ -31,7 +33,7 @@ bash scripts/deploy-eks.sh --context EKS_CONTEXT \
 
 bash scripts/collect-eks.sh --context EKS_CONTEXT \
   --cluster-name EKS_CLUSTER_NAME --region us-east-1 \
-  --binary ./kubecis --output-dir ./reports/eks
+  --output-dir ./reports/eks
 ```
 
 Each supported worker must have exactly one running auditor Pod. The collector
