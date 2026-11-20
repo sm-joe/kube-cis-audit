@@ -67,6 +67,10 @@ fi
 echo 'PASS: positive fixture and missing-evidence/identity regression checks'
 
 
+if [[ "${1:-}" == "--packaged" ]]; then
+  exit 0 # Source-build fixture needs go.mod and a source checkout.
+fi
+
 # Regression: a missing compiled CLI and a --binary cmd/kubecis directory
 # should both trigger a source build instead of a directory execution failure.
 # Test with a disposable fixture repository and a MOCK Go builder. This does
