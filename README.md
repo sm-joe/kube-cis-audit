@@ -133,8 +133,7 @@ worker. It produces `consolidated.json`, `results.txt`,
 explicit limitations, see [the Linux EKS collection guide](docs/LINUX-EKS-COLLECTION.md)
 and [the deployment guide](docs/LINUX-EKS-DEPLOY.md).
 
-**Runtime acceptance is not yet established:** This workflow requires a clean
-Linux-to-EKS integration run before support can be marked production verified.
+**Runtime acceptance:** Operator-provided EKS test runs have demonstrated API, node, ECR, provider, aggregation and RBAC collection. Published-artifact reproducibility and independent control-by-control conformance remain pending.
 The official CIS compliance score remains **WITHHELD**.
 
 ## Reporting and review
@@ -220,6 +219,12 @@ Typical report files:
 Use least-privilege access for Kubernetes API reads. AWS EKS evidence collection may require `eks:DescribeCluster`, `eks:ListAccessEntries`, `eks:DescribeAccessEntry`, `eks:ListAssociatedAccessPolicies`, `eks:DescribeAddon`, `ecr:GetRegistryScanningConfiguration` and `ecr:DescribeImageScanFindings`. Some metadata enrichment uses `nodes/proxy`, a sensitive Kubernetes permission; grant it only where reviewed and necessary. The Kubernetes deployment requires additional privileges to create its own ServiceAccounts, RBAC and DaemonSet.
 
 Store kubeconfigs, identity metadata, scan reports and reviewer records in access-restricted locations. Do not commit credentials, private cluster inventories or attestations into public source control. Verify published image tags, digests and provenance before deployment. Missing evidence must not be interpreted as a secure default.
+
+## Release validation
+
+Pull requests affecting the scanner or packaging run the release build matrix and inspect archives without publishing tags or images. The release workflow also supports a manual non-publishing validation run. A stable release requires independent approval of the exact conformance ledger; successful builds alone do not satisfy that gate.
+
+For verified Linux release archives, use `scripts/install-linux.sh` with the archive, its SHA256SUMS manifest and Sigstore bundle from the same tag. See [the Linux deployment guide](docs/LINUX-EKS-DEPLOY.md) and the [support matrix](docs/SUPPORT-MATRIX.md). Never install an unverified archive as a stable release.
 
 ## CI, project structure and support
 

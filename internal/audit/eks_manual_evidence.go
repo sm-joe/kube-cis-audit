@@ -14,7 +14,7 @@ import (
 // for human controls. No heuristic auto-approves a manual CIS recommendation.
 func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface, c Check) Result {
 	switch c.ID {
-	case "4.1.2", "4.1.3", "4.1.8", "4.1.10", "4.1.11", "4.1.12":
+	case "4.1.2", "4.1.3", "4.1.4", "4.1.8", "4.1.9", "4.1.10", "4.1.11", "4.1.12":
 		return evaluateEKSBoundRBAC(ctx, client, c)
 	}
 	r := Result{ID: c.ID, Title: c.Title, Target: c.Target, Status: "MANUAL", Method: "kubernetes_inventory_human_attestation", Scored: false, Remediation: c.Remediation}
@@ -55,7 +55,9 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 			}
 			for _, binding := range bindings.Items {
 				if binding.RoleRef.Name == "cluster-admin" && binding.RoleRef.Kind == "ClusterRole" {
-					r.Evidence = append(r.Evidence, Evidence{Resource: "ClusterRoleBinding", Name: binding.Name, Field: "roleRef", Observed: fmt.Sprintf("cluster-admin; %d subjects", len(binding.Subjects)), Expected: "approved administrative identities"})
+					for _, subject := range binding.Subjects {
+						r.Evidence = append(r.Evidence, Evidence{Resource: "ClusterRoleBinding", Name: binding.Name, Field: "roleRef/subject", Observed: fmt.Sprintf("cluster-admin; %s:%s:%s", subject.Kind, subject.Namespace, subject.Name), Expected: "approved administrative identities"})
+					}
 				}
 			}
 		} else {
@@ -128,8 +130,18 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 		}
 		seen := map[string]bool{}
 		for _, pod := range pods.Items {
+			images := make([]string, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers)+len(pod.Spec.EphemeralContainers))
 			for _, container := range pod.Spec.Containers {
-				parts := strings.Split(container.Image, "/")
+				images = append(images, container.Image)
+			}
+			for _, container := range pod.Spec.InitContainers {
+				images = append(images, container.Image)
+			}
+			for _, container := range pod.Spec.EphemeralContainers {
+				images = append(images, container.Image)
+			}
+			for _, image := range images {
+				parts := strings.Split(image, "/")
 				registry := "docker.io (implicit)"
 				if len(parts) > 1 && (strings.ContainsAny(parts[0], ".:") || parts[0] == "localhost") {
 					registry = parts[0]

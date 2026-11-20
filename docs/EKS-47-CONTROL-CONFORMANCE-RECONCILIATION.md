@@ -22,17 +22,17 @@ All **47** controls are now routed: **29 automated** audit paths and **18 manual
 | 3.2.7 | automated | `host_kubelet_config_field` | Pending |
 | 3.2.8 | automated | `host_kubelet_config_field` | Pending |
 | 4.1.1 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.2 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.3 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.4 | manual | `kubernetes_inventory_human_attestation` | Pending |
+| 4.1.2 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.3 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.4 | manual | `kubernetes_bound_rbac_inventory` | Pending |
 | 4.1.5 | automated | `eks_default_service_account` | Pending |
 | 4.1.6 | automated | `eks_token_mounts` | Pending |
 | 4.1.7 | automated | `aws_eks_access_entries` | Pending |
-| 4.1.8 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.9 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.10 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.11 | manual | `kubernetes_inventory_human_attestation` | Pending |
-| 4.1.12 | manual | `kubernetes_inventory_human_attestation` | Pending |
+| 4.1.8 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.9 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.10 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.11 | manual | `kubernetes_bound_rbac_inventory` | Pending |
+| 4.1.12 | manual | `kubernetes_bound_rbac_inventory` | Pending |
 | 4.2.1 | automated | `eks_psa_admission` | Pending |
 | 4.2.2 | automated | `eks_psa_admission` | Pending |
 | 4.2.3 | automated | `eks_psa_admission` | Pending |
@@ -65,7 +65,7 @@ The four newly attached AWS manual inventories are **review inputs, not approval
 - `5.1.2` lists deployed first-party ECR repositories and records hashes/presence of repository and registry policies, not their effective IAM authorization.
 - `5.1.3` inventories EKS managed node-group IAM roles and attached/inline policy identities; complete policy documents and Fargate/self-managed roles still need human review.
 - `5.3.1` inventories EKS encryption KMS key associations and key manager/state; grants, rotation and organization approval need review.
-- `5.4.3` inventories managed node-group subnets and public-IP defaults; actual node interfaces, effective route tables and self-managed placements still need review.
+- `5.4.3` inventories managed node-group subnets, effective routes and registered worker EC2 public addresses; observed public placement produces FAIL. Coverage outside the strict managed-worker contract needs review.
 
 A denied AWS API request produces PARTIAL or UNAVAILABLE reviewer evidence, **never PASS**. Reviewer decisions must be bound to a specific report digest using the existing `kubecis review` / `kubecis finalize` flow.
 
@@ -82,3 +82,7 @@ python3 scripts/verify-eks-evaluator-conformance.py --require-full
 ```
 
 The gate requires control-specific positive and negative fixtures, documented official audit-procedure review, real runtime acceptance evidence, and reviewer attribution for **every** control. No assistant can fabricate the required live AWS/account evidence, make real human decisions, or infer a CIS certification merely from CI being green.
+
+## Release-readiness source alignment
+
+The operator-held source was reopened and its SHA-256 matched the pinned digest. The engineering review found and addressed narrower RBAC inventory gaps and missing init/ephemeral registry inventory. This is not independent approval of every evaluator. The ledger remains unchanged until real control-specific fixtures, runtime evidence and reviewer approval are supplied. Release validation builds and checks archives without publishing on pull requests; stable tag publication still requires verified conformance and a separately pinned ledger approval signature.

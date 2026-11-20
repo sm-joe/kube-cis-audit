@@ -27,7 +27,7 @@ func TestEKSBoundRBACGrantsAndNamespaceScope(t *testing.T) {
 		RoleRef:  rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: "aggregated-permissions"},
 		Subjects: []rbacv1.Subject{{Kind: "ServiceAccount", Name: "app", Namespace: "dev"}}}
 	client := fake.NewSimpleClientset(role, binding)
-	for _, id := range []string{"4.1.2", "4.1.3", "4.1.8", "4.1.10", "4.1.11", "4.1.12"} {
+	for _, id := range []string{"4.1.2", "4.1.3", "4.1.4", "4.1.8", "4.1.9", "4.1.12"} {
 		t.Run(id, func(t *testing.T) {
 			result := EvaluateEKSManualEvidence(context.Background(), client, Check{ID: id, Target: "policies", Title: id})
 			if result.Status != "MANUAL" || len(result.Evidence) == 0 {
@@ -53,7 +53,11 @@ func TestEKSBoundRBACUnboundRoleIsNotAnEffectiveGrant(t *testing.T) {
 	client := fake.NewSimpleClientset(role)
 	for _, id := range []string{"4.1.2", "4.1.3", "4.1.8", "4.1.10", "4.1.11", "4.1.12"} {
 		got := EvaluateEKSManualEvidence(context.Background(), client, Check{ID: id})
-		if got.Status != "MANUAL" || len(got.Evidence) != 0 || !strings.Contains(got.Details, "0 sensitive grant(s)") {
+		wantEvidence := 0
+		if id == "4.1.3" {
+			wantEvidence = 1 // wildcard definition review, not an effective grant
+		}
+		if got.Status != "MANUAL" || len(got.Evidence) != wantEvidence || !strings.Contains(got.Details, "0 sensitive grant(s)") {
 			t.Fatalf("%s unbound role incorrectly reported as grant: %+v", id, got)
 		}
 	}
@@ -66,15 +70,20 @@ func TestEKSBoundRBACSensitiveResourceAndVerbMatching(t *testing.T) {
 		want bool
 	}{
 		{"4.1.12", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"serviceaccounts/token"}, Verbs: []string{"get"}}, false},
-		{"4.1.12", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"serviceaccounts/*"}, Verbs: []string{"create"}}, true},
+		{"4.1.12", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"serviceaccounts/*"}, Verbs: []string{"create"}}, false},
 		{"4.1.10", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"nodes"}, Verbs: []string{"get"}}, false},
-		{"4.1.10", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"nodes/*"}, Verbs: []string{"get"}}, true},
+		{"4.1.10", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"nodes/*"}, Verbs: []string{"get"}}, false},
 		{"4.1.11", rbacv1.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"validatingwebhookconfigurations"}, Verbs: []string{"delete"}}, false},
 		{"4.1.11", rbacv1.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingwebhookconfigurations"}, Verbs: []string{"delete"}}, true},
 		{"4.1.2", rbacv1.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"secrets"}, Verbs: []string{"get"}}, false},
 		{"4.1.2", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, Verbs: []string{"watch"}}, true},
 		{"4.1.8", rbacv1.PolicyRule{APIGroups: []string{"rbac.authorization.k8s.io"}, Resources: []string{"roles"}, Verbs: []string{"bind"}}, true},
 		{"4.1.8", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"users"}, Verbs: []string{"impersonate"}}, true},
+		{"4.1.12", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"*/token"}, Verbs: []string{"create"}}, true},
+		{"4.1.10", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"*/proxy"}, Verbs: []string{"get"}}, true},
+		{"4.1.3", rbacv1.PolicyRule{NonResourceURLs: []string{"/healthz/*"}, Verbs: []string{"get"}}, true},
+		{"4.1.9", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"persistentvolumeclaims"}, Verbs: []string{"create"}}, true},
+		{"4.1.9", rbacv1.PolicyRule{APIGroups: []string{"storage.k8s.io"}, Resources: []string{"storageclasses"}, Verbs: []string{"create"}}, true},
 	}
 	for i, tc := range cases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -124,5 +133,17 @@ func TestEKSBoundRBACTruncatedInventoryIsNotAssessed(t *testing.T) {
 		!strings.Contains(result.Details, "201 sensitive grant(s)") ||
 		!strings.Contains(result.Details, "Evidence truncated") {
 		t.Fatalf("truncated RBAC review evidence must fail closed: %+v", result)
+	}
+}
+
+func TestEKSBoundRBACClusterScopeNotGrantedByRoleBinding(t *testing.T) {
+	role := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "broad"}, Rules: []rbacv1.PolicyRule{{APIGroups: []string{"*"}, Resources: []string{"*"}, Verbs: []string{"*"}}}}
+	binding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "namespace-only", Namespace: "dev"}, RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: role.Name}, Subjects: []rbacv1.Subject{{Kind: "User", Name: "reviewer"}}}
+	client := fake.NewSimpleClientset(role, binding)
+	for _, id := range []string{"4.1.10", "4.1.11"} {
+		got := EvaluateEKSManualEvidence(context.Background(), client, Check{ID: id})
+		if len(got.Evidence) != 0 || !strings.Contains(got.Details, "0 sensitive grant(s)") {
+			t.Fatalf("%s cluster-scoped request cannot be granted by RoleBinding: %+v", id, got)
+		}
 	}
 }

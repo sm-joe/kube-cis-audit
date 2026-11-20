@@ -7,3 +7,7 @@ Kubelet content checks only accept `var/lib/kubelet/config.yaml`, allowlisted fi
 KubeCIS does not execute shell scripts or arbitrary commands provided by benchmark YAML. Never claim full CIS compliance for provisional or unsupported mappings. A `FAIL` is an evaluated insecure setting, while `NOT_ASSESSED` denotes unavailable/incomplete evidence. Missing current findings do not prove resolution.
 
 Report files can contain sensitive resource names and configuration details: protect access and avoid committing reports. No local credentials, kubeconfigs, secrets or Terraform state should be included in release archives.
+
+## Release and provenance integrity
+
+Use signed versioned archives and immutable OCI digests. Validation builds on pull requests never publish GHCR tags or GitHub releases. Stable publication requires the pinned independent reviewer public key and signature over the exact conformance ledger, supplied through repository-controlled settings. Keep private signing keys outside GitHub repository content. Never copy live provider inventories or licensed benchmark documents into public evidence files; use sanitized, consented records and their hashes.
