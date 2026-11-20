@@ -1,77 +1,37 @@
-# EKS release evidence and acceptance contract
+# EKS release evidence and acceptance
 
-## Product mode: EKS native preview
+The 47-control EKS v2.1.0 inventory is implemented through automated or review routes. Independent procedure conformance and official scoring remain blocked. A successful scan can contain FAIL, MANUAL or NOT_ASSESSED findings.
 
-This release is a **working native scanner**, not a complete verified CIS Amazon
-EKS Benchmark v2.1.0 implementation. The existing `cis-2.1.0` directory is a
-provisional starter profile, **not a transcription of the full official EKS
-benchmark**. An output percentage from five scored starter-profile controls is
-not the official EKS CIS benchmark coverage percentage.
+## Source conformance
 
-Official benchmark reference:
-https://www.cisecurity.org/benchmark/kubernetes
+Keep the licensed benchmark PDF outside the repository. Run the source inventory verifier, evaluator tests and ledger verifier:
 
-## What the end-to-end acceptance gate proves
-
-- A known kubeconfig context points to an actual EKS API endpoint.
-- AWS `eks:DescribeCluster` for a named cluster returns **the same HTTPS API
-  endpoint**, with the same ARN region/name and a valid AWS account ID.
-- The Kubernetes API reports an EKS distribution and its major.minor version
-  matches the AWS DescribeCluster version.
-- At least one supported Linux managed EC2 worker is assessed; **every** node
-  in the expected inventory has one fresh node-local source.
-- AL2023 kubelet file metadata plus two allowlisted fields were read and
-  assessed; raw credentials/configuration never enter the snapshot.
-- The output contains one native Kubernetes API source, its complete required
-  worker sources, and an unscored AWS provider configuration snapshot.
-- Reports reject stale sources, incompatible build versions, duplicate nodes,
-  incorrect provider identity and incomplete kubelet evidence.
-- EKS security posture is reported even when logging is disabled or the API
-  endpoint is deliberately public. Such settings may be intentional for a
-  nonproduction test cluster and do **not** cause the scanner itself to fail.
-
-The collector runs this preview gate automatically on its consolidated report.
-
-## Two distinct release decisions
-
-**Preview**: `Validate-EKSRelease.ps1 -ReleaseLevel Preview` checks the proven
-operational data path and keeps a withheld compliance score.
-
-**Full CIS EKS**: `Validate-EKSRelease.ps1 -ReleaseLevel Full` **fails closed**.
-It cannot pass until a verified, complete official CIS EKS benchmark revision
-and supported Kubernetes version mapping, control-level evidence, applicability
-disposition, end-to-end tests and signed published release are in place.
-Changing a flag, adding dummy PASS results or assuming that one verified EKS
-cluster exercises every rule cannot satisfy this gate.
-
-## Missing official CIS benchmark implementation
-
-- Obtain the authentic CIS Amazon EKS v2.1.0 control catalogue and verify
-  the documented supported Kubernetes versions.
-- Map each control ID and audit procedure to an independently testable
-  KubeCIS evidence collector, or record a documented `MANUAL`/`NOT_APPLICABLE`
-  with justification. Do not infer compliance for provider-managed hosts.
-- Create positive/negative/unknown fixtures for **each** control and validate
-  them against upstream guidance; validate that unsupported checks reduce
-  coverage rather than silently passing.
-- Keep official EKS controls separate from the generic CIS Kubernetes benchmark
-  and KubeCIS-native extensions.
-- Run Linux/Windows, Kind and supported EKS versions end to end; publish
-  reproducible builds, SBOM, provenance, and benchmark source/revision matrix.
-
-## Run on a test EKS cluster
-
-Use the extracted Windows release archive (the same commit as the DaemonSet).
-Adjust context/name/region to your actual cluster rather than treating context
-aliases as AWS cluster identities.
-
-```powershell
-kubectl config use-context my-eks-cluster
-kubectl apply -k .\deploy\eks
-kubectl -n kube-system rollout status daemonset/kubecis-node-auditor --timeout=300s
-.\scripts\Collect-ConsolidatedEKSReport.ps1 -Context my-eks-cluster -ClusterName my-eks-cluster -Region us-east-1 -Binary .\kubecis.exe
-.\scripts\Validate-EKSRelease.ps1 -ExpectedClusterName my-eks-cluster -ExpectedRegion us-east-1 -ReleaseLevel Preview
+```bash
+python3 scripts/verify-eks-210-source.py --pdf /private/path/to/benchmark.pdf
+go test ./... -count=1
+python3 scripts/test-eks-evaluator-conformance.py
+python3 scripts/verify-eks-evaluator-conformance.py
+python3 scripts/verify-eks-evaluator-conformance.py --print-evaluator-digest
 ```
 
-Use the immutable published image **matching the exact archive commit** for
-all DaemonSet containers before collecting evidence.
+The independent reviewer records actual per-control evidence and signs the exact ledger including evaluatorSourceSha256. Changes to evaluator, test, benchmark, deployment and collector sources invalidate the stable approval. The full gate also requires the pinned reviewer key and its signature. Never populate verification fields from synthetic or invented runtime evidence.
+
+## Signed release acceptance (Linux)
+
+A tagged release publishes a signed release-manifest.json linking the tag, source commit and immutable OCI image digest, plus signed archives and SHA256SUMS. Download these from the same release. With Cosign, jq, AWS CLI, kubectl and GNU tools installed, verify without touching the cluster:
+
+```bash
+bash scripts/accept-signed-eks-release.sh --release "$TAG" --assets "$ASSETS" --verify-only
+```
+
+Only after this succeeds, deploy that specific verified image using the matching archive's deploy script (this updates the node-auditor Kubernetes resources). Then run:
+
+```bash
+bash scripts/accept-signed-eks-release.sh --release "$TAG" --assets "$ASSETS" \
+  --context "$EKS_CONTEXT" --cluster-name "$EKS_CLUSTER" --region "$AWS_REGION" \
+  --output-dir reports/signed-release
+```
+
+Use a new output directory. The helper checks deployment readiness and exact image selection, performs a version-matched scan using the signed archive, and records report and archive digests in release-acceptance.json. This is an operator runtime record, not a signed independent CIS conformance decision. Do not commit sensitive reports.
+
+Stable tags remain blocked until independent approval and the verified benchmark compatibility mapping are established. A signed preview can be used for artifact acceptance without claiming full CIS coverage.
