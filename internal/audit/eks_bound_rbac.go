@@ -214,7 +214,7 @@ func eksRBACSensitiveRule(id string, rule rbacv1.PolicyRule) bool {
 	case "4.1.4":
 		return core && resource("pods") && verb("create")
 	case "4.1.8":
-		return verb("bind", "escalate") && rbac && (resource("roles") || resource("clusterroles")) || verb("impersonate") && (core && (resource("users") || resource("groups") || resource("serviceaccounts")) || has(rule.APIGroups, "authentication.k8s.io") && (resource("uids") || hasRBACResourceWildcard(rule.Resources) || resource("userextras/scopes")))
+		return verb("bind", "escalate") && rbac && (resource("roles") || resource("clusterroles")) || verb("impersonate") && (core && (resource("users") || resource("groups") || resource("serviceaccounts")) || has(rule.APIGroups, "authentication.k8s.io") && (resource("uids") || eksRBACUserExtras(rule.Resources)))
 	case "4.1.9":
 		return verb("create") && (core && (resource("persistentvolumes") || resource("persistentvolumeclaims")) || has(rule.APIGroups, "storage.k8s.io") && resource("storageclasses"))
 	case "4.1.10":
@@ -251,4 +251,13 @@ func eksRBACNamespacedEscalation(rule rbacv1.PolicyRule) bool {
 
 func eksRBACNamespacedStorage(rule rbacv1.PolicyRule) bool {
 	return hasRBACItemOrWildcard(rule.APIGroups, "") && hasRBACItemOrWildcard(rule.Resources, "persistentvolumeclaims") && hasRBACAny(rule.Verbs, "create", "*")
+}
+
+func eksRBACUserExtras(resources []string) bool {
+	for _, resource := range resources {
+		if strings.HasPrefix(resource, "userextras/") || strings.HasPrefix(resource, "*/") {
+			return true
+		}
+	}
+	return false
 }
