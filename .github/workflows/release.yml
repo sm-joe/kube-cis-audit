@@ -222,8 +222,17 @@ jobs:
           pattern: kubecis-*
           merge-multiple: true
 
-      - name: Generate Checksums
-        run: cd dist && sha256sum kubecis_* > SHA256SUMS
+      - name: Generate Checksums and immutable release manifest
+        env:
+          IMAGE_DIGEST: ${{ needs.container.outputs.digest }}
+        shell: bash
+        run: |
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          cd dist
+          sha256sum kubecis_* > SHA256SUMS
+          jq -n --arg version "$GITHUB_REF_NAME" --arg commit "$GITHUB_SHA" \
+            --arg image "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$IMAGE_DIGEST" \
+            '{schemaVersion:1,version:$version,commit:$commit,image:$image}' > release-manifest.json
 
       - name: Attest release archives and checksum manifest
         uses: actions/attest@v4
@@ -237,7 +246,7 @@ jobs:
         shell: bash
         run: |
           IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
-          for file in dist/kubecis_* dist/SHA256SUMS; do
+          for file in dist/kubecis_* dist/SHA256SUMS dist/release-manifest.json; do
             test -s "$file"
             cosign sign-blob "$file" --bundle "$file.sigstore.json" --yes
             cosign verify-blob "$file" --bundle "$file.sigstore.json" \
@@ -254,6 +263,8 @@ jobs:
 
   container:
     name: Publish Container Image
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     if: github.ref_type == 'tag' && github.event_name == 'push'
     needs: verify_archives
     runs-on: ubuntu-latest
