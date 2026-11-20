@@ -153,7 +153,7 @@ jobs:
             -o "$STAGE/kubecis$EXT" ./cmd/kubecis
           if [ "$GOOS" = "linux" ] && [ "$GOARCH" = "amd64" ]; then
             "$STAGE/kubecis" version | grep -Fx "$VERSION"
-            bash "$STAGE/scripts/test-linux-eks.sh"
+            bash "$STAGE/scripts/test-linux-eks.sh" --packaged
             bash "$STAGE/scripts/test-deploy-eks.sh"
           fi
           NAME="kubecis_${GOOS}_${GOARCH}"
@@ -205,7 +205,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     if: github.ref_type == 'tag' && github.event_name == 'push'
-    needs: verify_archives
+    needs: [verify_archives, container]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -283,11 +283,7 @@ jobs:
         shell: bash
         run: |
           tags="ghcr.io/${GITHUB_REPOSITORY_OWNER}/kubecis:${GITHUB_REF_NAME}"
-          # A prerelease (for example v3.0.0-rc4) must never move the stable
-          # latest tag. Only a stable semantic-version tag may publish latest.
-          if [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            tags+=$'\nghcr.io/'"${GITHUB_REPOSITORY_OWNER}"'/kubecis:latest'
-          fi
+          # Publish the versioned tag first; stable latest moves only after signature verification.
           { echo 'tags<<EOF'; printf '%s\n' "$tags"; echo 'EOF'; } >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Multi-architecture Image
@@ -316,3 +312,13 @@ jobs:
           cosign sign --yes "$IMAGE"
           cosign verify "$IMAGE" --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
+
+      - name: Promote verified stable digest to latest
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis"
+          docker buildx imagetools create --tag "$image:latest" "$image@$DIGEST"
+          cosign verify "$image:latest" --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}" --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' >/dev/null
