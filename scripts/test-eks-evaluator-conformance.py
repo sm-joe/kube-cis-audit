@@ -100,6 +100,18 @@ class CISConformanceGateTests(unittest.TestCase):
             valid, _ = module.verify_approval_signature(ledger, pub, pin, sig)
             self.assertFalse(valid)
 
+    def test_evaluator_digest_changes_after_source_edit(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            for name in ("go.mod", "go.sum", "Dockerfile"):
+                (root / name).write_text("fixture")
+            (root / "internal").mkdir()
+            evaluator = root / "internal/audit.go"
+            evaluator.write_text("original")
+            original = module.evaluator_digest(root)
+            evaluator.write_text("changed")
+            self.assertNotEqual(original, module.evaluator_digest(root))
+
     def test_candidate_cannot_exceed_actual_source_implementation(self):
         catalog = json.loads(json.dumps(self.catalog))
         catalog["controls"][0]["implemented"] = False
