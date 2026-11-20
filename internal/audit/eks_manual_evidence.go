@@ -7,6 +7,7 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -91,10 +92,54 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 			r.Details = "Cannot list NetworkPolicies: " + err.Error()
 			return r
 		}
-		for _, policy := range policies.Items {
-			r.Evidence = append(r.Evidence, Evidence{Resource: "NetworkPolicy", Namespace: policy.Namespace, Name: policy.Name, Field: "policyTypes", Observed: fmt.Sprintf("%v", policy.Spec.PolicyTypes), Expected: "ingress and egress rules covering intended Pods"})
+		pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+		if err != nil {
+			r.Status = "NOT_ASSESSED"
+			r.Details = "Cannot list workloads for policy selector mapping: " + err.Error()
+			return r
 		}
-		r.Details = fmt.Sprintf("Found %d namespaced NetworkPolicies; map active workloads to selectors and review additional ClusterNetworkPolicy engines before approval.", len(policies.Items))
+		covered, active := 0, 0
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == "Succeeded" || pod.Status.Phase == "Failed" {
+				continue
+			}
+			active++
+			ingress, egress := false, false
+			var matched []string
+			for _, policy := range policies.Items {
+				if policy.Namespace != pod.Namespace {
+					continue
+				}
+				selector, err := metav1.LabelSelectorAsSelector(&policy.Spec.PodSelector)
+				if err != nil {
+					r.Status = "NOT_ASSESSED"
+					r.Details = "Invalid NetworkPolicy selector: " + policy.Namespace + "/" + policy.Name
+					return r
+				}
+				if !selector.Matches(labels.Set(pod.Labels)) {
+					continue
+				}
+				matched = append(matched, policy.Name)
+				if len(policy.Spec.PolicyTypes) == 0 {
+					ingress = true
+					egress = egress || len(policy.Spec.Egress) > 0
+				}
+				for _, direction := range policy.Spec.PolicyTypes {
+					ingress = ingress || direction == "Ingress"
+					egress = egress || direction == "Egress"
+				}
+			}
+			if ingress && egress {
+				covered++
+			}
+			if len(r.Evidence) < 200 {
+				r.Evidence = append(r.Evidence, Evidence{Resource: "Pod", Namespace: pod.Namespace, Name: pod.Name, Field: "networkPolicySelector", Observed: fmt.Sprintf("matching=%v ingress=%t egress=%t hostNetwork=%t ownerReferences=%d", matched, ingress, egress, pod.Spec.HostNetwork, len(pod.OwnerReferences)), Expected: "review required workload coverage, cluster policies, enforcement and connection tests"})
+			}
+		}
+		if active > 200 {
+			r.Status = "NOT_ASSESSED"
+		}
+		r.Details = fmt.Sprintf("%d of %d active Pods selected in both directions by namespaced NetworkPolicies; %d policies inventoried. Selection is not enforcement. Review required workloads, ClusterNetworkPolicy tier/action, supported node scope and allowed/blocked connection tests. Evidence capped at 200 Pods.", covered, active, len(policies.Items))
 	case "4.4.2":
 		pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -162,7 +207,7 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 		}
 		for _, svc := range services.Items {
 			if string(svc.Spec.Type) == "LoadBalancer" {
-				r.Evidence = append(r.Evidence, Evidence{Resource: "Service", Namespace: svc.Namespace, Name: svc.Name, Field: "service.beta.kubernetes.io/aws-load-balancer-ssl-cert", Observed: firstNonEmpty(svc.Annotations["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"], "<unset or TLS passthrough>"), Expected: "valid certificate on TLS-terminating client-facing listeners"})
+				r.Evidence = append(r.Evidence, Evidence{Resource: "Service", Namespace: svc.Namespace, Name: svc.Name, Field: "loadBalancerTLS", Observed: fmt.Sprintf("certificate=%s sslPorts=%s", firstNonEmpty(svc.Annotations["service.beta.kubernetes.io/aws-load-balancer-ssl-cert"], "<unset>"), firstNonEmpty(svc.Annotations["service.beta.kubernetes.io/aws-load-balancer-ssl-ports"], "<all or unset>")), Expected: "valid certificate on TLS-terminating client-facing listeners"})
 			}
 		}
 		ingresses, err := client.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
@@ -172,7 +217,7 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 			return r
 		}
 		for _, ing := range ingresses.Items {
-			r.Evidence = append(r.Evidence, Evidence{Resource: "Ingress", Namespace: ing.Namespace, Name: ing.Name, Field: "alb.ingress.kubernetes.io/certificate-arn", Observed: firstNonEmpty(ing.Annotations["alb.ingress.kubernetes.io/certificate-arn"], "<auto-discovery or unset>"), Expected: "valid listener TLS certificate"})
+			r.Evidence = append(r.Evidence, Evidence{Resource: "Ingress", Namespace: ing.Namespace, Name: ing.Name, Field: "loadBalancerTLS", Observed: fmt.Sprintf("certificate=%s listenPorts=%s", firstNonEmpty(ing.Annotations["alb.ingress.kubernetes.io/certificate-arn"], "<auto-discovery or unset>"), firstNonEmpty(ing.Annotations["alb.ingress.kubernetes.io/listen-ports"], "<unset>")), Expected: "valid listener TLS certificate"})
 		}
 		r.Details = fmt.Sprintf("%d client-facing Service/Ingress candidates; verify actual ALB/NLB listeners, TLS termination and certificate validity.", len(r.Evidence))
 	}
