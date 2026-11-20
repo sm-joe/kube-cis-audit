@@ -13,6 +13,9 @@ SCRIPT = ROOT / "scripts/verify-eks-evaluator-conformance.py"
 spec = importlib.util.spec_from_file_location("eks_conformance_gate", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+source_spec = importlib.util.spec_from_file_location("eks_source_gate", ROOT / "scripts/verify-eks-210-source.py")
+source_module = importlib.util.module_from_spec(source_spec)
+source_spec.loader.exec_module(source_module)
 
 class CISConformanceGateTests(unittest.TestCase):
     @classmethod
@@ -27,6 +30,19 @@ class CISConformanceGateTests(unittest.TestCase):
         self.assertEqual(sum(counts.values()), 47)
         self.assertEqual(counts["candidate"], 47)
         self.assertEqual(counts["not_implemented"], 0)
+
+    def test_source_summary_parser_handles_layout_variations(self):
+        ids = [row["id"] for row in self.catalog["controls"]]
+        for separator in (" ", "  ", "\t", "\u00a0", ""):
+            appendix = "  Appendix: Summary Table\n" + "\n".join(
+                " " + control + separator + ("text" if separator else "")
+                for control in ids
+            )
+            self.assertEqual(source_module.extract_summary_ids(appendix), ids)
+        with self.assertRaises(SystemExit):
+            source_module.extract_summary_ids(appendix + "\n" + ids[0])
+        with self.assertRaises(SystemExit):
+            source_module.extract_summary_ids("Appendix: Summary Table\n" + "\n".join(ids[:-1]))
 
     def test_fabricated_verification_is_rejected(self):
         data = json.loads(json.dumps(self.ledger))
