@@ -51,6 +51,8 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 		byRole[v.Namespace+"/"+v.Name] = v
 	}
 	candidates, unresolved, emptySubjects := 0, 0, 0
+	boundRoles := make(map[string]bool)
+	retainedGrants, unboundWildcardRules := 0, 0
 	// Each binding is separately evaluated. A RoleBinding referencing a
 	// ClusterRole grants only within its namespace, not cluster-wide.
 	inspect := func(kind, namespace, name string, ref rbacv1.RoleRef, subjects []rbacv1.Subject) {
@@ -85,9 +87,18 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 			emptySubjects++
 			return
 		}
+		roleNamespace := ""
+		if ref.Kind == "Role" {
+			roleNamespace = namespace
+		}
+		boundRoles[ref.Kind+"/"+roleNamespace+"/"+ref.Name] = true
 		subjectNames := make([]string, 0, len(subjects))
 		for _, s := range subjects {
-			subjectNames = append(subjectNames, fmt.Sprintf("%s:%s:%s", s.Kind, s.Namespace, s.Name))
+			subjectNamespace := s.Namespace
+			if s.Kind == "ServiceAccount" && subjectNamespace == "" {
+				subjectNamespace = namespace
+			}
+			subjectNames = append(subjectNames, fmt.Sprintf("%s:%s:%s", s.Kind, subjectNamespace, s.Name))
 		}
 		sort.Strings(subjectNames)
 		scope := "cluster"
@@ -95,6 +106,9 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 			scope = "namespace:" + namespace
 		}
 		for i, rule := range rules {
+			if kind == "RoleBinding" && (c.ID == "4.1.10" || c.ID == "4.1.11" || c.ID == "4.1.8" && !eksRBACNamespacedEscalation(rule) || c.ID == "4.1.9" && !eksRBACNamespacedStorage(rule)) {
+				continue // A namespaced binding cannot grant cluster-scoped requests.
+			}
 			if !eksRBACSensitiveRule(c.ID, rule) {
 				continue
 			}
@@ -102,6 +116,7 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 			if len(r.Evidence) >= 200 {
 				continue
 			}
+			retainedGrants++
 			r.Evidence = append(r.Evidence, Evidence{Resource: kind, Namespace: namespace, Name: name,
 				Field: fmt.Sprintf("roleRef=%s/%s.rules[%d]", ref.Kind, ref.Name, i),
 				Observed: fmt.Sprintf("scope=%s; subjects=%s; apiGroups=%s; resources=%s; verbs=%s; resourceNames=%s; nonResourceURLs=%s",
@@ -116,15 +131,42 @@ func evaluateEKSBoundRBAC(ctx context.Context, client kubernetes.Interface, c Ch
 	for _, b := range rb.Items {
 		inspect("RoleBinding", b.Namespace, b.Name, b.RoleRef, b.Subjects)
 	}
+	// CIS 4.1.3 requires inspecting definitions as well as grants. Do not
+	// call unbound wildcard definitions effective authorizations.
+	if c.ID == "4.1.3" {
+		inspectUnbound := func(kind, namespace, name string, rules []rbacv1.PolicyRule) {
+			if boundRoles[kind+"/"+namespace+"/"+name] {
+				return
+			}
+			for i, rule := range rules {
+				if !eksRBACSensitiveRule(c.ID, rule) {
+					continue
+				}
+				unboundWildcardRules++
+				if len(r.Evidence) < 200 {
+					r.Evidence = append(r.Evidence, Evidence{Resource: kind, Namespace: namespace, Name: name, Field: fmt.Sprintf("rules[%d]", i), Observed: fmt.Sprintf("unbound wildcard definition; apiGroups=%v; resources=%v; verbs=%v; nonResourceURLs=%v", rule.APIGroups, rule.Resources, rule.Verbs, rule.NonResourceURLs), Expected: "review wildcard definition; not an effective grant"})
+				}
+			}
+		}
+		for _, role := range cr.Items {
+			inspectUnbound("ClusterRole", "", role.Name, role.Rules)
+		}
+		for _, role := range roles.Items {
+			inspectUnbound("Role", role.Namespace, role.Name, role.Rules)
+		}
+	}
 	// Evidence truncation prevents a reviewer from seeing every grant.
 	// Keep the summary/counts, but fail closed instead of allowing an
 	// apparently complete MANUAL review on the first 200 records.
-	if unresolved > 0 || candidates > 200 {
+	if unresolved > 0 || candidates+unboundWildcardRules+unresolved > 200 {
 		r.Status = "NOT_ASSESSED"
 	}
 	r.Details = fmt.Sprintf("Bound RBAC inventory: %d ClusterRoles, %d Roles, %d ClusterRoleBindings and %d RoleBindings; %d sensitive grant(s), %d unresolved role reference(s), %d binding(s) without subjects; evidence retained for %d of %d candidate(s). Effective namespace scope and bound subjects are recorded. Authorization necessity requires human review; no automatic PASS.",
-		len(cr.Items), len(roles.Items), len(cb.Items), len(rb.Items), candidates, unresolved, emptySubjects, min(candidates, len(r.Evidence)), candidates)
-	if len(r.Evidence) >= 200 && candidates > 200 {
+		len(cr.Items), len(roles.Items), len(cb.Items), len(rb.Items), candidates, unresolved, emptySubjects, retainedGrants, candidates)
+	if c.ID == "4.1.3" {
+		r.Details += fmt.Sprintf(" %d unbound wildcard definition(s) inventoried separately.", unboundWildcardRules)
+	}
+	if candidates+unboundWildcardRules+unresolved > 200 {
 		r.Details += " Evidence truncated at 200: assessment NOT_ASSESSED until a complete inventory is available."
 	}
 	return r
@@ -158,7 +200,7 @@ func eksRBACSensitiveRule(id string, rule rbacv1.PolicyRule) bool {
 		if len(parts) != 2 {
 			return false
 		}
-		return hasExact(rule.Resources, parts[0]+"/*")
+		return hasExact(rule.Resources, "*/"+parts[1])
 	}
 	core := has(rule.APIGroups, "")
 	rbac := has(rule.APIGroups, "rbac.authorization.k8s.io")
@@ -168,9 +210,13 @@ func eksRBACSensitiveRule(id string, rule rbacv1.PolicyRule) bool {
 		return core && resource("secrets") && verb("get", "list", "watch")
 	case "4.1.3":
 		return hasExact(rule.Verbs, "*") || hasExact(rule.APIGroups, "*") || hasExact(rule.Resources, "*") ||
-			hasRBACResourceWildcard(rule.Resources)
+			hasRBACResourceWildcard(rule.Resources) || hasRBACResourceWildcard(rule.NonResourceURLs)
+	case "4.1.4":
+		return core && resource("pods") && verb("create")
 	case "4.1.8":
-		return verb("bind", "escalate") && rbac || verb("impersonate") && len(rule.Resources) > 0
+		return verb("bind", "escalate") && rbac && (resource("roles") || resource("clusterroles")) || verb("impersonate") && (core && (resource("users") || resource("groups") || resource("serviceaccounts")) || has(rule.APIGroups, "authentication.k8s.io") && (resource("uids") || hasRBACResourceWildcard(rule.Resources) || resource("userextras/scopes")))
+	case "4.1.9":
+		return verb("create") && (core && (resource("persistentvolumes") || resource("persistentvolumeclaims")) || has(rule.APIGroups, "storage.k8s.io") && resource("storageclasses"))
 	case "4.1.10":
 		return core && resource("nodes/proxy") && verb("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection")
 	case "4.1.11":
@@ -190,9 +236,19 @@ func hasExact(items []string, value string) bool {
 }
 func hasRBACResourceWildcard(items []string) bool {
 	for _, x := range items {
-		if strings.HasSuffix(x, "/*") {
+		if strings.Contains(x, "*") {
 			return true
 		}
 	}
 	return false
+}
+
+// A RoleBinding can grant namespaced Role bind/escalate rights, not cluster
+// identity impersonation or cluster-scoped resource permissions.
+func eksRBACNamespacedEscalation(rule rbacv1.PolicyRule) bool {
+	return hasRBACItemOrWildcard(rule.APIGroups, "rbac.authorization.k8s.io") && hasRBACItemOrWildcard(rule.Resources, "roles") && hasRBACAny(rule.Verbs, "bind", "escalate", "*")
+}
+
+func eksRBACNamespacedStorage(rule rbacv1.PolicyRule) bool {
+	return hasRBACItemOrWildcard(rule.APIGroups, "") && hasRBACItemOrWildcard(rule.Resources, "persistentvolumeclaims") && hasRBACAny(rule.Verbs, "create", "*")
 }
