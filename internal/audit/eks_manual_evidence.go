@@ -56,8 +56,8 @@ func EvaluateEKSManualEvidence(ctx context.Context, client kubernetes.Interface,
 			for _, binding := range bindings.Items {
 				if binding.RoleRef.Name == "cluster-admin" && binding.RoleRef.Kind == "ClusterRole" {
 					for _, subject := range binding.Subjects {
-					r.Evidence = append(r.Evidence, Evidence{Resource: "ClusterRoleBinding", Name: binding.Name, Field: "roleRef/subject", Observed: fmt.Sprintf("cluster-admin; %s:%s:%s", subject.Kind, subject.Namespace, subject.Name), Expected: "approved administrative identities"})
-				}
+						r.Evidence = append(r.Evidence, Evidence{Resource: "ClusterRoleBinding", Name: binding.Name, Field: "roleRef/subject", Observed: fmt.Sprintf("cluster-admin; %s:%s:%s", subject.Kind, subject.Namespace, subject.Name), Expected: "approved administrative identities"})
+					}
 				}
 			}
 		} else {
