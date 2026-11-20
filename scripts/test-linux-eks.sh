@@ -87,7 +87,14 @@ if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp.new" --cluster-na
   echo 'FAIL: duplicate control accepted' >&2; exit 1
 fi
 rm -f "$tmp.new"
-echo 'PASS: complete 47-control catalog and duplicate rejection in source or packaged distribution'
+for filter in '.expectedNodes += [.expectedNodes[0]]' '.results[0].status = "UNKNOWN"' '.sources[0].generatedAt = "2000-01-01T00:00:00Z"'; do
+  jq "$filter" "$tmp" > "$tmp.new"
+  if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp.new" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
+    echo "FAIL: invalid report accepted: $filter" >&2; exit 1
+  fi
+done
+rm -f "$tmp.new"
+echo 'PASS: complete 47-control catalog, duplicate rejection, invalid status and stale evidence in source or packaged distribution'
 
 if [[ "${1:-}" == "--packaged" ]]; then
   exit 0 # Source-build fixture needs go.mod and a source checkout.
