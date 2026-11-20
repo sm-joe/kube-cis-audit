@@ -141,6 +141,8 @@ jobs:
           STAGE="$RUNNER_TEMP/kubecis"
           mkdir -p "$STAGE/benchmarks" dist
           cp -R benchmarks/. "$STAGE/benchmarks/"
+          mkdir -p "$STAGE/internal/audit/catalogs"
+          cp internal/audit/catalogs/eks-2.1.0.json "$STAGE/internal/audit/catalogs/"
           cp README.md LICENSE ATTRIBUTION.md "$STAGE/"
           cp -R docs "$STAGE/docs"
           mkdir -p "$STAGE/scripts" "$STAGE/deploy"
@@ -190,6 +192,7 @@ jobs:
             tar -tzf "$archive" > "$RUNNER_TEMP/archive-list"
             grep -Fx ./kubecis "$RUNNER_TEMP/archive-list"
             grep -Fx ./benchmarks/cis-eks-2.1.0/benchmark.yaml "$RUNNER_TEMP/archive-list"
+            grep -Fx ./internal/audit/catalogs/eks-2.1.0.json "$RUNNER_TEMP/archive-list"
           done
           unzip -t kubecis_windows_amd64.zip
           stage="$(mktemp -d)"

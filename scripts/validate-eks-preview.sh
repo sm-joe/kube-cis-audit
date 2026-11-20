@@ -36,7 +36,9 @@ jq -e --arg name "$name" --arg region "$region" '
   and (.compliance.scoredTotal >= 1)
   and ((.compliance.scoredPass + .compliance.scoredFail) <= .compliance.scoredTotal)
   and (.summary.total == (.results | length))
-  and (.expectedNodes | length) > 0
+  and all(.results[]; .status == "PASS" or .status == "FAIL" or .status == "WARN" or .status == "MANUAL" or .status == "NOT_ASSESSED")
+  and (.expectedNodes | type == "array" and length > 0 and length == (unique | length))
+  and all(.expectedNodes[]; type == "string" and length > 0)
   and ((.expectedControlPlaneNodes // []) | length) == 0
   and (.sources | length) == ((.expectedNodes | length) + 2)
   and ([.sources[] | select(.auditMode == "native" and (.nodeName // "") == "")] | length) == 1

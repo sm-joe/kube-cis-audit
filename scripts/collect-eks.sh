@@ -3,6 +3,7 @@
 # Requires: Linux, Bash, jq, kubectl, AWS CLI v2, matched kubecis CLI+image.
 # The CLI enforces freshness, source uniqueness and official score withholding.
 set -Eeuo pipefail
+umask 077
 die() { echo "ERROR: $*" >&2; exit 1; }
 usage() {
   echo 'Usage: bash scripts/collect-eks.sh --context KUBE_CONTEXT --cluster-name NAME --region REGION [--binary ./kubecis] [--output-dir reports/eks] [--namespace kube-system]'

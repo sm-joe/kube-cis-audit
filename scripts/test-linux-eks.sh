@@ -67,6 +67,35 @@ fi
 echo 'PASS: positive fixture and missing-evidence/identity regression checks'
 
 
+# Build a complete synthetic inventory with the actual packaged catalog.
+# This exercises the exact inventory gate without AWS credentials.
+catalog="$root/internal/audit/catalogs/eks-2.1.0.json"
+[[ -s "$catalog" ]] || { echo 'FAIL: official control inventory missing from distribution' >&2; exit 1; }
+jq --slurpfile catalog "$catalog" '
+  . as $r | .results += [ $catalog[0].controls[] | .id as $id |
+    select(all($r.results[]; .id != $id)) |
+    {id:$id,target:(if ($id|startswith("3.")) then "node" else "policies" end),
+     scope:(if ($id|startswith("3.")) then "worker-a" else "" end),status:"MANUAL"} ] |
+  .summary.total = (.results|length)
+' "$tmp" > "$tmp.new"
+# Restore the removed essential fixture before testing the complete inventory.
+jq '(.results[] | select(.id=="3.2.2")) |= (.status="PASS" | .evidence=[{name:"etc/kubernetes/kubelet/config.json"}])' "$tmp.new" > "$tmp"
+rm -f "$tmp.new"
+bash "$root/scripts/validate-eks-preview.sh" --report "$tmp" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null
+jq '.results += [.results[0]] | .summary.total = (.results|length)' "$tmp" > "$tmp.new"
+if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp.new" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
+  echo 'FAIL: duplicate control accepted' >&2; exit 1
+fi
+rm -f "$tmp.new"
+for filter in '.expectedNodes += [.expectedNodes[0]]' '.results[0].status = "UNKNOWN"' '.sources[0].generatedAt = "2000-01-01T00:00:00Z"'; do
+  jq "$filter" "$tmp" > "$tmp.new"
+  if bash "$root/scripts/validate-eks-preview.sh" --report "$tmp.new" --cluster-name sample --region us-east-1 --complete-inventory >/dev/null 2>&1; then
+    echo "FAIL: invalid report accepted: $filter" >&2; exit 1
+  fi
+done
+rm -f "$tmp.new"
+echo 'PASS: complete 47-control catalog, duplicate rejection, invalid status and stale evidence in source or packaged distribution'
+
 if [[ "${1:-}" == "--packaged" ]]; then
   exit 0 # Source-build fixture needs go.mod and a source checkout.
 fi
