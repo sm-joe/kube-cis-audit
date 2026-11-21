@@ -33,7 +33,7 @@ func main() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var report audit.Report
 			var err error
-			// kube-bench has been removed; retain the legacy flags so older
+			// Retain legacy flags so older
 			// automation receives an actionable error rather than an unknown flag.
 			if strings.ToLower(engine) != "native" {
 				return fmt.Errorf("engine %q is no longer available: KubeCIS Native supports --engine native only; remove --upstream-benchmark and use native node-audit for host checks", engine)
