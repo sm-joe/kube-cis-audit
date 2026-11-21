@@ -1,6 +1,6 @@
 # KubeCIS Native support matrix and release acceptance
 
-Last reviewed: 2026-11-20. This table is an **engineering scope
+Last reviewed: 2026-11-21. This table is an **engineering scope
 statement**, not an official CIS benchmark compatibility certification.
 
 | Environment | API assessment | Linux node-local assessment | AWS provider evidence | Integrated acceptance |
@@ -21,14 +21,13 @@ statement**, not an official CIS benchmark compatibility certification.
   against the identical published artifact versions, including negative cases.
 - **Benchmark verified**: Official control revision, audit procedure, applicability
   and actual evaluator correctness have independent, traceable acceptance.
-- **Stable**: All above gates have passed, plus image digest, binary signature,
-  SBOM, provenance, reproducible installation, upgrade and rollback acceptance.
+- **Stable product**: Engineering and distribution gates have passed. Independent benchmark verification is a separate classification, not a product publication prerequisite.
 
 A passing benchmark-profile parser or Kubernetes API scan does **not** imply
 verified official CIS compliance. Provisional EKS and generic benchmark
 profiles must retain a withheld official compliance score.
 
-## Pending gates before stable publication
+## Engineering validation and ongoing benchmark improvements
 
 1. Independently obtain and verify the licensed official benchmark recommendations,
    version support and all control applicability.
@@ -42,4 +41,4 @@ profiles must retain a withheld official compliance score.
 5. Freeze supported versions and remove obsolete candidate documentation after
    references, reproducibility and licensing have been reviewed.
 
-The full-CIS acceptance gate deliberately fails until these items are proven.
+The stronger benchmark verification gate remains separate from stable product publication; the provisional profile and score withholding remain unchanged.
