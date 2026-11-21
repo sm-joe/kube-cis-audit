@@ -101,3 +101,21 @@ func TestEKS543PrimaryPublicIPDoesNotDoubleCountNetworkInterface(t *testing.T) {
 		t.Fatalf("distinct additional IPv4 must remain visible: %s %s %+v", status, detail, evidence)
 	}
 }
+
+func TestEKS543PublicIPDefaultEvidence(t *testing.T) {
+	for _, value := range []string{"true", "false", "null"} {
+		t.Run(value, func(t *testing.T) {
+			review := EKSAWSManualEvidence{Items: []json.RawMessage{
+				json.RawMessage(fmt.Sprintf(`{"SubnetId":"subnet-123","VpcId":"vpc-123","MapPublicIpOnLaunch":%s}`, value)),
+			}}
+			_, _, evidence := assessEKSPrivateNodes(review)
+			want := value
+			if value == "null" {
+				want = "unknown"
+			}
+			if len(evidence) != 1 || !strings.HasSuffix(evidence[0].Observed, "mapPublicIP="+want) {
+				t.Fatalf("expected public-IP default %s, got %+v", want, evidence)
+			}
+		})
+	}
+}
