@@ -109,7 +109,9 @@ trap 'rm -rf -- "$tmp" "$fixture"' EXIT
 mkdir -p "$fixture/scripts" "$fixture/cmd/kubecis" "$fixture/benchmarks/cis-eks-2.1.0" "$fixture/tools"
 cp "$root/scripts/collect-eks.sh" "$fixture/scripts/collect-eks.sh"
 cp "$root/go.mod" "$fixture/go.mod"
-touch "$fixture/benchmarks/cis-eks-2.1.0/benchmark.yaml"
+mkdir -p "$fixture/internal/audit/catalogs"
+cp "$catalog" "$fixture/internal/audit/catalogs/"
+printf 'id: cis-eks-2.1.0\n' > "$fixture/benchmarks/cis-eks-2.1.0/benchmark.yaml"
 cat > "$fixture/tools/go" <<'EOF'
 #!/usr/bin/env bash
 [[ "$1" == build ]] || exit 5

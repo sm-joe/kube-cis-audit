@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/eks-candidate-image.yml'
+      - 'scripts/package-linux-candidate.sh'
+      - 'scripts/test-linux-eks.sh'
 permissions:
   contents: read
 concurrency:
@@ -10,7 +16,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -34,8 +39,23 @@ jobs:
           bash scripts/test-linux-install.sh
           python3 scripts/verify-eks-evaluator-conformance.py
           python3 scripts/test-eks-evaluator-conformance.py
-  publish:
+  package-test:
     needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate candidate archive layout without publishing
+        run: |
+          mkdir -p /tmp/candidate-test
+          bash scripts/package-linux-candidate.sh /tmp/candidate-test
+          tar -C /tmp/candidate-test -czf /tmp/candidate-test.tar.gz .
+          mkdir -p /tmp/candidate-extracted
+          tar -xzf /tmp/candidate-test.tar.gz -C /tmp/candidate-extracted
+          bash /tmp/candidate-extracted/scripts/test-linux-eks.sh --packaged
+          bash /tmp/candidate-extracted/scripts/test-deploy-eks.sh
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [validate, package-test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -99,15 +119,20 @@ jobs:
             stage="/tmp/candidate/$arch"
             mkdir -p "$stage"
             CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/sm-joe/kube-cis-audit/internal/audit.BuildVersion=$VERSION" -o "$stage/kubecis" ./cmd/kubecis
-            cp -R benchmarks scripts deploy docs "$stage/"
-            cp README.md LICENSE ATTRIBUTION.md "$stage/"
+            bash scripts/package-linux-candidate.sh "$stage"
             printf '%s\n' "$IMAGE@$DIGEST" > "$stage/IMAGE_DIGEST"
             printf '%s\n' "$GITHUB_SHA" > "$stage/SOURCE_COMMIT"
             if [[ "$arch" == amd64 ]]; then
               "$stage/kubecis" version | grep -Fx "$VERSION"
               bash "$stage/scripts/test-deploy-eks.sh"
             fi
-            tar -C "$stage" -czf "dist/kubecis_candidate_linux_$arch.tar.gz" .
+            archive="dist/kubecis_candidate_linux_$arch.tar.gz"
+            tar -C "$stage" -czf "$archive" .
+            extracted="$(mktemp -d)"
+            tar -xzf "$archive" -C "$extracted"
+            bash "$extracted/scripts/test-linux-eks.sh" --packaged
+            bash "$extracted/scripts/test-deploy-eks.sh"
+            rm -rf -- "$extracted"
           done
           (cd dist && sha256sum *.tar.gz > SHA256SUMS)
           for asset in dist/*.tar.gz dist/SHA256SUMS; do
