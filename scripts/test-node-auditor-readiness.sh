@@ -6,6 +6,9 @@ tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 mkdir -p "$tmp/scripts" "$tmp/bin" "$tmp/benchmarks/cis-eks-2.1.0"
 cp "$root/scripts/collect-eks.sh" "$tmp/scripts/"
+mkdir -p "$tmp/internal/audit/catalogs"
+# Missing catalog must fail before any AWS or Kubernetes request.
+
 printf 'id: cis-eks-2.1.0\n' > "$tmp/benchmarks/cis-eks-2.1.0/benchmark.yaml"
 cat > "$tmp/kubecis" <<'EOF'
 #!/usr/bin/env bash
@@ -55,6 +58,16 @@ exit 1
 EOF
 chmod +x "$tmp/bin/aws" "$tmp/bin/kubectl"
 args=(--context test-context --cluster-name test-eks --region us-east-1 --binary "$tmp/kubecis")
+if FIXTURE_CASE=missing-ds PATH="$tmp/bin:$PATH" bash "$tmp/scripts/collect-eks.sh" "${args[@]}" > "$tmp/log" 2>&1; then
+  echo 'FAIL: missing packaged catalog was accepted' >&2; exit 1
+fi
+grep -q 'Missing packaged official control inventory' "$tmp/log" || { cat "$tmp/log"; exit 1; }
+printf '{"controls":[]}' > "$tmp/internal/audit/catalogs/eks-2.1.0.json"
+if FIXTURE_CASE=missing-ds PATH="$tmp/bin:$PATH" bash "$tmp/scripts/collect-eks.sh" "${args[@]}" > "$tmp/log" 2>&1; then
+  echo 'FAIL: invalid packaged catalog was accepted' >&2; exit 1
+fi
+grep -q 'Invalid packaged official control inventory' "$tmp/log" || { cat "$tmp/log"; exit 1; }
+cp "$root/internal/audit/catalogs/eks-2.1.0.json" "$tmp/internal/audit/catalogs/"
 if FIXTURE_CASE=missing-ds PATH="$tmp/bin:$PATH" bash "$tmp/scripts/collect-eks.sh" "${args[@]}" > "$tmp/log" 2>&1; then
   echo 'FAIL: missing DaemonSet was accepted' >&2; exit 1
 fi
