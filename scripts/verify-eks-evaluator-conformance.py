@@ -98,6 +98,22 @@ def audit(ledger, catalog, repo):
     ready = not problems and len(seen) == 47 and all(s == "verified" for s in statuses)
     return problems, ready, {s: statuses.count(s) for s in sorted(VALID)}
 
+def evaluator_digest(repo):
+    """Bind a signed review ledger to the actual evaluator and collection sources."""
+    digest = hashlib.sha256()
+    paths = []
+    for directory in ("internal", "cmd", "benchmarks", "scripts", "deploy", "conformance"):
+        paths.extend(p for p in (repo / directory).rglob("*")
+                     if p.is_file() and p.suffix in {".go", ".yaml", ".yml", ".sh", ".py", ".json"}
+                     and not p.relative_to(repo).as_posix().startswith("conformance/evidence/")
+                     and p.relative_to(repo).as_posix() != str(PATH))
+    paths.extend(repo / name for name in ("go.mod", "go.sum", "Dockerfile"))
+    for path in sorted(set(paths)):
+        relative = path.relative_to(repo).as_posix()
+        digest.update(relative.encode() + b"\\0" + hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
 def verify_approval_signature(ledger_path, public_key_path, key_pin, signature_path):
     """Require independent, explicitly pinned approval of the exact ledger bytes."""
     if not public_key_path or not key_pin or not signature_path:
@@ -127,14 +143,21 @@ def main():
     p.add_argument("--ledger", type=pathlib.Path, default=PATH)
     p.add_argument("--catalog", type=pathlib.Path, default=CATALOG)
     p.add_argument("--require-full", action="store_true")
+    p.add_argument("--print-evaluator-digest", action="store_true")
     p.add_argument("--approval-public-key", type=pathlib.Path)
     p.add_argument("--approval-key-sha256")
     p.add_argument("--approval-signature", type=pathlib.Path)
     a = p.parse_args()
+    if a.print_evaluator_digest:
+        print(evaluator_digest(pathlib.Path(".")))
+        return 0
     ledger=json.loads(a.ledger.read_text())
     catalog=json.loads(a.catalog.read_text())
     problems, ready, counts=audit(ledger,catalog,pathlib.Path("."))
     if a.require_full:
+        if ledger.get("evaluatorSourceSha256") != evaluator_digest(pathlib.Path(".")):
+            problems.append("signed ledger is not bound to the current evaluator sources")
+            ready = False
         signature_ok, reason = verify_approval_signature(
             a.ledger, a.approval_public_key, a.approval_key_sha256,
             a.approval_signature,

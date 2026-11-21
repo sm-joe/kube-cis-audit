@@ -1,7 +1,6 @@
 # Benchmark provenance and open-source distribution
 
 KubeCIS Native is an independent implementation of security assessment logic.
-It does **not** depend on the kube-bench runtime or execute kube-bench scripts.
 
 ## Profile boundaries
 
