@@ -166,4 +166,4 @@ from a consolidated assessment.
 - RBAC names associated with platform controllers are triage hints, **not** unconditional allowlists.
 - Some CI releases test platform-specific packaging; they do not establish complete CIS implementation or independent compliance certification.
 
-See the repository [README](../../README.md), [release scope](../../docs/RELEASE-SCOPE.md) and [security guidance](../../docs/SECURITY.md).
+See the repository [README](../../README.md), [release scope](../../docs/RELEASE-SCOPE.md) and [security guidance](../../SECURITY.md).

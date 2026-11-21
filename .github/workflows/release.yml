@@ -84,6 +84,7 @@ jobs:
           python3 scripts/verify-eks-evaluator-conformance.py
           python3 scripts/test-eks-evaluator-conformance.py
           bash scripts/test-linux-install.sh
+          bash scripts/test-signed-eks-release.sh
 
       - name: Run Go Vet
         run: go vet ./...
@@ -102,19 +103,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - goos: windows
-            goarch: amd64
-            archive: zip
           - goos: linux
             goarch: amd64
             archive: tar.gz
           - goos: linux
-            goarch: arm64
-            archive: tar.gz
-          - goos: darwin
-            goarch: amd64
-            archive: tar.gz
-          - goos: darwin
             goarch: arm64
             archive: tar.gz
     steps:
@@ -140,7 +132,7 @@ jobs:
           cp -R benchmarks/. "$STAGE/benchmarks/"
           mkdir -p "$STAGE/internal/audit/catalogs"
           cp internal/audit/catalogs/eks-2.1.0.json "$STAGE/internal/audit/catalogs/"
-          cp README.md LICENSE ATTRIBUTION.md "$STAGE/"
+          cp README.md SECURITY.md LICENSE ATTRIBUTION.md "$STAGE/"
           cp -R docs "$STAGE/docs"
           mkdir -p "$STAGE/scripts" "$STAGE/deploy"
           cp scripts/*.sh "$STAGE/scripts/"
@@ -184,14 +176,13 @@ jobs:
           cd dist
           sha256sum kubecis_* > SHA256SUMS
           sha256sum -c SHA256SUMS
-          for archive in kubecis_linux_amd64.tar.gz kubecis_linux_arm64.tar.gz kubecis_darwin_amd64.tar.gz kubecis_darwin_arm64.tar.gz; do
+          for archive in kubecis_linux_amd64.tar.gz kubecis_linux_arm64.tar.gz; do
             test -s "$archive"
             tar -tzf "$archive" > "$RUNNER_TEMP/archive-list"
             grep -Fx ./kubecis "$RUNNER_TEMP/archive-list"
             grep -Fx ./benchmarks/cis-eks-2.1.0/benchmark.yaml "$RUNNER_TEMP/archive-list"
             grep -Fx ./internal/audit/catalogs/eks-2.1.0.json "$RUNNER_TEMP/archive-list"
           done
-          unzip -t kubecis_windows_amd64.zip
           stage="$(mktemp -d)"
           tar -xzf kubecis_linux_amd64.tar.gz -C "$stage"
           "$stage/kubecis" version | grep -Fx "$VERSION"
@@ -219,8 +210,14 @@ jobs:
           pattern: kubecis-*
           merge-multiple: true
 
-      - name: Generate Checksums
-        run: cd dist && sha256sum kubecis_* > SHA256SUMS
+      - name: Generate checksums and release manifest
+        env:
+          IMAGE_DIGEST: ${{ needs.container.outputs.digest }}
+        run: |
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          cd dist
+          sha256sum kubecis_* > SHA256SUMS
+          jq -n --arg version "$GITHUB_REF_NAME" --arg commit "$GITHUB_SHA" --arg image "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kubecis@$IMAGE_DIGEST" '{schemaVersion:1,version:$version,commit:$commit,image:$image}' > release-manifest.json
 
       - name: Attest release archives and checksum manifest
         uses: actions/attest@v4
@@ -234,7 +231,7 @@ jobs:
         shell: bash
         run: |
           IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${GITHUB_REF_NAME}"
-          for file in dist/kubecis_* dist/SHA256SUMS; do
+          for file in dist/kubecis_* dist/SHA256SUMS dist/release-manifest.json; do
             test -s "$file"
             cosign sign-blob "$file" --bundle "$file.sigstore.json" --yes
             cosign verify-blob "$file" --bundle "$file.sigstore.json" \
@@ -246,15 +243,17 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: dist/*
-          generate_release_notes: true
+          generate_release_notes: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            KubeCIS security assessment tool. Product release stability does not certify benchmark conformance.
-            The bundled CIS EKS and generic Kubernetes profiles remain provisional; consult the release scope and support matrix.
-            Official compliance scoring is withheld. Review MANUAL and NOT_ASSESSED findings separately.
+            KubeCIS Linux security scanner for Kubernetes and Amazon EKS.
+            Includes signed Linux AMD64 and ARM64 archives, checksums, and container images.
+            See README.md for installation and usage.
 
   container:
     name: Publish Container Image
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     if: github.ref_type == 'tag' && github.event_name == 'push'
     needs: verify_archives
     runs-on: ubuntu-latest

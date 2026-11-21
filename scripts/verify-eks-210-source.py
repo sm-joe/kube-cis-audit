@@ -15,6 +15,16 @@ PINNED_SHA256 = "c3c9eb01253643a0176b21aafd19cc7c08af0a19872f869712d2d82be8a967e
 MANUAL = set("4.1.1 4.1.2 4.1.3 4.1.4 4.1.8 4.1.9 4.1.10 4.1.11 4.1.12 4.3.2 4.4.2 4.5.1 5.1.2 5.1.3 5.1.4 5.3.1 5.4.3 5.4.4".split())
 PROVIDER = set("2.1.1 4.1.7 5.1.1 5.4.1 5.4.2 5.5.1".split())
 
+def extract_summary_ids(appendix):
+    if not re.search(r"(?im)^[^\S\r\n]*Appendix:\s*Summary Table\b", appendix):
+        sys.exit("FAIL: official summary appendix heading not found on pinned pages")
+    ids = re.findall(r"(?m)^[^\S\r\n]*([2-5]\.\d+\.\d+)(?=[^\S\r\n]|$)", appendix)
+    if len(ids) != 47 or len(set(ids)) != 47:
+        sys.exit(f"FAIL: official appendix must have 47 unique recommendation IDs; "
+                 f"found {len(ids)} rows, {len(set(ids))} unique: {', '.join(ids)}")
+    return ids
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--pdf", required=True, type=Path, help="privately held official CIS EKS v2.1.0 PDF")
@@ -23,14 +33,15 @@ def main():
     a = p.parse_args()
     if hashlib.sha256(a.pdf.read_bytes()).hexdigest() != PINNED_SHA256:
         sys.exit("FAIL: unknown PDF revision; pin and verify the source independently")
-    text = subprocess.check_output(["pdftotext", "-layout", str(a.pdf), "-"], text=True)
-    marker = "\fAppendix: Summary Table"
-    if marker not in text:
-        sys.exit("FAIL: official summary appendix not found")
-    appendix = text.split(marker, 1)[1].split("\fAppendix: CIS Controls", 1)[0]
-    ids = re.findall(r"(?m)^\s*([2-5]\.\d+\.\d+)\s{2,}", appendix)
-    if len(ids) != 47 or len(set(ids)) != 47:
-        sys.exit("FAIL: official appendix must have 47 unique recommendation IDs")
+    # The exact pinned PDF has its summary on physical pages 228–231.
+    # Bound extraction to these pages instead of depending on whitespace
+    # around the next appendix heading (which varies by Poppler version).
+    appendix = subprocess.check_output(
+        ["pdftotext", "-f", "228", "-l", "231", "-layout",
+         "-enc", "UTF-8", "-nopgbrk", str(a.pdf), "-"],
+        encoding="utf-8",
+    )
+    ids = extract_summary_ids(appendix)
     catalog = json.loads(a.catalog.read_text(encoding="utf-8"))
     control_ids = [row["id"] for row in catalog["controls"]]
     if len(control_ids) != 47 or len(set(control_ids)) != 47 or set(control_ids) != set(ids):

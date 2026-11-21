@@ -1,11 +1,11 @@
-# KubeCIS Native: no kube-bench executable, source or benchmark bundle.
+# KubeCIS native Linux scanner
 FROM --platform=$BUILDPLATFORM golang:1.27.4-bookworm AS build
 
 WORKDIR /src
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-ARG VERSION=3.2.0-native-eks-rc1
+ARG VERSION=v1.0.0
 
 COPY go.mod go.sum ./
 

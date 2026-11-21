@@ -53,7 +53,7 @@ MANUAL/NOT_ASSESSED, and non-ECR images require third-party review. Denied
 Pod inventory is explicitly UNAVAILABLE.
 
 EKS access-entry and managed VPC CNI AWS inventories remain unavailable in
-the Linux adapter. This is less provider coverage than the PowerShell collector.
+the Linux adapter.
 The official score must remain withheld.
 
 Kubelet metadata schema v5 adds a bounded parse of the active allowlisted
