@@ -84,6 +84,8 @@ func TestEKSBoundRBACSensitiveResourceAndVerbMatching(t *testing.T) {
 		{"4.1.3", rbacv1.PolicyRule{NonResourceURLs: []string{"/healthz/*"}, Verbs: []string{"get"}}, true},
 		{"4.1.9", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"persistentvolumeclaims"}, Verbs: []string{"create"}}, true},
 		{"4.1.9", rbacv1.PolicyRule{APIGroups: []string{"storage.k8s.io"}, Resources: []string{"storageclasses"}, Verbs: []string{"create"}}, true},
+		{"4.1.10", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"nodes/proxy"}, Verbs: []string{"list", "watch"}}, false},
+		{"4.1.3", rbacv1.PolicyRule{APIGroups: []string{""}, Resources: []string{"nodes/*"}, Verbs: []string{"get"}}, false},
 	}
 	for i, tc := range cases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -145,5 +147,17 @@ func TestEKSBoundRBACClusterScopeNotGrantedByRoleBinding(t *testing.T) {
 		if len(got.Evidence) != 0 || !strings.Contains(got.Details, "0 sensitive grant(s)") {
 			t.Fatalf("%s cluster-scoped request cannot be granted by RoleBinding: %+v", id, got)
 		}
+	}
+}
+
+func TestEKSBoundRBACNamespacedServiceAccountImpersonation(t *testing.T) {
+	role := &rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: "impersonation"}, Rules: []rbacv1.PolicyRule{
+		{APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, Verbs: []string{"impersonate"}},
+		{APIGroups: []string{""}, Resources: []string{"users", "groups"}, Verbs: []string{"impersonate"}},
+	}}
+	binding := &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "namespace-only", Namespace: "dev"}, RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: role.Name}, Subjects: []rbacv1.Subject{{Kind: "User", Name: "reviewer"}}}
+	result := EvaluateEKSManualEvidence(context.Background(), fake.NewSimpleClientset(role, binding), Check{ID: "4.1.8"})
+	if result.Status != "MANUAL" || len(result.Evidence) != 1 || !strings.Contains(result.Evidence[0].Observed, "resources=serviceaccounts") {
+		t.Fatalf("only namespace-scoped service account impersonation should be retained: %+v", result)
 	}
 }
