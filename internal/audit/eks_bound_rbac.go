@@ -210,7 +210,7 @@ func eksRBACSensitiveRule(id string, rule rbacv1.PolicyRule) bool {
 		return core && resource("secrets") && verb("get", "list", "watch")
 	case "4.1.3":
 		return hasExact(rule.Verbs, "*") || hasExact(rule.APIGroups, "*") || hasExact(rule.Resources, "*") ||
-			hasRBACResourceWildcard(rule.Resources) || hasRBACResourceWildcard(rule.NonResourceURLs)
+			hasRBACResourceWildcard(rule.Resources) || hasRBACNonResourceWildcard(rule.NonResourceURLs)
 	case "4.1.4":
 		return core && resource("pods") && verb("create")
 	case "4.1.8":
@@ -218,7 +218,7 @@ func eksRBACSensitiveRule(id string, rule rbacv1.PolicyRule) bool {
 	case "4.1.9":
 		return verb("create") && (core && (resource("persistentvolumes") || resource("persistentvolumeclaims")) || has(rule.APIGroups, "storage.k8s.io") && resource("storageclasses"))
 	case "4.1.10":
-		return core && resource("nodes/proxy") && verb("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection")
+		return core && resource("nodes/proxy") && verb("get", "create", "update", "patch", "delete")
 	case "4.1.11":
 		return admission && (resource("validatingwebhookconfigurations") || resource("mutatingwebhookconfigurations")) && verb("create", "update", "patch", "delete", "deletecollection")
 	case "4.1.12":
@@ -236,17 +236,27 @@ func hasExact(items []string, value string) bool {
 }
 func hasRBACResourceWildcard(items []string) bool {
 	for _, x := range items {
-		if strings.Contains(x, "*") {
+		if x == "*" || strings.HasPrefix(x, "*/") && len(x) > 2 && !strings.Contains(x[2:], "*") {
 			return true
 		}
 	}
 	return false
 }
 
-// A RoleBinding can grant namespaced Role bind/escalate rights, not cluster
-// identity impersonation or cluster-scoped resource permissions.
+func hasRBACNonResourceWildcard(items []string) bool {
+	for _, x := range items {
+		if strings.HasSuffix(x, "*") {
+			return true
+		}
+	}
+	return false
+}
+
+// A RoleBinding can grant namespaced Role bind/escalate rights and service
+// account impersonation, but not cluster-scoped user/group impersonation.
 func eksRBACNamespacedEscalation(rule rbacv1.PolicyRule) bool {
-	return hasRBACItemOrWildcard(rule.APIGroups, "rbac.authorization.k8s.io") && hasRBACItemOrWildcard(rule.Resources, "roles") && hasRBACAny(rule.Verbs, "bind", "escalate", "*")
+	return hasRBACItemOrWildcard(rule.APIGroups, "rbac.authorization.k8s.io") && hasRBACItemOrWildcard(rule.Resources, "roles") && hasRBACAny(rule.Verbs, "bind", "escalate", "*") ||
+		hasRBACItemOrWildcard(rule.APIGroups, "") && hasRBACItemOrWildcard(rule.Resources, "serviceaccounts") && hasRBACAny(rule.Verbs, "impersonate", "*")
 }
 
 func eksRBACNamespacedStorage(rule rbacv1.PolicyRule) bool {

@@ -11,6 +11,44 @@ This deployment targets Amazon EKS **managed EC2 Linux worker nodes**. The node-
 - Published `ghcr.io/sm-joe/kubecis` Linux image built from the **same source commit** as the local KubeCIS CLI. Never reuse an old image with a newer CLI.
 - For source builds: Go 1.27.4.
 
+## Install a CI-published candidate (no local Docker build)
+
+Open [EKS Candidate Image workflow runs](https://github.com/sm-joe/kube-cis-audit/actions/workflows/eks-candidate-image.yml).
+Choose a successful main-branch run and download its signed candidate artifact.
+Extract the downloaded artifact ZIP, then run these commands in the directory
+containing the archives. Cosign is required.
+
+```bash
+case "$(uname -m)" in
+  x86_64) ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+  *) echo "Unsupported platform"; exit 1 ;;
+esac
+ARCHIVE="kubecis_candidate_linux_$ARCH.tar.gz"
+IDENTITY=https://github.com/sm-joe/kube-cis-audit/.github/workflows/eks-candidate-image.yml@refs/heads/main
+cosign verify-blob --bundle "$ARCHIVE.sigstore.json" \
+  --certificate-identity "$IDENTITY" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ARCHIVE"
+sha256sum -c --ignore-missing SHA256SUMS
+mkdir -p kubecis-candidate
+tar -xzf "$ARCHIVE" -C kubecis-candidate
+cd kubecis-candidate
+IMAGE="$(cat IMAGE_DIGEST)"
+cosign verify "$IMAGE" --certificate-identity "$IDENTITY" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+./kubecis version
+bash scripts/deploy-eks.sh --context "$(kubectl config current-context)" --image "$IMAGE"
+```
+
+The archive and image use the same commit-specific build version and the
+archive includes the exact OCI digest. GHCR must permit the worker nodes to
+pull the package (public visibility or approved registry access). A successful
+candidate publication is not a stable CIS release or independent conformance.
+Use the packaged CLI and scripts together; do not mix older binaries and images.
+If a deployment fails, inspect pod Events and verify image digest and registry
+access before attempting a rebuild. To roll back, redeploy the previous verified
+digest with its matching candidate archive.
+
 ## Build CLI from source
 
 From the repository root:
