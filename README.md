@@ -222,13 +222,13 @@ Store kubeconfigs, identity metadata, scan reports and reviewer records in acces
 
 ## Release validation
 
-Pull requests affecting the scanner or packaging run the release build matrix and inspect archives without publishing tags or images. The release workflow also supports a manual non-publishing validation run. A stable release requires independent approval of the exact conformance ledger; successful builds alone do not satisfy that gate.
+Pull requests affecting the scanner or packaging run the release build matrix and inspect archives without publishing tags or images. The release workflow also supports a manual non-publishing validation run. Stable product releases require passing engineering and distribution checks, not independent CIS certification. Benchmark profile verification is separate; provisional profiles retain withheld official scoring.
 
 For verified Linux release archives, use `scripts/install-linux.sh` with the archive, its SHA256SUMS manifest and Sigstore bundle from the same tag. See [the Linux deployment guide](docs/LINUX-EKS-DEPLOY.md) and the [support matrix](docs/SUPPORT-MATRIX.md). Never install an unverified archive as a stable release.
 
 ## CI, project structure and support
 
-Go CI, security scans and benchmark contract tests run under [GitHub Actions](.github/workflows/). Release packaging and smoke tests exist, but **the currently published automated artifact workflow is not a general Linux/Unix release installer**. Users building on Linux should use the native Go build or the Linux container image, with matching source/image versions.
+Go CI, security scans and benchmark contract tests run under [GitHub Actions](.github/workflows/). Signed Linux archives and multi-architecture images are produced automatically. Use matching CLI and image versions, verify signatures and checksums, and deploy by immutable digest.
 
 ```text
 cmd/kubecis/          Go CLI, rendering and review engine
