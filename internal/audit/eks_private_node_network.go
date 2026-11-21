@@ -48,6 +48,10 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 			continue
 		}
 		subnetIDs[s.SubnetID] = true
+		publicOnLaunch := "unknown"
+		if s.PublicOnLaunch != nil {
+			publicOnLaunch = fmt.Sprintf("%t", *s.PublicOnLaunch)
+		}
 		if s.PublicOnLaunch == nil {
 			unknown = append(unknown, s.SubnetID+": subnet public IP default not verified")
 		} else if *s.PublicOnLaunch {
@@ -76,7 +80,7 @@ func assessEKSPrivateNodes(review EKSAWSManualEvidence) (string, string, []Evide
 		}
 		evidence = append(evidence, Evidence{
 			Resource: "AWS::EC2::Subnet", Name: s.SubnetID, Field: "effectiveRouteTable",
-			Observed: fmt.Sprintf("nodeGroup=%s source=%s table=%s mapPublicIP=%v", s.NodeGroup, s.RouteSource, s.RouteTableID, s.PublicOnLaunch),
+			Observed: fmt.Sprintf("nodeGroup=%s source=%s table=%s mapPublicIP=%s", s.NodeGroup, s.RouteSource, s.RouteTableID, publicOnLaunch),
 			Expected: "no IGW route; MapPublicIpOnLaunch=false; all worker nodes private",
 		})
 	}
