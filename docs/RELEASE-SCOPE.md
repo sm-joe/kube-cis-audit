@@ -1,4 +1,4 @@
-# KubeCIS 3.0.0 release scope
+# KubeCIS release scope
 
 ## Product scope
 
@@ -28,13 +28,10 @@ Node-local and cluster/API reports are separate outputs; this release does not s
 
 ## Release classification
 
-This is a **technical-preview / release-candidate source package**, not a stable full-CIS compliance release. Stable compliance claims require a complete authorized benchmark inventory, native evidence mappings for every applicable recommendation, distribution-specific applicability, multi-node aggregation, and passing clean-room build, unit, integration, and E2E validation.
+Stable product versions describe a tested, supported distribution of KubeCIS, not certification of CIS benchmark conformance. Benchmark compatibility and result accuracy are tracked separately. The generic Kubernetes starter profile remains limited; the CIS EKS 2.1.0 profile routes all 47 control IDs and remains provisional. Official compliance scores remain withheld.
 
-## Linux EKS preview workflow (November 2026)
+Product releases require engineering checks, secure packaging and signed distribution. Independent benchmark verification is not required to publish the product. Stronger benchmark claims require separate supporting evidence.
 
-The CLI + Bash collection pipeline produces validated, per-worker and AWS
-DescribeCluster source reports, but has not yet completed clean-room Linux
-EKS runtime acceptance. IAM access entries, VPC CNI and ECR enrichment are
-currently uncollected in the Linux provider adapter and must not be treated as
-secure or conformant. The full official benchmark remains unverified, so the
-stable full-CIS release gate is intentionally blocked.
+## Linux EKS assessment
+
+The native Linux workflow collects Kubernetes API, per-worker kubelet metadata and AWS evidence (EKS, access entries, CNI, ECR and subnet routing), then consolidates and validates the exact control inventory. A live two-worker assessment has completed. Supported scope is managed EC2 Linux workers with the documented kubelet layout; unsupported compute modes are rejected by the integrated collector. See [support matrix](SUPPORT-MATRIX.md) and [deployment guide](../deploy/eks/README.md).
