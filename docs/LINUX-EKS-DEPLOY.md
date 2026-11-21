@@ -5,8 +5,7 @@ requires a Linux/Unix Bash environment, `kubectl`, a selected EKS kubeconfig
 context, and an immutable container image digest.
 
 ```bash
-# Build/publish a Linux image from the same source commit as the CLI and verify
-# its provenance, architecture and digest before deployment.
+# Download a signed release or matching main candidate and verify its digest.
 kubectl config current-context
 kubectl get nodes -L eks.amazonaws.com/nodegroup
 bash scripts/deploy-eks.sh \
@@ -19,10 +18,7 @@ three DaemonSet images **before** applying any objects, and waits for rollout.
 It does not configure AWS authentication, collect EKS provider evidence,
 consolidate results, or confer CIS compliance.
 
-The native CLI is already cross-platform, but the repository's complete
-EKS provider + worker collection is currently implemented in PowerShell.
-Until a POSIX collection workflow passes real AWS/EKS end-to-end tests, do not
-represent the above installation as a complete Linux EKS assessment.
+The native Linux collector is available through scripts/collect-eks.sh and has completed a live managed-worker EKS assessment. Use the matching signed CLI and published image digest. See [EKS installation and collection](../deploy/eks/README.md) for supported scope and limitations.
 
 For reproducible shell checks:
 

@@ -1,6 +1,6 @@
 # KubeCIS release process
 
-> **Current decision:** do not tag a stable `v3.0.0` from the reviewed snapshot yet. See [RELEASE-READINESS-REVIEW.md](../RELEASE-READINESS-REVIEW.md) and [PRODUCTION-CIS-RELEASE-BLOCKERS.md](PRODUCTION-CIS-RELEASE-BLOCKERS.md). The benchmark profile is provisional and limited, and the complete Go validation suite has not yet been run against this candidate.
+> Stable product releases do not require independent CIS certification. The bundled provisional benchmark profiles retain their stated limitations and withheld official scoring.
 
 A version tag is the release trigger. The workflow builds platform binaries with the benchmark profiles, publishes SHA-256 checksums, and builds/pushes a multi-architecture GHCR image.
 
@@ -8,12 +8,14 @@ A version tag is the release trigger. The workflow builds platform binaries with
 
 Review [RC4-PATCH-NOTES.md](RC4-PATCH-NOTES.md) for the candidate hardening changes and validation limitations.
 
-Run locally with Go 1.26 or later:
+Run locally with the Go version pinned in go.mod:
 
-```powershell
-.\scripts\Build-KubeCIS.ps1 -Version 3.0.0
-.\dist\kubecis.exe --version
-.\dist\kubecis.exe --help
+```bash
+go vet ./...
+go test ./... -count=1
+CGO_ENABLED=0 go build -trimpath -o ./kubecis ./cmd/kubecis
+./kubecis version
+./kubecis --help
 ```
 
 Review the included benchmark compatibility note and all three deployment modes (`deploy/job.yaml`, `deploy/node-auditor-daemonset.yaml`, and `deploy/controlplane-auditor-daemonset.yaml`). Do not claim complete CIS coverage or certification.
@@ -24,9 +26,9 @@ The release workflow matches every tag beginning with `v`. Tags containing a hyp
 
 Merge the release-ready changes to `main`, then create and push a semantic version tag:
 
-```powershell
-git tag v3.0.0
-git push origin v3.0.0
+```bash
+git tag v3.2.0
+git push origin v3.2.0
 ```
 
 The GitHub Actions Release workflow publishes:
@@ -37,7 +39,7 @@ The GitHub Actions Release workflow publishes:
 - `kubecis_darwin_amd64.tar.gz`
 - `kubecis_darwin_arm64.tar.gz`
 - `SHA256SUMS`
-- `ghcr.io/sm-joe/kubecis:v3.0.0` and `:latest` for a stable release; prereleases receive only their versioned tag
+- `ghcr.io/sm-joe/kubecis:v3.2.0` and `:latest` for a stable release; prereleases receive only their versioned tag
 
 The Windows installer downloads the release asset and verifies its SHA-256 checksum before installation.
 
