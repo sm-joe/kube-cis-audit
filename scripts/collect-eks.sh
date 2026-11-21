@@ -47,6 +47,9 @@ fi
 [[ -f "$binary" && -x "$binary" ]] || die "Not a runnable KubeCIS CLI: $binary. From the repository root run: CGO_ENABLED=0 go build -trimpath -o ./kubecis ./cmd/kubecis"
 [[ -s "$root/benchmarks/cis-eks-2.1.0/benchmark.yaml" ]] || die 'Missing benchmark profile'
 for tool in jq kubectl aws; do command -v "$tool" >/dev/null || die "$tool missing"; done
+catalog="$root/internal/audit/catalogs/eks-2.1.0.json"
+[[ -s "$catalog" ]] || die "Missing packaged official control inventory: $catalog. Download a complete KubeCIS archive before collecting."
+jq -e '.controls | length == 47 and ([.[].id] | unique | length) == 47' "$catalog" >/dev/null || die "Invalid packaged official control inventory: $catalog"
 [[ "$(kubectl config current-context)" == "$context" ]] || die "Selected context must equal current kubeconfig context ($context)"
 version_json="$(kubectl --context "$context" version -o json)"
 jq -e '.serverVersion.gitVersion | contains("-eks-")' <<<"$version_json" >/dev/null || die 'Expected EKS API server'
